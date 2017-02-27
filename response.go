@@ -24,12 +24,12 @@ func (resp *respType) String() string {
 // response is returned to the caller
 type response struct {
 	status respType
+	id     uint64
+	body   []byte
 	msgC   chan *message
 }
 
 func newResponse(status respType) *response {
-	r := &response{
-		status: status,
-	}
+	r := &response{status: status}
 	return r
 }

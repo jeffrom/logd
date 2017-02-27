@@ -40,16 +40,16 @@ func (cmd *cmdType) String() string {
 
 // command is an input received by a caller
 type command struct {
-	name cmdType
-	args [][]byte
-	resp chan *response
+	name  cmdType
+	args  [][]byte
+	respC chan *response
 }
 
 func newCommand(name cmdType, args ...[]byte) *command {
 	c := &command{
-		name: name,
-		args: args,
-		resp: make(chan *response, 0),
+		name:  name,
+		args:  args,
+		respC: make(chan *response, 0),
 	}
 	return c
 }
