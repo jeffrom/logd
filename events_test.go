@@ -158,6 +158,21 @@ func TestEventQRead(t *testing.T) {
 	checkMessageReceived(t, tailResp, 2, expectedMsg)
 }
 
+func TestEventQReadFromEmpty(t *testing.T) {
+	q := startQ(t, false)
+	defer stopQ(t, q)
+
+	expectedMsg := []byte("Hello, log!")
+
+	tailResp, err := q.add(newCommand(cmdRead, []byte("1"), []byte("0")))
+	checkNoErrAndSuccess(t, tailResp, err)
+
+	resp, err := q.add(newCommand(cmdMsg, expectedMsg))
+	checkNoErrAndSuccess(t, resp, err)
+
+	checkMessageReceived(t, tailResp, 1, expectedMsg)
+}
+
 func TestEventQReadErr(t *testing.T) {
 	q := startQ(t, true)
 	defer stopQ(t, q)

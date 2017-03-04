@@ -61,3 +61,30 @@ func BenchmarkEventQLogFive(b *testing.B) {
 		q.add(newCommand(cmdMsg, msg, msg, msg, msg, msg))
 	}
 }
+
+func BenchmarkEventQReadOne(b *testing.B) {
+	b.StopTimer()
+	q := startQForBench(b)
+	defer stopQ(b, q)
+	q.add(newCommand(cmdMsg, []byte("hey i'm a message")))
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		resp, _ := q.add(newCommand(cmdRead, []byte("1"), []byte("1")))
+		<-resp.msgC
+	}
+}
+
+func BenchmarkEventQReadFromHeadOne(b *testing.B) {
+	b.StopTimer()
+	q := startQForBench(b)
+	defer stopQ(b, q)
+	msg := []byte("hey i'm a message")
+	resp, _ := q.add(newCommand(cmdRead, []byte("1"), []byte("0")))
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		q.add(newCommand(cmdMsg, msg))
+		<-resp.msgC
+	}
+}
