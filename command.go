@@ -30,8 +30,8 @@ func (cmd *cmdType) String() string {
 		return "PING"
 	case cmdClose:
 		return "CLOSE"
-	case cmdSleep:
-		return "SLEEP"
+	// case cmdSleep:
+	// 	return "SLEEP"
 	case cmdShutdown:
 		return "SHUTDOWN"
 	}
@@ -52,6 +52,13 @@ func newCommand(name cmdType, args ...[]byte) *command {
 		respC: make(chan *response, 0),
 	}
 	return c
+}
+
+func newCloseCommand(respC chan *response) *command {
+	return &command{
+		name:  cmdClose,
+		respC: respC,
+	}
 }
 
 func (cmd *command) String() string {
