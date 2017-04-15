@@ -10,3 +10,10 @@ type Config struct {
 func NewConfig() *Config {
 	return &Config{}
 }
+
+var defaultConfig *Config
+
+func init() {
+	defaultConfig = NewConfig()
+	defaultConfig.Verbose = true
+}

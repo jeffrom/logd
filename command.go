@@ -1,6 +1,13 @@
 package logd
 
-import "fmt"
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"strconv"
+)
+
+var errUnknownCmdType = errors.New("unknown command type")
 
 type cmdType uint8
 
@@ -43,6 +50,7 @@ type command struct {
 	name  cmdType
 	args  [][]byte
 	respC chan *response
+	done  chan struct{}
 }
 
 func newCommand(name cmdType, args ...[]byte) *command {
@@ -50,6 +58,7 @@ func newCommand(name cmdType, args ...[]byte) *command {
 		name:  name,
 		args:  args,
 		respC: make(chan *response, 0),
+		done:  make(chan struct{}),
 	}
 	return c
 }
@@ -63,4 +72,53 @@ func newCloseCommand(respC chan *response) *command {
 
 func (cmd *command) String() string {
 	return fmt.Sprintf("%s/%d", cmd.name.String(), len(cmd.args))
+}
+
+func (cmd *command) Bytes() []byte {
+	buf := bytes.Buffer{}
+	buf.WriteString(fmt.Sprintf("%s %d\r\n", cmd.name.String(), len(cmd.args)))
+	for _, arg := range cmd.args {
+		buf.WriteString(strconv.FormatInt(int64(len(arg)), 10))
+		buf.WriteByte(' ')
+		buf.Write(arg)
+		buf.WriteString("\r\n")
+	}
+	return buf.Bytes()
+}
+
+func (cmd *command) respond(resp *response) {
+	cmd.respC <- resp
+}
+
+func (cmd *command) finish() {
+	if cmd.done != nil {
+		select {
+		case cmd.done <- struct{}{}:
+		default:
+		}
+		close(cmd.respC)
+		close(cmd.done)
+	}
+}
+
+func cmdNamefromBytes(b []byte) cmdType {
+	if bytes.Equal(b, []byte("MSG")) {
+		return cmdMsg
+	}
+	if bytes.Equal(b, []byte("READ")) {
+		return cmdRead
+	}
+	if bytes.Equal(b, []byte("HEAD")) {
+		return cmdHead
+	}
+	if bytes.Equal(b, []byte("PING")) {
+		return cmdPing
+	}
+	if bytes.Equal(b, []byte("CLOSE")) {
+		return cmdClose
+	}
+	if bytes.Equal(b, []byte("SHUTDOWN")) {
+		return cmdShutdown
+	}
+	return 0
 }

@@ -1,12 +1,13 @@
 package logd
 
-import "errors"
+import (
+	"errors"
+)
 
 type memLogger struct {
-	messages    [][]byte
-	headC       chan []byte
-	subscribers []chan *message
-	returnErr   bool
+	messages  [][]byte
+	headC     chan []byte
+	returnErr bool
 }
 
 func newMemLogger() *memLogger {
@@ -36,8 +37,10 @@ func (log *memLogger) ReadFromID(c chan *message, id uint64, limit int) error {
 	}
 	forever := limit == 0
 
+	// TODO read forever in a goroutine that can be closed
 	for i := id - 1; i < uint64(len(log.messages)); i++ {
 		c <- newMessage(i+1, log.messages[i])
+
 		if !forever {
 			limit--
 			if limit == 0 {

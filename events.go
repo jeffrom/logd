@@ -1,7 +1,9 @@
 package logd
 
 import (
+	"log"
 	"strconv"
+	"time"
 )
 
 // this file contains the core logic of the program. Commands come from the
@@ -9,6 +11,9 @@ import (
 // message is received, it is written to a backend, and a log id is returned to
 // the caller. Or, a tail command is received, and the caller receives a log
 // stream.
+
+// TODO use an array of send close <- struct{}{} functions to run on shutdown
+// instead of doing each one manually
 
 // eventQ manages the receiving, processing, and responding to events.
 type eventQ struct {
@@ -73,18 +78,23 @@ func (q *eventQ) loop() {
 }
 
 func (q *eventQ) stop() error {
-	q.close <- struct{}{}
-	close(q.close)
-	close(q.in)
+	select {
+	case q.close <- struct{}{}:
+
+	case <-time.After(500 * time.Millisecond):
+		log.Printf("event queue failed to stop properly")
+	}
 	return nil
 }
 
 func (q *eventQ) handleMsg(cmd *command) {
 	var id uint64
 	for _, msg := range cmd.args {
-		_, currID, err := q.log.WriteMessage(msg)
+		cp := make([]byte, len(msg))
+		copy(cp, msg)
+		_, currID, err := q.log.WriteMessage(cp)
 		if err != nil {
-			cmd.respC <- newResponse(respErr)
+			cmd.respond(newResponse(respErr))
 			return
 		}
 		id = currID
@@ -92,53 +102,56 @@ func (q *eventQ) handleMsg(cmd *command) {
 
 	resp := newResponse(respOK)
 	resp.id = id
-	cmd.respC <- resp
+	cmd.respond(resp)
 
-	for _, subs := range q.subscriptions {
-		go func(subs *subscription) {
+	for _, sub := range q.subscriptions {
+		go func(sub *subscription) {
 			for _, msg := range cmd.args {
-				subs.send(newMessage(id, msg))
+				sub.send(newMessage(id, msg))
 			}
-		}(subs)
+		}(sub)
 	}
 }
 
 func (q *eventQ) handleRead(cmd *command) {
 	if len(cmd.args) != 2 {
-		cmd.respC <- newResponse(respErr)
+		cmd.respond(newResponse(respErr))
 		return
 	}
 
 	startID, err := strconv.ParseUint(string(cmd.args[0]), 10, 64)
 	if err != nil {
-		cmd.respC <- newResponse(respErr)
+		cmd.respond(newResponse(respErr))
 		return
 	}
 
 	limit, err := strconv.ParseUint(string(cmd.args[1]), 10, 64)
 	if err != nil {
-		cmd.respC <- newResponse(respErr)
+		cmd.respond(newResponse(respErr))
 		return
 	}
 
 	resp := newResponse(respOK)
 	resp.msgC = make(chan *message, 0)
-	cmd.respC <- resp
+	cmd.respond(resp)
 
-	q.log.ReadFromID(resp.msgC, startID, int(limit))
+	err = q.log.ReadFromID(resp.msgC, startID, int(limit))
+	panicOnError(err)
 
 	if limit == 0 { // read forever
-		q.subscriptions[cmd.respC] = newSubscription(resp.msgC)
+		q.subscriptions[cmd.respC] = newSubscription(resp.msgC, cmd.done)
+	} else {
+		cmd.finish()
 	}
 }
 
 func (q *eventQ) handleHead(cmd *command) {
 	if id, err := q.log.Head(); err != nil {
-		cmd.respC <- newResponse(respErr)
+		cmd.respond(newResponse(respErr))
 	} else {
 		resp := newResponse(respOK)
 		resp.id = id
-		cmd.respC <- resp
+		cmd.respond(resp)
 	}
 }
 
@@ -147,8 +160,12 @@ func (q *eventQ) handlePing(cmd *command) {
 }
 
 func (q *eventQ) handleClose(cmd *command) {
+	if sub, ok := q.subscriptions[cmd.respC]; ok {
+		sub.finish()
+	}
 	delete(q.subscriptions, cmd.respC)
-	cmd.respC <- newResponse(respOK)
+	cmd.respond(newResponse(respOK))
+	// cmd.finish()
 }
 
 // func (q *eventQ) handleSleep(cmd *command) {

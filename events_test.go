@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"runtime/debug"
 	"testing"
+	"time"
 )
 
 func testConfig(loggerShouldErr bool) *Config {
@@ -69,6 +70,16 @@ func checkErrResp(t *testing.T, resp *response) {
 	if resp.status != respErr {
 		t.Logf("%s", debug.Stack())
 		t.Fatalf("Expected error result but got %v", resp.status)
+	}
+}
+
+// use this to help debug deadlocks, more helpful probably to just use:
+// kill -ABRT <pid>
+func finishCommand(cmd *command) {
+	select {
+	case <-cmd.done:
+	case <-time.After(500 * time.Millisecond):
+		panic("failed to finish command")
 	}
 }
 
@@ -144,11 +155,13 @@ func TestEventQRead(t *testing.T) {
 	resp, err := q.add(newCommand(cmdMsg, expectedMsg))
 	checkNoErrAndSuccess(t, resp, err)
 
-	tailResp, err := q.add(newCommand(cmdRead, []byte("1"), []byte("1")))
+	cmd := newCommand(cmdRead, []byte("1"), []byte("1"))
+	tailResp, err := q.add(cmd)
 	checkNoErrAndSuccess(t, tailResp, err)
 	checkMessageReceived(t, tailResp, 1, expectedMsg)
 
-	tailResp, err = q.add(newCommand(cmdRead, []byte("1"), []byte("0")))
+	cmd = newCommand(cmdRead, []byte("1"), []byte("0"))
+	tailResp, err = q.add(cmd)
 	checkNoErrAndSuccess(t, tailResp, err)
 	checkMessageReceived(t, tailResp, 1, expectedMsg)
 
@@ -156,6 +169,10 @@ func TestEventQRead(t *testing.T) {
 	checkNoErrAndSuccess(t, resp, err)
 
 	checkMessageReceived(t, tailResp, 2, expectedMsg)
+
+	closeCmd := newCloseCommand(cmd.respC)
+	closeResp, err := q.add(closeCmd)
+	checkNoErrAndSuccess(t, closeResp, err)
 }
 
 func TestEventQReadFromEmpty(t *testing.T) {

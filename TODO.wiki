@@ -1,0 +1,11 @@
+= TODO =
+
+- logger shouldn't care about subscribers, events should do that logic
+    - events -> sockets
+        - if socket gets a read/tail command, must pass messages from
+          response.msgC through the socket
+- connection state, timeouts, graceful shutdown
+- test/benchmark sockets using a NilLogger
+- test/benchmark with different configs
+- abstract protocol from sockets/events
+

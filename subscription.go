@@ -2,13 +2,13 @@ package logd
 
 type subscription struct {
 	msgC chan *message
-	// closeC chan struct{}
+	done chan struct{}
 }
 
-func newSubscription(msgC chan *message) *subscription {
+func newSubscription(msgC chan *message, done chan struct{}) *subscription {
 	return &subscription{
 		msgC: msgC,
-		// closeC: make(chan struct{}, 0),
+		done: done,
 	}
 }
 
@@ -16,6 +16,9 @@ func (subs *subscription) send(msg *message) {
 	subs.msgC <- msg
 }
 
-// func (subs *subscription) close() {
-// 	subs.closeC <- struct{}{}
-// }
+func (subs *subscription) finish() {
+	select {
+	case subs.done <- struct{}{}:
+	default:
+	}
+}
