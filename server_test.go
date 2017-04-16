@@ -6,25 +6,25 @@ import (
 	"testing"
 )
 
-func newTestNetConn(config *Config, srv *server) *Client {
+func newTestNetConn(config *Config, srv *SocketServer) *Client {
 	if config == nil {
 		config = defaultTestConfig()
 	}
-	conn, err := dialConfig(srv.ln.Addr().String(), config)
+	conn, err := DialConfig(srv.ln.Addr().String(), config)
 	if err != nil {
 		panic(err)
 	}
 	return conn
 }
 
-func newTestServer(config *Config) *server {
-	srv := newServer("127.0.0.1:0", config)
+func newTestServer(config *Config) *SocketServer {
+	srv := NewServer("127.0.0.1:0", config)
 	srv.goServe()
 
 	return srv
 }
 
-func closeTestServer(t testing.TB, srv *server) {
+func closeTestServer(t testing.TB, srv *SocketServer) {
 	srv.stop()
 	srv.connMu.Lock()
 	defer srv.connMu.Unlock()
@@ -36,7 +36,7 @@ func closeTestServer(t testing.TB, srv *server) {
 	}
 }
 
-func checkScan(t *testing.T, scanner *protoScanner, msg []byte) {
+func checkScan(t *testing.T, scanner *Scanner, msg []byte) {
 	readALine := scanner.Scan()
 	if !readALine {
 		debug.PrintStack()
@@ -57,7 +57,7 @@ func checkScan(t *testing.T, scanner *protoScanner, msg []byte) {
 	}
 }
 
-func checkRespOK(t *testing.T, resp *response) {
+func checkRespOK(t *testing.T, resp *Response) {
 	if !reflect.DeepEqual(resp, newResponse(respOK)) {
 		debug.PrintStack()
 		t.Fatalf("response was not OK: %q", resp.Bytes())
@@ -76,7 +76,7 @@ func TestPingServer(t *testing.T) {
 	client := newTestNetConn(defaultTestConfig(), srv)
 	defer client.close()
 
-	resp, err := client.do(newCommand(cmdPing))
+	resp, err := client.Do(NewCommand(CmdPing))
 	checkError(t, err)
 
 	if !reflect.DeepEqual(resp, newResponse(respOK)) {
@@ -91,7 +91,7 @@ func TestMsgServer(t *testing.T) {
 	client := newTestNetConn(defaultTestConfig(), srv)
 	defer client.close()
 
-	resp, err := client.do(newCommand(cmdMsg, []byte("cool message")))
+	resp, err := client.Do(NewCommand(CmdMessage, []byte("cool message")))
 	checkError(t, err)
 
 	if !reflect.DeepEqual(resp, newResponse(respOK)) {
@@ -107,11 +107,11 @@ func TestReadServer(t *testing.T) {
 	defer client.close()
 
 	msg := []byte("cool message")
-	resp, err := client.do(newCommand(cmdMsg, msg))
+	resp, err := client.Do(NewCommand(CmdMessage, msg))
 	checkError(t, err)
 	checkRespOK(t, resp)
 
-	scanner, err := client.doRead(1, 1)
+	scanner, err := client.DoRead(1, 1)
 	checkError(t, err)
 
 	checkScan(t, scanner, msg)
@@ -127,11 +127,11 @@ func TestTailServer(t *testing.T) {
 	writerClient := newTestNetConn(defaultTestConfig(), srv)
 	defer writerClient.close()
 
-	scanner, err := client.doRead(1, 0)
+	scanner, err := client.DoRead(1, 0)
 	checkError(t, err)
 
 	msg := []byte("cool message")
-	resp, err := writerClient.do(newCommand(cmdMsg, msg))
+	resp, err := writerClient.Do(NewCommand(CmdMessage, msg))
 	checkError(t, err)
 	checkRespOK(t, resp)
 
@@ -140,12 +140,12 @@ func TestTailServer(t *testing.T) {
 	secondTailClient := newTestNetConn(defaultTestConfig(), srv)
 	defer secondTailClient.close()
 
-	secondScanner, err := client.doRead(1, 0)
+	secondScanner, err := client.DoRead(1, 0)
 	checkError(t, err)
 	checkScan(t, secondScanner, msg)
 
 	msg = []byte("another cool message")
-	resp, err = writerClient.do(newCommand(cmdMsg, msg))
+	resp, err = writerClient.Do(NewCommand(CmdMessage, msg))
 	checkError(t, err)
 	checkRespOK(t, resp)
 
@@ -160,7 +160,7 @@ func TestServerSleep(t *testing.T) {
 	client := newTestNetConn(defaultTestConfig(), srv)
 	defer client.close()
 
-	resp, err := client.do(newCommand(cmdSleep, []byte("10")))
+	resp, err := client.Do(NewCommand(CmdSleep, []byte("10")))
 	checkError(t, err)
 	checkRespOK(t, resp)
 }

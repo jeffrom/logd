@@ -27,12 +27,12 @@ func serverBenchConfigWithOpts(discard bool) *Config {
 	return config
 }
 
-func startServerForBench(b *testing.B) *server {
+func startServerForBench(b *testing.B) *SocketServer {
 	return startServerForBenchWithConfig(b, serverBenchConfig())
 }
 
-func startServerForBenchWithConfig(b *testing.B, config *Config) *server {
-	srv := newServer("127.0.0.1:0", config)
+func startServerForBenchWithConfig(b *testing.B, config *Config) *SocketServer {
+	srv := NewServer("127.0.0.1:0", config)
 	if err := srv.ListenAndServe(); err != nil {
 		b.Logf("%s", debug.Stack())
 		b.Fatalf("error running server: %v", err)
@@ -70,7 +70,7 @@ func BenchmarkServerPing(b *testing.B) {
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		client.do(newCommand(cmdPing))
+		client.Do(NewCommand(CmdPing))
 	}
 }
 
@@ -87,7 +87,7 @@ func BenchmarkServerMsg(b *testing.B) {
 	b.StartTimer()
 
 	for i := 0; i < b.N; i++ {
-		client.do(newCommand(cmdMsg, msg))
+		client.Do(NewCommand(CmdMessage, msg))
 	}
 }
 
@@ -99,11 +99,11 @@ func BenchmarkServerRead(b *testing.B) {
 
 	client := newTestNetConn(config, srv)
 	defer client.close()
-	client.do(newCommand(cmdMsg, someMessage))
+	client.Do(NewCommand(CmdMessage, someMessage))
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		scanner, _ := client.doRead(1, 1)
+		scanner, _ := client.DoRead(1, 1)
 		for scanner.Scan() {
 		}
 	}
@@ -121,11 +121,11 @@ func BenchmarkServerTail(b *testing.B) {
 	writerClient := newTestNetConn(config, srv)
 	defer writerClient.close()
 
-	scanner, _ := client.doRead(1, 0)
+	scanner, _ := client.DoRead(1, 0)
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		writerClient.do(newCommand(cmdMsg, someMessage))
+		writerClient.Do(NewCommand(CmdMessage, someMessage))
 		for scanner.Scan() {
 		}
 	}
@@ -143,15 +143,15 @@ func BenchmarkServerTailTwenty(b *testing.B) {
 	writerClient := newTestNetConn(config, srv)
 	defer writerClient.close()
 
-	var scanners []*protoScanner
+	var scanners []*Scanner
 	for i := 0; i < 20; i++ {
-		scanner, _ := client.doRead(1, 0)
+		scanner, _ := client.DoRead(1, 0)
 		scanners = append(scanners, scanner)
 	}
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		writerClient.do(newCommand(cmdMsg, someMessage))
+		writerClient.Do(NewCommand(CmdMessage, someMessage))
 		for _, scanner := range scanners {
 			for scanner.Scan() {
 			}

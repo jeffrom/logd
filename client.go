@@ -24,10 +24,11 @@ type Client struct {
 
 // Dial returns a new instance of Conn
 func Dial(addr string, conns ...net.Conn) (*Client, error) {
-	return dialConfig(addr, defaultConfig, conns...)
+	return DialConfig(addr, DefaultConfig, conns...)
 }
 
-func dialConfig(addr string, config *Config, conns ...net.Conn) (*Client, error) {
+// DialConfig returns a configured Conn
+func DialConfig(addr string, config *Config, conns ...net.Conn) (*Client, error) {
 	var conn net.Conn
 	var err error
 
@@ -52,7 +53,7 @@ func dialConfig(addr string, config *Config, conns ...net.Conn) (*Client, error)
 
 }
 
-func (c *Client) writeCommand(cmd *command) error {
+func (c *Client) writeCommand(cmd *Command) error {
 	if err := c.conn.SetWriteDeadline(time.Now().Add(c.writeTimeout)); err != nil {
 		return err
 	}
@@ -70,7 +71,7 @@ func (c *Client) flush() error {
 	return c.pw.bw.Flush()
 }
 
-func (c *Client) readResponse() (*response, error) {
+func (c *Client) readResponse() (*Response, error) {
 	if err := c.conn.SetReadDeadline(time.Now().Add(c.readTimeout)); err != nil {
 		return nil, err
 	}
@@ -83,7 +84,7 @@ func (c *Client) readResponse() (*response, error) {
 	return resp, nil
 }
 
-func (c *Client) readScanResponse() (*protoScanner, error) {
+func (c *Client) readScanResponse() (*Scanner, error) {
 	resp, err := c.pr.readResponse()
 	if err != nil {
 		return nil, err
@@ -97,7 +98,7 @@ func (c *Client) readScanResponse() (*protoScanner, error) {
 func (c *Client) close() error {
 	debugf(c.config, "closing %s->%s", c.conn.LocalAddr(), c.conn.RemoteAddr())
 
-	err := c.writeCommand(newCommand(cmdClose))
+	err := c.writeCommand(NewCommand(CmdClose))
 	if err != nil {
 		log.Printf("close error: %s", err)
 		c.conn.Close()
@@ -115,7 +116,8 @@ func (c *Client) close() error {
 	return c.conn.Close()
 }
 
-func (c *Client) do(cmds ...*command) (*response, error) {
+// Do executes a command and returns the response.
+func (c *Client) Do(cmds ...*Command) (*Response, error) {
 	for _, cmd := range cmds {
 		if err := c.writeCommand(cmd); err != nil {
 			return nil, err
@@ -124,14 +126,13 @@ func (c *Client) do(cmds ...*command) (*response, error) {
 	if err := c.flush(); err != nil {
 		return nil, err
 	}
-
 	return c.readResponse()
 }
 
-// returns a scanner that can be used to loop over messages, similar to
+// DoRead returns a scanner that can be used to loop over messages, similar to
 // bufio.Scanner
-func (c *Client) doRead(id uint64, limit int) (*protoScanner, error) {
-	cmd := newCommand(cmdRead,
+func (c *Client) DoRead(id uint64, limit int) (*Scanner, error) {
+	cmd := NewCommand(CmdRead,
 		[]byte(fmt.Sprintf("%d", id)),
 		[]byte(fmt.Sprintf("%d", limit)),
 	)
@@ -142,7 +143,7 @@ func (c *Client) doRead(id uint64, limit int) (*protoScanner, error) {
 }
 
 func (c *Client) Write(p []byte) (int, error) {
-	if err := c.writeCommand(newCommand(cmdMsg, p)); err != nil {
+	if err := c.writeCommand(NewCommand(CmdMessage, p)); err != nil {
 		return 0, err
 	}
 	return len(p), nil

@@ -1,22 +1,23 @@
 package logd
 
-type subscription struct {
-	msgC chan *message
+// Subscription is used to tail logs
+type Subscription struct {
+	msgC chan *Message
 	done chan struct{}
 }
 
-func newSubscription(msgC chan *message, done chan struct{}) *subscription {
-	return &subscription{
+func newSubscription(msgC chan *Message, done chan struct{}) *Subscription {
+	return &Subscription{
 		msgC: msgC,
 		done: done,
 	}
 }
 
-func (subs *subscription) send(msg *message) {
+func (subs *Subscription) send(msg *Message) {
 	subs.msgC <- msg
 }
 
-func (subs *subscription) finish() {
+func (subs *Subscription) finish() {
 	select {
 	case subs.done <- struct{}{}:
 	default:

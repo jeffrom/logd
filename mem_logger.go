@@ -20,7 +20,9 @@ func (log *memLogger) WriteMessage(msg []byte) (int, uint64, error) {
 		return 0, 0, errors.New("hey it's an error")
 	}
 	if !log.discard {
-		log.messages = append(log.messages, msg)
+		cp := make([]byte, len(msg))
+		copy(cp, msg)
+		log.messages = append(log.messages, cp)
 	}
 
 	id, err := log.Head()
@@ -31,7 +33,7 @@ func (log *memLogger) WriteMessage(msg []byte) (int, uint64, error) {
 	return len(msg), id, nil
 }
 
-func (log *memLogger) ReadFromID(c chan *message, id uint64, limit int) error {
+func (log *memLogger) ReadFromID(c chan *Message, id uint64, limit int) error {
 	if log.returnErr {
 		return errors.New("hey it's an error")
 	}
@@ -42,7 +44,7 @@ func (log *memLogger) ReadFromID(c chan *message, id uint64, limit int) error {
 
 	// TODO read forever in a goroutine that can be closed
 	for i := id - 1; i < uint64(len(log.messages)); i++ {
-		c <- newMessage(i+1, log.messages[i])
+		c <- NewMessage(i+1, log.messages[i])
 
 		if !forever {
 			limit--

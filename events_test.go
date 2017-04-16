@@ -35,7 +35,7 @@ func stopQ(t testing.TB, q *eventQ) {
 	}
 }
 
-func checkNoErrAndSuccess(t *testing.T, resp *response, err error) {
+func checkNoErrAndSuccess(t *testing.T, resp *Response, err error) {
 	if err != nil {
 		t.Logf("%s", debug.Stack())
 		t.Fatalf("error adding command to queue: %v", err)
@@ -50,7 +50,7 @@ func checkNoErrAndSuccess(t *testing.T, resp *response, err error) {
 	}
 }
 
-func checkMessageReceived(t *testing.T, resp *response, expectedID uint64, expectedMsg []byte) {
+func checkMessageReceived(t *testing.T, resp *Response, expectedID uint64, expectedMsg []byte) {
 	msg, ok := <-resp.msgC
 	if !ok {
 		t.Logf("%s", debug.Stack())
@@ -66,7 +66,7 @@ func checkMessageReceived(t *testing.T, resp *response, expectedID uint64, expec
 	}
 }
 
-func checkErrResp(t *testing.T, resp *response) {
+func checkErrResp(t *testing.T, resp *Response) {
 	if resp.status != respErr {
 		t.Logf("%s", debug.Stack())
 		t.Fatalf("Expected error result but got %v", resp.status)
@@ -75,7 +75,7 @@ func checkErrResp(t *testing.T, resp *response) {
 
 // use this to help debug deadlocks, more helpful probably to just use:
 // kill -ABRT <pid>
-func finishCommand(cmd *command) {
+func finishCommand(cmd *Command) {
 	select {
 	case <-cmd.done:
 	case <-time.After(500 * time.Millisecond):
@@ -92,7 +92,7 @@ func TestEventQAdd(t *testing.T) {
 	q := startQ(t, false)
 	defer stopQ(t, q)
 
-	resp, err := q.add(newCommand(cmdPing))
+	resp, err := q.add(NewCommand(CmdPing))
 	checkNoErrAndSuccess(t, resp, err)
 }
 
@@ -100,7 +100,7 @@ func TestEventQLog(t *testing.T) {
 	q := startQ(t, false)
 	defer stopQ(t, q)
 
-	resp, err := q.add(newCommand(cmdMsg, []byte("Hello, log!")))
+	resp, err := q.add(NewCommand(CmdMessage, []byte("Hello, log!")))
 	checkNoErrAndSuccess(t, resp, err)
 	if resp.id != 1 {
 		t.Fatalf("Expected response with id 1 but got %d", resp.id)
@@ -111,7 +111,7 @@ func TestEventQLogErr(t *testing.T) {
 	q := startQ(t, true)
 	defer stopQ(t, q)
 
-	resp, _ := q.add(newCommand(cmdMsg, []byte("Hello, log!")))
+	resp, _ := q.add(NewCommand(CmdMessage, []byte("Hello, log!")))
 	checkErrResp(t, resp)
 }
 
@@ -119,19 +119,19 @@ func TestEventQHead(t *testing.T) {
 	q := startQ(t, false)
 	defer stopQ(t, q)
 
-	resp, err := q.add(newCommand(cmdHead))
+	resp, err := q.add(NewCommand(CmdHead))
 	checkNoErrAndSuccess(t, resp, err)
 	if resp.id != 0 {
 		t.Fatalf("Expected response with id 0 but got %d", resp.id)
 	}
 
-	resp, err = q.add(newCommand(cmdMsg, []byte("Hello, log!")))
+	resp, err = q.add(NewCommand(CmdMessage, []byte("Hello, log!")))
 	checkNoErrAndSuccess(t, resp, err)
 	if resp.id != 1 {
 		t.Fatalf("Expected response with id 1 but got %d", resp.id)
 	}
 
-	resp, err = q.add(newCommand(cmdHead))
+	resp, err = q.add(NewCommand(CmdHead))
 	checkNoErrAndSuccess(t, resp, err)
 	if resp.id != 1 {
 		t.Fatalf("Expected response with id 1 but got %d", resp.id)
@@ -142,7 +142,7 @@ func TestEventQHeadErr(t *testing.T) {
 	q := startQ(t, true)
 	defer stopQ(t, q)
 
-	resp, _ := q.add(newCommand(cmdHead))
+	resp, _ := q.add(NewCommand(CmdHead))
 	checkErrResp(t, resp)
 }
 
@@ -152,20 +152,20 @@ func TestEventQRead(t *testing.T) {
 
 	expectedMsg := []byte("Hello, log!")
 
-	resp, err := q.add(newCommand(cmdMsg, expectedMsg))
+	resp, err := q.add(NewCommand(CmdMessage, expectedMsg))
 	checkNoErrAndSuccess(t, resp, err)
 
-	cmd := newCommand(cmdRead, []byte("1"), []byte("1"))
+	cmd := NewCommand(CmdRead, []byte("1"), []byte("1"))
 	tailResp, err := q.add(cmd)
 	checkNoErrAndSuccess(t, tailResp, err)
 	checkMessageReceived(t, tailResp, 1, expectedMsg)
 
-	cmd = newCommand(cmdRead, []byte("1"), []byte("0"))
+	cmd = NewCommand(CmdRead, []byte("1"), []byte("0"))
 	tailResp, err = q.add(cmd)
 	checkNoErrAndSuccess(t, tailResp, err)
 	checkMessageReceived(t, tailResp, 1, expectedMsg)
 
-	resp, err = q.add(newCommand(cmdMsg, expectedMsg))
+	resp, err = q.add(NewCommand(CmdMessage, expectedMsg))
 	checkNoErrAndSuccess(t, resp, err)
 
 	checkMessageReceived(t, tailResp, 2, expectedMsg)
@@ -181,10 +181,10 @@ func TestEventQReadFromEmpty(t *testing.T) {
 
 	expectedMsg := []byte("Hello, log!")
 
-	tailResp, err := q.add(newCommand(cmdRead, []byte("1"), []byte("0")))
+	tailResp, err := q.add(NewCommand(CmdRead, []byte("1"), []byte("0")))
 	checkNoErrAndSuccess(t, tailResp, err)
 
-	resp, err := q.add(newCommand(cmdMsg, expectedMsg))
+	resp, err := q.add(NewCommand(CmdMessage, expectedMsg))
 	checkNoErrAndSuccess(t, resp, err)
 
 	checkMessageReceived(t, tailResp, 1, expectedMsg)
@@ -194,7 +194,7 @@ func TestEventQReadErr(t *testing.T) {
 	q := startQ(t, true)
 	defer stopQ(t, q)
 
-	resp, _ := q.add(newCommand(cmdRead))
+	resp, _ := q.add(NewCommand(CmdRead))
 	checkErrResp(t, resp)
 }
 
@@ -204,10 +204,10 @@ func TestEventQReadClose(t *testing.T) {
 
 	expectedMsg := []byte("Hello, log!")
 
-	resp, err := q.add(newCommand(cmdMsg, expectedMsg))
+	resp, err := q.add(NewCommand(CmdMessage, expectedMsg))
 	checkNoErrAndSuccess(t, resp, err)
 
-	readCmd := newCommand(cmdRead, []byte("1"), []byte("0"))
+	readCmd := NewCommand(CmdRead, []byte("1"), []byte("0"))
 	tailResp, err := q.add(readCmd)
 	checkNoErrAndSuccess(t, tailResp, err)
 	checkMessageReceived(t, tailResp, 1, expectedMsg)
@@ -216,7 +216,7 @@ func TestEventQReadClose(t *testing.T) {
 	closeResp, err := q.add(closeCmd)
 	checkNoErrAndSuccess(t, closeResp, err)
 
-	resp, err = q.add(newCommand(cmdMsg, expectedMsg))
+	resp, err = q.add(NewCommand(CmdMessage, expectedMsg))
 	checkNoErrAndSuccess(t, resp, err)
 
 	if len(q.subscriptions) > 0 {
@@ -228,13 +228,13 @@ func TestEventQReadInvalidParams(t *testing.T) {
 	q := startQ(t, false)
 	defer stopQ(t, q)
 
-	resp, _ := q.add(newCommand(cmdRead, []byte("asdf"), []byte("1")))
+	resp, _ := q.add(NewCommand(CmdRead, []byte("asdf"), []byte("1")))
 	checkErrResp(t, resp)
 
-	resp, _ = q.add(newCommand(cmdRead, []byte("1"), []byte("asdf")))
+	resp, _ = q.add(NewCommand(CmdRead, []byte("1"), []byte("asdf")))
 	checkErrResp(t, resp)
 
-	resp, _ = q.add(newCommand(cmdRead, []byte("1")))
+	resp, _ = q.add(NewCommand(CmdRead, []byte("1")))
 	checkErrResp(t, resp)
 }
 
@@ -242,7 +242,7 @@ func TestEventQUnknownCommand(t *testing.T) {
 	q := startQ(t, false)
 	defer stopQ(t, q)
 
-	resp, _ := q.add(newCommand(100))
+	resp, _ := q.add(NewCommand(100))
 	checkErrResp(t, resp)
 }
 
@@ -250,14 +250,14 @@ func TestEventQSleep(t *testing.T) {
 	q := startQ(t, false)
 	defer stopQ(t, q)
 
-	resp, err := q.add(newCommand(cmdSleep, []byte("0")))
+	resp, err := q.add(NewCommand(CmdSleep, []byte("0")))
 	checkNoErrAndSuccess(t, resp, err)
 
-	resp, err = q.add(newCommand(cmdSleep, []byte("1")))
+	resp, err = q.add(NewCommand(CmdSleep, []byte("1")))
 	checkNoErrAndSuccess(t, resp, err)
 
 	done := make(chan struct{})
-	sleepCmd := newCommand(cmdSleep, []byte("100"))
+	sleepCmd := NewCommand(CmdSleep, []byte("100"))
 
 	go func() {
 		resp, err = q.add(sleepCmd)

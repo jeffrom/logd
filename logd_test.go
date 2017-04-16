@@ -16,7 +16,10 @@ func init() {
 }
 
 func defaultTestConfig() *Config {
-	return &Config{Verbose: testing.Verbose(), Logger: newMemLogger()}
+	return &Config{
+		Verbose: testing.Verbose(),
+		Logger:  newMemLogger(),
+	}
 }
 
 func checkGoldenFile(t *testing.T, filename string, b []byte, golden bool) {

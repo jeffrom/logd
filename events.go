@@ -19,19 +19,21 @@ import (
 // eventQ manages the receiving, processing, and responding to events.
 type eventQ struct {
 	config        *Config
-	in            chan *command
+	in            chan *Command
 	close         chan struct{}
-	subscriptions map[chan *response]*subscription
+	subscriptions map[chan *Response]*Subscription
 	log           Logger
+	// srv           Server
 }
 
 func newEventQ(config *Config) *eventQ {
 	q := &eventQ{
 		config:        config,
-		in:            make(chan *command, 0),
+		in:            make(chan *Command, 0),
 		close:         make(chan struct{}),
-		subscriptions: make(map[chan *response]*subscription),
+		subscriptions: make(map[chan *Response]*Subscription),
 		log:           config.Logger,
+		// srv:           config.Server,
 	}
 	return q
 }
@@ -48,19 +50,19 @@ func (q *eventQ) loop() {
 			debugf(q.config, "event: %s", cmd)
 
 			switch cmd.name {
-			case cmdMsg:
+			case CmdMessage:
 				q.handleMsg(cmd)
-			case cmdRead:
+			case CmdRead:
 				q.handleRead(cmd)
-			case cmdHead:
+			case CmdHead:
 				q.handleHead(cmd)
-			case cmdPing:
+			case CmdPing:
 				q.handlePing(cmd)
-			case cmdClose:
+			case CmdClose:
 				q.handleClose(cmd)
-			case cmdSleep:
+			case CmdSleep:
 				q.handleSleep(cmd)
-			case cmdShutdown:
+			case CmdShutdown:
 				if err := q.handleShutdown(cmd); err != nil {
 					cmd.respC <- newResponse(respErr)
 				} else {
@@ -88,12 +90,10 @@ func (q *eventQ) stop() error {
 	return nil
 }
 
-func (q *eventQ) handleMsg(cmd *command) {
+func (q *eventQ) handleMsg(cmd *Command) {
 	var id uint64
 	for _, msg := range cmd.args {
-		cp := make([]byte, len(msg))
-		copy(cp, msg)
-		_, currID, err := q.log.WriteMessage(cp)
+		_, currID, err := q.log.WriteMessage(msg)
 		if err != nil {
 			cmd.respond(newResponse(respErr))
 			return
@@ -106,15 +106,15 @@ func (q *eventQ) handleMsg(cmd *command) {
 	cmd.respond(resp)
 
 	for _, sub := range q.subscriptions {
-		go func(sub *subscription) {
+		go func(sub *Subscription) {
 			for _, msg := range cmd.args {
-				sub.send(newMessage(id, msg))
+				sub.send(NewMessage(id, msg))
 			}
 		}(sub)
 	}
 }
 
-func (q *eventQ) handleRead(cmd *command) {
+func (q *eventQ) handleRead(cmd *Command) {
 	if len(cmd.args) != 2 {
 		cmd.respond(newResponse(respErr))
 		return
@@ -133,7 +133,7 @@ func (q *eventQ) handleRead(cmd *command) {
 	}
 
 	resp := newResponse(respOK)
-	resp.msgC = make(chan *message, 0)
+	resp.msgC = make(chan *Message, 0)
 	cmd.respond(resp)
 
 	err = q.log.ReadFromID(resp.msgC, startID, int(limit))
@@ -146,7 +146,7 @@ func (q *eventQ) handleRead(cmd *command) {
 	}
 }
 
-func (q *eventQ) handleHead(cmd *command) {
+func (q *eventQ) handleHead(cmd *Command) {
 	if id, err := q.log.Head(); err != nil {
 		cmd.respond(newResponse(respErr))
 	} else {
@@ -156,11 +156,11 @@ func (q *eventQ) handleHead(cmd *command) {
 	}
 }
 
-func (q *eventQ) handlePing(cmd *command) {
+func (q *eventQ) handlePing(cmd *Command) {
 	cmd.respC <- newResponse(respOK)
 }
 
-func (q *eventQ) handleClose(cmd *command) {
+func (q *eventQ) handleClose(cmd *Command) {
 	if sub, ok := q.subscriptions[cmd.respC]; ok {
 		sub.finish()
 	}
@@ -170,7 +170,7 @@ func (q *eventQ) handleClose(cmd *command) {
 	// cmd.finish()
 }
 
-func (q *eventQ) handleSleep(cmd *command) {
+func (q *eventQ) handleSleep(cmd *Command) {
 	var msecs int
 	_, err := fmt.Sscanf(string(cmd.args[0]), "%d", &msecs)
 	panicOnError(err)
@@ -183,13 +183,13 @@ func (q *eventQ) handleSleep(cmd *command) {
 	cmd.respond(newResponse(respOK))
 }
 
-func (q *eventQ) handleShutdown(cmd *command) error {
+func (q *eventQ) handleShutdown(cmd *Command) error {
 	// check if shutdown command is allowed and wait to finish any outstanding
 	// work here
 	return nil
 }
 
-func (q *eventQ) add(cmd *command) (*response, error) {
+func (q *eventQ) add(cmd *Command) (*Response, error) {
 	q.in <- cmd
 	resp := <-cmd.respC
 	return resp, nil

@@ -14,69 +14,82 @@ type cmdType uint8
 const (
 	_ cmdType = iota
 
-	cmdMsg
+	// CmdMessage is a message command type.
+	CmdMessage
 
-	cmdRead
-	cmdHead
+	// CmdRead is a read command type.
+	CmdRead
 
-	cmdPing
-	cmdClose
-	cmdSleep
-	cmdShutdown
+	// CmdHead is a head command type.
+	CmdHead
+
+	// CmdPing is a ping command type.
+	CmdPing
+
+	// CmdClose is a close command type.
+	CmdClose
+
+	// CmdSleep is a sleep command type.
+	CmdSleep
+
+	// CmdShutdown is a shutdown command type.
+	CmdShutdown
 )
 
 func (cmd *cmdType) String() string {
 	switch *cmd {
-	case cmdMsg:
+	case CmdMessage:
 		return "MSG"
-	case cmdRead:
+	case CmdRead:
 		return "READ"
-	case cmdHead:
+	case CmdHead:
 		return "HEAD"
-	case cmdPing:
+	case CmdPing:
 		return "PING"
-	case cmdClose:
+	case CmdClose:
 		return "CLOSE"
-	case cmdSleep:
+	case CmdSleep:
 		return "SLEEP"
-	case cmdShutdown:
+	case CmdShutdown:
 		return "SHUTDOWN"
 	}
 	return fmt.Sprintf("<unknown_command %q>", *cmd)
 }
 
-// command is an input received by a caller
-type command struct {
+// Command is an input received by a caller
+type Command struct {
 	name  cmdType
 	args  [][]byte
-	respC chan *response
+	respC chan *Response
 	done  chan struct{}
 	wake  chan struct{}
 }
 
-func newCommand(name cmdType, args ...[]byte) *command {
-	c := &command{
+// NewCommand returns a new instance of a command type
+func NewCommand(name cmdType, args ...[]byte) *Command {
+	c := &Command{
 		name:  name,
 		args:  args,
-		respC: make(chan *response, 0),
+		respC: make(chan *Response, 0),
 		done:  make(chan struct{}),
 		wake:  make(chan struct{}),
 	}
 	return c
 }
 
-func newCloseCommand(respC chan *response) *command {
-	return &command{
-		name:  cmdClose,
+func newCloseCommand(respC chan *Response) *Command {
+	return &Command{
+		name:  CmdClose,
 		respC: respC,
 	}
 }
 
-func (cmd *command) String() string {
+func (cmd *Command) String() string {
 	return fmt.Sprintf("%s/%d", cmd.name.String(), len(cmd.args))
 }
 
-func (cmd *command) Bytes() []byte {
+// Bytes returns a byte representation of the command
+func (cmd *Command) Bytes() []byte {
 	buf := bytes.Buffer{}
 	buf.WriteString(fmt.Sprintf("%s %d\r\n", cmd.name.String(), len(cmd.args)))
 	for _, arg := range cmd.args {
@@ -88,11 +101,11 @@ func (cmd *command) Bytes() []byte {
 	return buf.Bytes()
 }
 
-func (cmd *command) respond(resp *response) {
+func (cmd *Command) respond(resp *Response) {
 	cmd.respC <- resp
 }
 
-func (cmd *command) finish() {
+func (cmd *Command) finish() {
 	if cmd.done != nil {
 		select {
 		case cmd.done <- struct{}{}:
@@ -103,31 +116,31 @@ func (cmd *command) finish() {
 	}
 }
 
-func (cmd *command) cancelSleep() {
+func (cmd *Command) cancelSleep() {
 	cmd.wake <- struct{}{}
 }
 
 func cmdNamefromBytes(b []byte) cmdType {
 	if bytes.Equal(b, []byte("MSG")) {
-		return cmdMsg
+		return CmdMessage
 	}
 	if bytes.Equal(b, []byte("READ")) {
-		return cmdRead
+		return CmdRead
 	}
 	if bytes.Equal(b, []byte("HEAD")) {
-		return cmdHead
+		return CmdHead
 	}
 	if bytes.Equal(b, []byte("PING")) {
-		return cmdPing
+		return CmdPing
 	}
 	if bytes.Equal(b, []byte("CLOSE")) {
-		return cmdClose
+		return CmdClose
 	}
 	if bytes.Equal(b, []byte("SHUTDOWN")) {
-		return cmdShutdown
+		return CmdShutdown
 	}
 	if bytes.Equal(b, []byte("SLEEP")) {
-		return cmdSleep
+		return CmdSleep
 	}
 	return 0
 }

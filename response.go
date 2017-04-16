@@ -33,28 +33,29 @@ func (resp respType) String() string {
 	return "<unknown_resp_type>"
 }
 
-// response is returned to the caller
-type response struct {
+// Response is returned to the caller
+type Response struct {
 	status respType
 	id     uint64
 	body   []byte
-	msgC   chan *message
+	msgC   chan *Message
 }
 
-func newResponse(status respType) *response {
-	r := &response{status: status}
+func newResponse(status respType) *Response {
+	r := &Response{status: status}
 	return r
 }
 
-func newErrResponse(body []byte) *response {
-	return &response{status: respErr, body: body}
+func newErrResponse(body []byte) *Response {
+	return &Response{status: respErr, body: body}
 }
 
-func newClientErrResponse(body []byte) *response {
-	return &response{status: respErrClient, body: body}
+func newClientErrResponse(body []byte) *Response {
+	return &Response{status: respErrClient, body: body}
 }
 
-func (r *response) Bytes() []byte {
+// Bytes returns a byte representation of the response
+func (r *Response) Bytes() []byte {
 	buf := bytes.Buffer{}
 	buf.WriteString(r.status.String())
 

@@ -9,7 +9,14 @@ import (
 	"time"
 )
 
-type server struct {
+// Server is an interface for interaction with clients
+// type Server interface {
+// 	Respond(cmd *Command, resp *Response) error
+// 	Send(sub *Subscription, msg *Message) error
+// }
+
+// SocketServer handles socket connections
+type SocketServer struct {
 	config *Config
 
 	addr string
@@ -33,11 +40,12 @@ type server struct {
 	statlock sync.RWMutex
 }
 
-func newServer(addr string, config *Config) *server {
+// NewServer will return a new instance of a log server
+func NewServer(addr string, config *Config) *SocketServer {
 	q := newEventQ(config)
 	q.start()
 
-	return &server{
+	return &SocketServer{
 		config:       config,
 		addr:         addr,
 		readyC:       make(chan struct{}),
@@ -52,7 +60,12 @@ func newServer(addr string, config *Config) *server {
 	}
 }
 
-func (s *server) ListenAndServe() error {
+// ListenAndServe starts serving requests
+func (s *SocketServer) ListenAndServe() error {
+	return s.listenAndServe(false)
+}
+
+func (s *SocketServer) listenAndServe(wait bool) error {
 	var outerErr error
 
 	s.mu.Lock()
@@ -67,7 +80,9 @@ func (s *server) ListenAndServe() error {
 	s.statlock.Unlock()
 
 	log.Printf("Serving at %s", s.ln.Addr())
-	s.readyC <- struct{}{}
+	if wait {
+		s.readyC <- struct{}{}
+	}
 
 	go s.accept()
 
@@ -82,7 +97,22 @@ func (s *server) ListenAndServe() error {
 	}
 }
 
-func (s *server) accept() {
+// Respond satisfies Server interface
+func (s *SocketServer) Respond(cmd *Command, resp *Response) error {
+	return nil
+}
+
+// Send satisfies Server interface
+func (s *SocketServer) Send(sub *Subscription, msg *Message) error {
+	return nil
+}
+
+// ready signals that the application is ready to serve on this host:port
+func (s *SocketServer) ready() {
+	<-s.readyC
+}
+
+func (s *SocketServer) accept() {
 	for {
 		rawConn, err := s.ln.Accept()
 		if err != nil {
@@ -98,16 +128,16 @@ func (s *server) accept() {
 	}
 }
 
-func (s *server) goServe() {
+func (s *SocketServer) goServe() {
 	go func() {
-		if err := s.ListenAndServe(); err != nil {
+		if err := s.listenAndServe(true); err != nil {
 			log.Printf("error serving: %v", err)
 		}
 	}()
-	<-s.readyC
+	s.ready()
 }
 
-func (s *server) shutdown() error {
+func (s *SocketServer) shutdown() error {
 	defer func() {
 		s.shutdownC <- struct{}{}
 	}()
@@ -122,24 +152,24 @@ func (s *server) shutdown() error {
 	return err
 }
 
-func (s *server) stop() {
+func (s *SocketServer) stop() {
 	s.stopC <- struct{}{}
 	<-s.shutdownC
 }
 
-func (s *server) addConn(conn *conn) {
+func (s *SocketServer) addConn(conn *conn) {
 	s.connMu.Lock()
 	s.conns[conn] = true
 	s.connMu.Unlock()
 }
 
-func (s *server) removeConn(conn *conn) {
+func (s *SocketServer) removeConn(conn *conn) {
 	s.connMu.Lock()
 	delete(s.conns, conn)
 	s.connMu.Unlock()
 }
 
-func (s *server) handleClient(conn *conn) {
+func (s *SocketServer) handleClient(conn *conn) {
 	counts.Add("clients", 1)
 
 	defer func() {
@@ -172,7 +202,7 @@ func (s *server) handleClient(conn *conn) {
 		panicOnError(err)
 
 		respBytes := resp.Bytes()
-		if cmd.name == cmdClose {
+		if cmd.name == CmdClose {
 			debugf(s.config, "close %s", conn.RemoteAddr())
 			conn.mu.Lock()
 			conn.pw.bw.Write(respBytes)
@@ -199,14 +229,14 @@ func (s *server) handleClient(conn *conn) {
 		}
 		debugf(s.config, "%s->%s: %q", conn.LocalAddr(), conn.RemoteAddr(), respBytes)
 
-		if cmd.name == cmdRead {
+		if cmd.name == CmdRead {
 			debugf(s.config, "sending log messages to %s", conn.RemoteAddr())
 			go s.handleSubscriber(conn.Conn, cmd, resp)
 		}
 	}
 }
 
-func (s *server) handleSubscriber(c net.Conn, cmd *command, resp *response) {
+func (s *SocketServer) handleSubscriber(c net.Conn, cmd *Command, resp *Response) {
 	conn := newConn(c, s.config)
 	for {
 		select {

@@ -1,10 +1,12 @@
 package logd
 
-type message struct {
+// Message is a log message type.
+type Message struct {
 	id   uint64
 	body []byte
 }
 
-func newMessage(id uint64, body []byte) *message {
-	return &message{id: id, body: body}
+// NewMessage returns a new instance of a Message.
+func NewMessage(id uint64, body []byte) *Message {
+	return &Message{id: id, body: body}
 }

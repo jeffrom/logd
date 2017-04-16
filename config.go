@@ -4,6 +4,7 @@ package logd
 type Config struct {
 	Verbose bool
 	Logger  Logger
+	Server  Server
 }
 
 // NewConfig returns a new configuration object
@@ -11,9 +12,10 @@ func NewConfig() *Config {
 	return &Config{}
 }
 
-var defaultConfig *Config
+// DefaultConfig is the default application config
+var DefaultConfig *Config
 
 func init() {
-	defaultConfig = NewConfig()
-	defaultConfig.Verbose = true
+	DefaultConfig = NewConfig()
+	DefaultConfig.Verbose = true
 }

@@ -8,7 +8,7 @@ import "testing"
 
 func TestEventQShutdown(t *testing.T) {
 	q := startQ(t, false)
-	resp, err := q.add(newCommand(cmdShutdown))
+	resp, err := q.add(NewCommand(CmdShutdown))
 	checkNoErrAndSuccess(t, resp, err)
 
 	defer func() {
@@ -17,5 +17,5 @@ func TestEventQShutdown(t *testing.T) {
 		}
 	}()
 
-	q.add(newCommand(cmdPing))
+	q.add(NewCommand(CmdPing))
 }

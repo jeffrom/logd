@@ -33,7 +33,7 @@ func newProtoWriter(w io.Writer, config *Config) *protoWriter {
 	return &protoWriter{w: w, bw: bufio.NewWriter(w), config: config}
 }
 
-func (pw *protoWriter) writeCommand(cmd *command) (int, error) {
+func (pw *protoWriter) writeCommand(cmd *Command) (int, error) {
 	buf := pw.bw
 	buf.WriteString(fmt.Sprintf("%s %d\r\n", cmd.name.String(), len(cmd.args)))
 	for _, arg := range cmd.args {
@@ -45,7 +45,7 @@ func (pw *protoWriter) writeCommand(cmd *command) (int, error) {
 	return 0, nil
 }
 
-func (pw *protoWriter) writeResponse(resp *response) (int, error) {
+func (pw *protoWriter) writeResponse(resp *Response) (int, error) {
 
 	return 0, nil
 }
@@ -61,7 +61,7 @@ func newProtoReader(r io.Reader, config *Config) *protoReader {
 	return &protoReader{r: r, br: bufio.NewReader(r), config: config}
 }
 
-func (pr *protoReader) readCommand() (*command, error) {
+func (pr *protoReader) readCommand() (*Command, error) {
 	line, err := readLine(pr.br)
 	if err != nil {
 		return nil, err
@@ -103,17 +103,17 @@ func (pr *protoReader) readCommand() (*command, error) {
 		args = append(args, arg)
 	}
 
-	return newCommand(name, args...), nil
+	return NewCommand(name, args...), nil
 }
 
-func (pr *protoReader) readResponse() (*response, error) {
+func (pr *protoReader) readResponse() (*Response, error) {
 	line, err := readLine(pr.br)
 	if err != nil {
 		return nil, err
 	}
 
 	parts := bytes.SplitN(line, []byte(" "), 2)
-	var resp *response
+	var resp *Response
 	if bytes.Equal(parts[0], []byte("OK")) {
 		resp = newResponse(respOK)
 	} else if bytes.Equal(parts[0], []byte("+EOF")) {
@@ -132,19 +132,21 @@ func (pr *protoReader) readResponse() (*response, error) {
 	return resp, nil
 }
 
-type protoScanner struct {
+// Scanner is used to loop over the result of a READ command
+type Scanner struct {
 	config *Config
 	br     *bufio.Reader
 	conn   net.Conn
 	err    error
-	msg    *message
+	msg    *Message
 }
 
-func newProtoScanner(r io.Reader, conn net.Conn, config *Config) *protoScanner {
-	return &protoScanner{br: bufio.NewReader(r), conn: conn, config: config}
+func newProtoScanner(r io.Reader, conn net.Conn, config *Config) *Scanner {
+	return &Scanner{br: bufio.NewReader(r), conn: conn, config: config}
 }
 
-func (ps *protoScanner) Scan() bool {
+// Scan reads the next result from a READ command.
+func (ps *Scanner) Scan() bool {
 	err := ps.conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
 	if err != nil {
 		ps.err = err
@@ -162,15 +164,18 @@ func (ps *protoScanner) Scan() bool {
 	return true
 }
 
-func (ps *protoScanner) Message() *message {
+// Message returns the current message. It will be overwritten on the next
+// iteration.
+func (ps *Scanner) Message() *Message {
 	return ps.msg
 }
 
-func (ps *protoScanner) Err() error {
+// Err returns the current error.
+func (ps *Scanner) Err() error {
 	return ps.err
 }
 
-func (ps *protoScanner) readMessage() (*message, error) {
+func (ps *Scanner) readMessage() (*Message, error) {
 	var id uint64
 	var body []byte
 	var bodylen int
@@ -207,5 +212,5 @@ func (ps *protoScanner) readMessage() (*message, error) {
 		return nil, errors.New("invalid body length")
 	}
 
-	return newMessage(id, body), err
+	return NewMessage(id, body), err
 }
