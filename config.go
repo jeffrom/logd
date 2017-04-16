@@ -4,7 +4,7 @@ package logd
 type Config struct {
 	Verbose bool
 	Logger  Logger
-	Server  Server
+	// Server  Server
 }
 
 // NewConfig returns a new configuration object
