@@ -24,7 +24,6 @@ func startQForBench(b *testing.B) *eventQ {
 		b.Fatalf("error starting queue: %v", err)
 	}
 	return q
-
 }
 
 func BenchmarkEventQPing(b *testing.B) {
@@ -86,5 +85,26 @@ func BenchmarkEventQReadFromHeadOne(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		q.add(newCommand(cmdMsg, msg))
 		<-resp.msgC
+	}
+}
+
+func BenchmarkEventQReadFromHeadTen(b *testing.B) {
+	b.StopTimer()
+	q := startQForBench(b)
+	defer stopQ(b, q)
+	msg := []byte("hey i'm a message")
+
+	var subs []*response
+	for i := 0; i < 10; i++ {
+		resp, _ := q.add(newCommand(cmdRead, []byte("1"), []byte("0")))
+		subs = append(subs, resp)
+	}
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		q.add(newCommand(cmdMsg, msg))
+		for _, resp := range subs {
+			<-resp.msgC
+		}
 	}
 }

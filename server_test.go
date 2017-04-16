@@ -7,7 +7,10 @@ import (
 )
 
 func newTestNetConn(config *Config, srv *server) *Client {
-	conn, err := Dial(srv.ln.Addr().String())
+	if config == nil {
+		config = defaultTestConfig()
+	}
+	conn, err := dialConfig(srv.ln.Addr().String(), config)
 	if err != nil {
 		panic(err)
 	}
@@ -21,7 +24,7 @@ func newTestServer(config *Config) *server {
 	return srv
 }
 
-func closeTestServer(t *testing.T, srv *server) {
+func closeTestServer(t testing.TB, srv *server) {
 	srv.stop()
 	srv.connMu.Lock()
 	defer srv.connMu.Unlock()
@@ -59,6 +62,11 @@ func checkRespOK(t *testing.T, resp *response) {
 		debug.PrintStack()
 		t.Fatalf("response was not OK: %q", resp.Bytes())
 	}
+}
+
+func TestStartStopServer(t *testing.T) {
+	srv := newTestServer(defaultTestConfig())
+	closeTestServer(t, srv)
 }
 
 func TestPingServer(t *testing.T) {

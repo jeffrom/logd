@@ -8,6 +8,7 @@ type memLogger struct {
 	messages  [][]byte
 	headC     chan []byte
 	returnErr bool
+	discard   bool
 }
 
 func newMemLogger() *memLogger {
@@ -18,7 +19,9 @@ func (log *memLogger) WriteMessage(msg []byte) (int, uint64, error) {
 	if log.returnErr {
 		return 0, 0, errors.New("hey it's an error")
 	}
-	log.messages = append(log.messages, msg)
+	if !log.discard {
+		log.messages = append(log.messages, msg)
+	}
 
 	id, err := log.Head()
 	if err != nil {
