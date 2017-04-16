@@ -37,8 +37,8 @@ func (cmd *cmdType) String() string {
 		return "PING"
 	case cmdClose:
 		return "CLOSE"
-	// case cmdSleep:
-	// 	return "SLEEP"
+	case cmdSleep:
+		return "SLEEP"
 	case cmdShutdown:
 		return "SHUTDOWN"
 	}
@@ -51,6 +51,7 @@ type command struct {
 	args  [][]byte
 	respC chan *response
 	done  chan struct{}
+	wake  chan struct{}
 }
 
 func newCommand(name cmdType, args ...[]byte) *command {
@@ -59,6 +60,7 @@ func newCommand(name cmdType, args ...[]byte) *command {
 		args:  args,
 		respC: make(chan *response, 0),
 		done:  make(chan struct{}),
+		wake:  make(chan struct{}),
 	}
 	return c
 }
@@ -101,6 +103,10 @@ func (cmd *command) finish() {
 	}
 }
 
+func (cmd *command) cancelSleep() {
+	cmd.wake <- struct{}{}
+}
+
 func cmdNamefromBytes(b []byte) cmdType {
 	if bytes.Equal(b, []byte("MSG")) {
 		return cmdMsg
@@ -119,6 +125,9 @@ func cmdNamefromBytes(b []byte) cmdType {
 	}
 	if bytes.Equal(b, []byte("SHUTDOWN")) {
 		return cmdShutdown
+	}
+	if bytes.Equal(b, []byte("SLEEP")) {
+		return cmdSleep
 	}
 	return 0
 }

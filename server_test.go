@@ -144,3 +144,15 @@ func TestTailServer(t *testing.T) {
 	checkScan(t, scanner, msg)
 	checkScan(t, secondScanner, msg)
 }
+
+func TestServerSleep(t *testing.T) {
+	srv := newTestServer(testConfig(false))
+	defer closeTestServer(t, srv)
+
+	client := newTestNetConn(defaultTestConfig(), srv)
+	defer client.close()
+
+	resp, err := client.do(newCommand(cmdSleep, []byte("10")))
+	checkError(t, err)
+	checkRespOK(t, resp)
+}

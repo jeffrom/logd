@@ -1,6 +1,7 @@
 package logd
 
 import (
+	"fmt"
 	"log"
 	"strconv"
 	"time"
@@ -28,7 +29,7 @@ func newEventQ(config *Config) *eventQ {
 	q := &eventQ{
 		config:        config,
 		in:            make(chan *command, 0),
-		close:         make(chan struct{}, 0),
+		close:         make(chan struct{}),
 		subscriptions: make(map[chan *response]*subscription),
 		log:           config.Logger,
 	}
@@ -57,8 +58,8 @@ func (q *eventQ) loop() {
 				q.handlePing(cmd)
 			case cmdClose:
 				q.handleClose(cmd)
-			// case cmdSleep:
-			// 	q.handleSleep(cmd)
+			case cmdSleep:
+				q.handleSleep(cmd)
 			case cmdShutdown:
 				if err := q.handleShutdown(cmd); err != nil {
 					cmd.respC <- newResponse(respErr)
@@ -163,13 +164,24 @@ func (q *eventQ) handleClose(cmd *command) {
 	if sub, ok := q.subscriptions[cmd.respC]; ok {
 		sub.finish()
 	}
+
 	delete(q.subscriptions, cmd.respC)
 	cmd.respond(newResponse(respOK))
 	// cmd.finish()
 }
 
-// func (q *eventQ) handleSleep(cmd *command) {
-// }
+func (q *eventQ) handleSleep(cmd *command) {
+	var msecs int
+	_, err := fmt.Sscanf(string(cmd.args[0]), "%d", &msecs)
+	panicOnError(err)
+
+	select {
+	case <-time.After(time.Duration(msecs) * time.Millisecond):
+	case <-cmd.wake:
+	}
+
+	cmd.respond(newResponse(respOK))
+}
 
 func (q *eventQ) handleShutdown(cmd *command) error {
 	// check if shutdown command is allowed and wait to finish any outstanding

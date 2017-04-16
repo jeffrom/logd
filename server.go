@@ -40,13 +40,13 @@ func newServer(addr string, config *Config) *server {
 	return &server{
 		config:       config,
 		addr:         addr,
-		readyC:       make(chan struct{}, 0),
+		readyC:       make(chan struct{}),
 		conns:        make(map[*conn]bool),
 		connIn:       make(chan *conn, 0),
 		readTimeout:  time.Duration(500 * time.Millisecond),
 		writeTimeout: time.Duration(500 * time.Millisecond),
-		stopC:        make(chan struct{}, 0),
-		shutdownC:    make(chan struct{}, 0),
+		stopC:        make(chan struct{}),
+		shutdownC:    make(chan struct{}),
 		q:            q,
 		stats:        &stats{},
 	}

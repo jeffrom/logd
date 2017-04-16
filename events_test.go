@@ -245,3 +245,31 @@ func TestEventQUnknownCommand(t *testing.T) {
 	resp, _ := q.add(newCommand(100))
 	checkErrResp(t, resp)
 }
+
+func TestEventQSleep(t *testing.T) {
+	q := startQ(t, false)
+	defer stopQ(t, q)
+
+	resp, err := q.add(newCommand(cmdSleep, []byte("0")))
+	checkNoErrAndSuccess(t, resp, err)
+
+	resp, err = q.add(newCommand(cmdSleep, []byte("1")))
+	checkNoErrAndSuccess(t, resp, err)
+
+	done := make(chan struct{})
+	sleepCmd := newCommand(cmdSleep, []byte("100"))
+
+	go func() {
+		resp, err = q.add(sleepCmd)
+		checkNoErrAndSuccess(t, resp, err)
+		done <- struct{}{}
+	}()
+
+	sleepCmd.cancelSleep()
+
+	select {
+	case <-done:
+	case <-time.After(10 * time.Millisecond):
+		t.Fatalf("Failed to cancel sleep")
+	}
+}
