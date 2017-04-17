@@ -83,7 +83,6 @@ func (q *eventQ) loop() {
 func (q *eventQ) stop() error {
 	select {
 	case q.close <- struct{}{}:
-
 	case <-time.After(500 * time.Millisecond):
 		log.Printf("event queue failed to stop properly")
 	}
@@ -189,7 +188,7 @@ func (q *eventQ) handleShutdown(cmd *Command) error {
 	return nil
 }
 
-func (q *eventQ) add(cmd *Command) (*Response, error) {
+func (q *eventQ) pushCommand(cmd *Command) (*Response, error) {
 	q.in <- cmd
 	resp := <-cmd.respC
 	return resp, nil

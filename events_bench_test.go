@@ -33,7 +33,7 @@ func BenchmarkEventQPing(b *testing.B) {
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		q.add(NewCommand(CmdPing))
+		q.pushCommand(NewCommand(CmdPing))
 	}
 }
 
@@ -45,7 +45,7 @@ func BenchmarkEventQLogOne(b *testing.B) {
 	msg := []byte("hey i'm a message")
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		q.add(NewCommand(CmdMessage, msg))
+		q.pushCommand(NewCommand(CmdMessage, msg))
 	}
 }
 
@@ -57,7 +57,7 @@ func BenchmarkEventQLogFive(b *testing.B) {
 	msg := []byte("hey i'm a message")
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		q.add(NewCommand(CmdMessage, msg, msg, msg, msg, msg))
+		q.pushCommand(NewCommand(CmdMessage, msg, msg, msg, msg, msg))
 	}
 }
 
@@ -65,11 +65,11 @@ func BenchmarkEventQReadOne(b *testing.B) {
 	b.StopTimer()
 	q := startQForBench(b)
 	defer stopQ(b, q)
-	q.add(NewCommand(CmdMessage, []byte("hey i'm a message")))
+	q.pushCommand(NewCommand(CmdMessage, []byte("hey i'm a message")))
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		resp, _ := q.add(NewCommand(CmdRead, []byte("1"), []byte("1")))
+		resp, _ := q.pushCommand(NewCommand(CmdRead, []byte("1"), []byte("1")))
 		<-resp.msgC
 	}
 }
@@ -79,11 +79,11 @@ func BenchmarkEventQReadFromHeadOne(b *testing.B) {
 	q := startQForBench(b)
 	defer stopQ(b, q)
 	msg := []byte("hey i'm a message")
-	resp, _ := q.add(NewCommand(CmdRead, []byte("1"), []byte("0")))
+	resp, _ := q.pushCommand(NewCommand(CmdRead, []byte("1"), []byte("0")))
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		q.add(NewCommand(CmdMessage, msg))
+		q.pushCommand(NewCommand(CmdMessage, msg))
 		<-resp.msgC
 	}
 }
@@ -96,13 +96,13 @@ func BenchmarkEventQReadFromHeadTen(b *testing.B) {
 
 	var subs []*Response
 	for i := 0; i < 10; i++ {
-		resp, _ := q.add(NewCommand(CmdRead, []byte("1"), []byte("0")))
+		resp, _ := q.pushCommand(NewCommand(CmdRead, []byte("1"), []byte("0")))
 		subs = append(subs, resp)
 	}
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		q.add(NewCommand(CmdMessage, msg))
+		q.pushCommand(NewCommand(CmdMessage, msg))
 		for _, resp := range subs {
 			<-resp.msgC
 		}

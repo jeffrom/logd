@@ -10,10 +10,10 @@ import (
 )
 
 // Server is an interface for interaction with clients
-// type Server interface {
-// 	Respond(cmd *Command, resp *Response) error
-// 	Send(sub *Subscription, msg *Message) error
-// }
+type Server interface {
+	Respond(cmd *Command, resp *Response) error
+	Send(sub *Subscription, msg *Message) error
+}
 
 // SocketServer handles socket connections
 type SocketServer struct {
@@ -195,7 +195,7 @@ func (s *SocketServer) handleClient(conn *conn) {
 
 		debugf(s.config, "%s<-%s: %s", conn.LocalAddr(), conn.RemoteAddr(), cmd)
 
-		resp, err := s.q.add(cmd)
+		resp, err := s.q.pushCommand(cmd)
 		panicOnError(err)
 
 		err = conn.SetWriteDeadline(time.Now().Add(s.writeTimeout))
