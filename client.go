@@ -3,7 +3,6 @@ package logd
 // NOTE CLIENT
 
 import (
-	"bufio"
 	"fmt"
 	"log"
 	"net"
@@ -157,27 +156,6 @@ func (pe protocolError) Error() string {
 
 func (c *Client) readLine() ([]byte, error) {
 	return readLine(c.pr.br)
-}
-
-func readLine(br *bufio.Reader) ([]byte, error) {
-	line, err := br.ReadSlice('\n')
-	if err == bufio.ErrBufferFull {
-		return nil, protocolError("long response line")
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	if len(line) < termLen {
-		return nil, protocolError("line missing terminator")
-	}
-
-	if line[len(line)-1] != '\n' || line[len(line)-2] != '\r' {
-		return nil, protocolError("bad response line terminator")
-	}
-
-	line = line[:len(line)-2]
-	return line, nil
 }
 
 func (c *Client) resetLimit() {

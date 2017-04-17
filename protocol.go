@@ -62,6 +62,7 @@ func newProtoReader(r io.Reader, config *Config) *protoReader {
 }
 
 func (pr *protoReader) readCommand() (*Command, error) {
+	pr.br = bufio.NewReader(pr.r)
 	line, err := readLine(pr.br)
 	if err != nil {
 		return nil, err
@@ -198,7 +199,6 @@ func (ps *Scanner) readMessage() (*Message, error) {
 
 	_, err = fmt.Sscanf(string(parts[0]), "+%d", &id)
 	if err != nil {
-		fmt.Println("fuck", err)
 		return nil, err
 	}
 
@@ -213,4 +213,25 @@ func (ps *Scanner) readMessage() (*Message, error) {
 	}
 
 	return NewMessage(id, body), err
+}
+
+func readLine(br *bufio.Reader) ([]byte, error) {
+	line, err := br.ReadSlice('\n')
+	if err == bufio.ErrBufferFull {
+		return nil, protocolError("long response line")
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	if len(line) < termLen {
+		return nil, protocolError("line missing terminator")
+	}
+
+	if line[len(line)-1] != '\n' || line[len(line)-2] != '\r' {
+		return nil, protocolError("bad response line terminator")
+	}
+
+	line = line[:len(line)-2]
+	return line, nil
 }

@@ -204,23 +204,10 @@ func (s *SocketServer) handleClient(conn *conn) {
 		respBytes := resp.Bytes()
 		if cmd.name == CmdClose {
 			debugf(s.config, "close %s", conn.RemoteAddr())
-			conn.mu.Lock()
-			conn.pw.bw.Write(respBytes)
-			conn.pw.bw.Flush()
-			conn.mu.Unlock()
+			conn.write(respBytes)
 			break
 		} else {
-			conn.mu.Lock()
-			_, err = conn.pw.bw.Write(respBytes)
-			conn.mu.Unlock()
-			if err, ok := err.(net.Error); ok && err.Timeout() {
-				debugf(s.config, "%s timed out", conn.RemoteAddr())
-				return
-			}
-			panicOnError(err)
-			conn.mu.Lock()
-			err = conn.pw.bw.Flush()
-			conn.mu.Unlock()
+			_, err = conn.write(respBytes)
 			if err, ok := err.(net.Error); ok && err.Timeout() {
 				debugf(s.config, "%s timed out", conn.RemoteAddr())
 				return
@@ -241,15 +228,10 @@ func (s *SocketServer) handleSubscriber(c net.Conn, cmd *Command, resp *Response
 	for {
 		select {
 		case msg := <-resp.msgC:
-			conn.mu.Lock()
-			conn.pw.bw.WriteString(fmt.Sprintf("+%d %d %s\r\n", msg.id, len(msg.body), msg.body))
-			conn.pw.bw.Flush()
-			conn.mu.Unlock()
+			serialized := []byte(fmt.Sprintf("+%d %d %s\r\n", msg.id, len(msg.body), msg.body))
+			conn.write(serialized)
 		case <-cmd.done:
-			conn.mu.Lock()
-			conn.pw.bw.Write([]byte("+EOF\r\n"))
-			conn.pw.bw.Flush()
-			conn.mu.Unlock()
+			conn.write([]byte("+EOF\r\n"))
 			return
 		}
 	}
