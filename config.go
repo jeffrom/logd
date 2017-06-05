@@ -18,4 +18,8 @@ var DefaultConfig *Config
 func init() {
 	DefaultConfig = NewConfig()
 	DefaultConfig.Verbose = true
+
+	logger := newMemLogger()
+	logger.discard = true
+	DefaultConfig.Logger = logger
 }

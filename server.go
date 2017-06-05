@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"strings"
 	"sync"
 	"time"
 )
@@ -31,10 +32,12 @@ type SocketServer struct {
 	readTimeout  time.Duration
 	writeTimeout time.Duration
 
-	stopC     chan struct{}
-	shutdownC chan struct{}
+	stopC        chan struct{}
+	shutdownC    chan struct{}
+	shuttingDown bool
 
-	q *eventQ
+	q       *eventQ
+	replica *Replica
 
 	stats    *stats
 	statlock sync.RWMutex
@@ -90,6 +93,7 @@ func (s *SocketServer) listenAndServe(wait bool) error {
 		select {
 		case <-s.stopC:
 			log.Printf("Shutting down server at %s", s.ln.Addr())
+			s.logConns()
 			return s.shutdown()
 		case conn := <-s.connIn:
 			go s.handleClient(conn)
@@ -112,10 +116,26 @@ func (s *SocketServer) ready() {
 	<-s.readyC
 }
 
+func (s *SocketServer) isShuttingDown() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.shuttingDown
+}
+
 func (s *SocketServer) accept() {
 	for {
+		if s.isShuttingDown() {
+			break
+		}
+
 		rawConn, err := s.ln.Accept()
 		if err != nil {
+			break
+		}
+		if s.isShuttingDown() {
+			log.Printf("Closed new connection from %s because shutting down", rawConn.RemoteAddr())
+			rawConn.Close()
 			break
 		}
 
@@ -141,15 +161,52 @@ func (s *SocketServer) shutdown() error {
 	defer func() {
 		s.shutdownC <- struct{}{}
 	}()
+
+	s.mu.Lock()
+	s.shuttingDown = true
+	s.mu.Unlock()
+
 	err := s.q.stop()
 
+	wg := sync.WaitGroup{}
 	s.connMu.Lock()
-	for conn := range s.conns {
-		delete(s.conns, conn)
+	for c := range s.conns {
+		wg.Add(1)
+		go func(c *conn) {
+			defer wg.Done()
+
+			if c.isActive() {
+				select {
+				case <-c.done:
+				case <-time.After(1 * time.Second): // XXX config timeout
+					log.Printf("%s timed out", c.RemoteAddr())
+				}
+			} else {
+				c.Conn.Close()
+			}
+
+			s.connMu.Lock()
+			delete(s.conns, c)
+			s.connMu.Unlock()
+		}(c)
 	}
 	s.connMu.Unlock()
+	wg.Wait()
 
 	return err
+}
+
+func (s *SocketServer) logConns() {
+	s.connMu.Lock()
+	defer s.connMu.Unlock()
+
+	var states []string
+	for c := range s.conns {
+		state := fmt.Sprintf("%s(%s)", c.Conn.RemoteAddr(), c.getState())
+		states = append(states, state)
+	}
+
+	log.Printf("connection states (%d): %s", len(states), strings.Join(states, ", "))
 }
 
 func (s *SocketServer) stop() {
@@ -158,6 +215,7 @@ func (s *SocketServer) stop() {
 }
 
 func (s *SocketServer) addConn(conn *conn) {
+	conn.setState(connStateInactive)
 	s.connMu.Lock()
 	s.conns[conn] = true
 	s.connMu.Unlock()
@@ -169,6 +227,20 @@ func (s *SocketServer) removeConn(conn *conn) {
 	s.connMu.Unlock()
 }
 
+func (s *SocketServer) handleConnErr(err error, conn *conn) error {
+	if err == io.EOF {
+		debugf(s.config, "%s closed the connection", conn.RemoteAddr())
+	} else if err, ok := err.(net.Error); ok && err.Timeout() {
+		log.Printf("%s timed out", conn.RemoteAddr())
+	} else if err != nil {
+		conn.setState(connStateFailed)
+
+		// XXX
+		panic(err)
+	}
+	return err
+}
+
 func (s *SocketServer) handleClient(conn *conn) {
 	counts.Add("clients", 1)
 
@@ -176,30 +248,39 @@ func (s *SocketServer) handleClient(conn *conn) {
 		counts.Add("clients", -1)
 
 		s.removeConn(conn)
-		conn.Close()
+		conn.close()
 	}()
 
 	for {
+		if s.isShuttingDown() {
+			break
+		}
+
 		err := conn.SetReadDeadline(time.Now().Add(s.readTimeout))
-		panicOnError(err)
+		if cerr := s.handleConnErr(err, conn); cerr != nil {
+			return
+		}
 
+		conn.setState(connStateActive)
 		cmd, err := conn.pr.readCommand()
-		if err == io.EOF {
+		if cerr := s.handleConnErr(err, conn); cerr != nil {
 			return
 		}
-		if err, ok := err.(net.Error); ok && err.Timeout() {
-			log.Printf("%s timed out", conn.RemoteAddr())
-			return
-		}
-		panicOnError(err)
-
 		debugf(s.config, "%s<-%s: %s", conn.LocalAddr(), conn.RemoteAddr(), cmd)
 
+		if s.isShuttingDown() {
+			break
+		}
+
 		resp, err := s.q.pushCommand(cmd)
-		panicOnError(err)
+		if cerr := s.handleConnErr(err, conn); cerr != nil {
+			return
+		}
 
 		err = conn.SetWriteDeadline(time.Now().Add(s.writeTimeout))
-		panicOnError(err)
+		if cerr := s.handleConnErr(err, conn); cerr != nil {
+			return
+		}
 
 		respBytes := resp.Bytes()
 		if cmd.name == CmdClose {
@@ -208,28 +289,33 @@ func (s *SocketServer) handleClient(conn *conn) {
 			break
 		} else {
 			_, err = conn.write(respBytes)
-			if err, ok := err.(net.Error); ok && err.Timeout() {
-				debugf(s.config, "%s timed out", conn.RemoteAddr())
+			if cerr := s.handleConnErr(err, conn); cerr != nil {
 				return
 			}
-			panicOnError(err)
 		}
 		debugf(s.config, "%s->%s: %q", conn.LocalAddr(), conn.RemoteAddr(), respBytes)
 
 		if cmd.name == CmdRead {
 			debugf(s.config, "sending log messages to %s", conn.RemoteAddr())
-			go s.handleSubscriber(conn.Conn, cmd, resp)
+			conn.setState(connStateReading)
+			// continue the loop to accept additional commands
+			go s.handleSubscriber(conn, cmd, resp)
+		} else {
+			conn.setState(connStateInactive)
+		}
+
+		if s.isShuttingDown() {
+			break
 		}
 	}
 }
 
-func (s *SocketServer) handleSubscriber(c net.Conn, cmd *Command, resp *Response) {
-	conn := newConn(c, s.config)
+func (s *SocketServer) handleSubscriber(conn *conn, cmd *Command, resp *Response) {
 	for {
 		select {
 		case msg := <-resp.msgC:
-			serialized := []byte(fmt.Sprintf("+%d %d %s\r\n", msg.id, len(msg.body), msg.body))
-			conn.write(serialized)
+			// serialized := []byte(fmt.Sprintf("+%d %d %s\r\n", msg.id, len(msg.body), msg.body))
+			conn.write(append([]byte("+"), msg...))
 		case <-cmd.done:
 			conn.write([]byte("+EOF\r\n"))
 			return

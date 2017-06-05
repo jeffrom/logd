@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"log"
 	"runtime/debug"
+	"sync"
 	"testing"
 )
 
@@ -17,7 +18,7 @@ func serverBenchConfigWithOpts(discard bool) *Config {
 	config := NewConfig()
 
 	logger := newMemLogger()
-	logger.discard = true
+	logger.discard = discard
 	// logger.returnErr = loggerShouldErr
 
 	config.Verbose = false
@@ -40,11 +41,11 @@ func startServerForBenchWithConfig(b *testing.B, config *Config) *SocketServer {
 	return srv
 }
 
-func BenchmarkServerStartStop(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		newTestServer(serverBenchConfig()).stop()
-	}
-}
+// func BenchmarkServerStartStop(b *testing.B) {
+// 	for i := 0; i < b.N; i++ {
+// 		newTestServer(serverBenchConfig()).stop()
+// 	}
+// }
 
 func BenchmarkServerConnect(b *testing.B) {
 	b.StopTimer()
@@ -54,8 +55,8 @@ func BenchmarkServerConnect(b *testing.B) {
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		client := newTestNetConn(config, srv)
-		client.close()
+		client := newTestClient(config, srv)
+		client.Close()
 	}
 }
 
@@ -65,8 +66,8 @@ func BenchmarkServerPing(b *testing.B) {
 	srv := newTestServer(config)
 	defer closeTestServer(b, srv)
 
-	client := newTestNetConn(config, srv)
-	defer client.close()
+	client := newTestClient(config, srv)
+	defer client.Close()
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
@@ -80,8 +81,8 @@ func BenchmarkServerMsg(b *testing.B) {
 	srv := newTestServer(config)
 	defer closeTestServer(b, srv)
 
-	client := newTestNetConn(config, srv)
-	defer client.close()
+	client := newTestClient(config, srv)
+	defer client.Close()
 
 	msg := someMessage
 	b.StartTimer()
@@ -97,8 +98,9 @@ func BenchmarkServerRead(b *testing.B) {
 	srv := newTestServer(config)
 	defer closeTestServer(b, srv)
 
-	client := newTestNetConn(config, srv)
-	defer client.close()
+	client := newTestClient(config, srv)
+	defer client.Close()
+
 	client.Do(NewCommand(CmdMessage, someMessage))
 
 	b.StartTimer()
@@ -111,15 +113,15 @@ func BenchmarkServerRead(b *testing.B) {
 
 func BenchmarkServerTail(b *testing.B) {
 	b.StopTimer()
-	config := serverBenchConfigWithOpts(true)
+	config := serverBenchConfig()
 	srv := newTestServer(config)
 	defer closeTestServer(b, srv)
 
-	client := newTestNetConn(config, srv)
-	defer client.close()
+	client := newTestClient(config, srv)
+	defer client.Close()
 
-	writerClient := newTestNetConn(config, srv)
-	defer writerClient.close()
+	writerClient := newTestClient(config, srv)
+	defer writerClient.Close()
 
 	scanner, _ := client.DoRead(1, 0)
 
@@ -133,18 +135,18 @@ func BenchmarkServerTail(b *testing.B) {
 
 func BenchmarkServerTailTwenty(b *testing.B) {
 	b.StopTimer()
-	config := serverBenchConfigWithOpts(true)
+	config := serverBenchConfig()
 	srv := newTestServer(config)
 	defer closeTestServer(b, srv)
 
-	client := newTestNetConn(config, srv)
-	defer client.close()
-
-	writerClient := newTestNetConn(config, srv)
-	defer writerClient.close()
+	writerClient := newTestClient(config, srv)
+	defer writerClient.Close()
 
 	var scanners []*Scanner
 	for i := 0; i < 20; i++ {
+		client := newTestClient(config, srv)
+		defer client.Close()
+
 		scanner, _ := client.DoRead(1, 0)
 		scanners = append(scanners, scanner)
 	}
@@ -156,5 +158,62 @@ func BenchmarkServerTailTwenty(b *testing.B) {
 			for scanner.Scan() {
 			}
 		}
+	}
+}
+
+func BenchmarkServerLoadTest(b *testing.B) {
+	b.StopTimer()
+	config := serverBenchConfig()
+	srv := newTestServer(config)
+	defer closeTestServer(b, srv)
+
+	client := newTestClient(config, srv)
+	defer client.Close()
+
+	var writers []*Client
+	for i := 0; i < 50; i++ {
+		writerClient := newTestClient(config, srv)
+		defer writerClient.Close()
+		writers = append(writers, writerClient)
+	}
+
+	var scanners []*Scanner
+	for i := 0; i < 50; i++ {
+		client := newTestClient(config, srv)
+		defer client.Close()
+
+		scanner, _ := client.DoRead(1, 0)
+		scanners = append(scanners, scanner)
+	}
+
+	var wg sync.WaitGroup
+	var connwg sync.WaitGroup
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		for ii := 0; ii < 50; ii++ {
+			connwg.Add(1)
+			go func() {
+				client := newTestClient(config, srv)
+				client.Close()
+				connwg.Done()
+			}()
+		}
+
+		for _, writerClient := range writers {
+			wg.Add(1)
+			go func(writerClient *Client) {
+				writerClient.Do(NewCommand(CmdMessage, someMessage))
+				wg.Done()
+			}(writerClient)
+		}
+		wg.Wait()
+
+		for _, scanner := range scanners {
+			for scanner.Scan() {
+			}
+		}
+
+		connwg.Wait()
 	}
 }

@@ -17,6 +17,12 @@ const (
 	// CmdMessage is a message command type.
 	CmdMessage
 
+	// CmdRawMessage is a message command type. Used for replication.
+	CmdRawMessage
+
+	// CmdReplicate initiates a replication session on the connection.
+	CmdReplicate
+
 	// CmdRead is a read command type.
 	CmdRead
 
@@ -40,6 +46,10 @@ func (cmd *cmdType) String() string {
 	switch *cmd {
 	case CmdMessage:
 		return "MSG"
+	case CmdReplicate:
+		return "REPLICATE"
+	case CmdRawMessage:
+		return "RAWMSG"
 	case CmdRead:
 		return "READ"
 	case CmdHead:
@@ -124,6 +134,9 @@ func cmdNamefromBytes(b []byte) cmdType {
 	if bytes.Equal(b, []byte("MSG")) {
 		return CmdMessage
 	}
+	if bytes.Equal(b, []byte("RAWMSG")) {
+		return CmdMessage
+	}
 	if bytes.Equal(b, []byte("READ")) {
 		return CmdRead
 	}
@@ -143,4 +156,8 @@ func cmdNamefromBytes(b []byte) cmdType {
 		return CmdSleep
 	}
 	return 0
+}
+
+func parseNumber(b []byte) (uint64, error) {
+	return strconv.ParseUint(string(b), 10, 64)
 }

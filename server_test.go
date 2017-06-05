@@ -6,10 +6,11 @@ import (
 	"testing"
 )
 
-func newTestNetConn(config *Config, srv *SocketServer) *Client {
+func newTestClient(config *Config, srv *SocketServer) *Client {
 	if config == nil {
 		config = defaultTestConfig()
 	}
+
 	conn, err := DialConfig(srv.ln.Addr().String(), config)
 	if err != nil {
 		panic(err)
@@ -39,16 +40,16 @@ func closeTestServer(t testing.TB, srv *SocketServer) {
 func checkScan(t *testing.T, scanner *Scanner, msg []byte) {
 	readALine := scanner.Scan()
 	if !readALine {
-		debug.PrintStack()
+		t.Logf("%s", debug.Stack())
 		t.Fatalf("Expected to scan one message but failed: %s", scanner.Err())
 	}
 	if err := scanner.Err(); err != nil {
-		debug.PrintStack()
+		t.Logf("%s", debug.Stack())
 		t.Fatalf("unexpected error scanning: %v", err)
 	}
 
 	if respMsg := scanner.Message(); respMsg == nil || !reflect.DeepEqual(respMsg.body, msg) {
-		debug.PrintStack()
+		t.Logf("%s", debug.Stack())
 		if respMsg == nil {
 			t.Fatalf("Expected %q response but got nil message", msg)
 		} else {
@@ -59,7 +60,7 @@ func checkScan(t *testing.T, scanner *Scanner, msg []byte) {
 
 func checkRespOK(t *testing.T, resp *Response) {
 	if !reflect.DeepEqual(resp, newResponse(respOK)) {
-		debug.PrintStack()
+		t.Logf("%s", debug.Stack())
 		t.Fatalf("response was not OK: %q", resp.Bytes())
 	}
 }
@@ -73,8 +74,8 @@ func TestPingServer(t *testing.T) {
 	srv := newTestServer(defaultTestConfig())
 	defer closeTestServer(t, srv)
 
-	client := newTestNetConn(defaultTestConfig(), srv)
-	defer client.close()
+	client := newTestClient(defaultTestConfig(), srv)
+	defer client.Close()
 
 	resp, err := client.Do(NewCommand(CmdPing))
 	checkError(t, err)
@@ -85,11 +86,11 @@ func TestPingServer(t *testing.T) {
 }
 
 func TestMsgServer(t *testing.T) {
-	srv := newTestServer(testConfig(false))
+	srv := newTestServer(testConfig(newMemLogger()))
 	defer closeTestServer(t, srv)
 
-	client := newTestNetConn(defaultTestConfig(), srv)
-	defer client.close()
+	client := newTestClient(defaultTestConfig(), srv)
+	defer client.Close()
 
 	resp, err := client.Do(NewCommand(CmdMessage, []byte("cool message")))
 	checkError(t, err)
@@ -100,11 +101,11 @@ func TestMsgServer(t *testing.T) {
 }
 
 func TestReadServer(t *testing.T) {
-	srv := newTestServer(testConfig(false))
+	srv := newTestServer(testConfig(newMemLogger()))
 	defer closeTestServer(t, srv)
 
-	client := newTestNetConn(defaultTestConfig(), srv)
-	defer client.close()
+	client := newTestClient(defaultTestConfig(), srv)
+	defer client.Close()
 
 	msg := []byte("cool message")
 	resp, err := client.Do(NewCommand(CmdMessage, msg))
@@ -118,14 +119,14 @@ func TestReadServer(t *testing.T) {
 }
 
 func TestTailServer(t *testing.T) {
-	srv := newTestServer(testConfig(false))
+	srv := newTestServer(testConfig(newMemLogger()))
 	defer closeTestServer(t, srv)
 
-	client := newTestNetConn(defaultTestConfig(), srv)
-	defer client.close()
+	client := newTestClient(defaultTestConfig(), srv)
+	defer client.Close()
 
-	writerClient := newTestNetConn(defaultTestConfig(), srv)
-	defer writerClient.close()
+	writerClient := newTestClient(defaultTestConfig(), srv)
+	defer writerClient.Close()
 
 	scanner, err := client.DoRead(1, 0)
 	checkError(t, err)
@@ -137,8 +138,8 @@ func TestTailServer(t *testing.T) {
 
 	checkScan(t, scanner, msg)
 
-	secondTailClient := newTestNetConn(defaultTestConfig(), srv)
-	defer secondTailClient.close()
+	secondTailClient := newTestClient(defaultTestConfig(), srv)
+	defer secondTailClient.Close()
 
 	secondScanner, err := client.DoRead(1, 0)
 	checkError(t, err)
@@ -154,13 +155,25 @@ func TestTailServer(t *testing.T) {
 }
 
 func TestServerSleep(t *testing.T) {
-	srv := newTestServer(testConfig(false))
+	srv := newTestServer(testConfig(newMemLogger()))
 	defer closeTestServer(t, srv)
 
-	client := newTestNetConn(defaultTestConfig(), srv)
-	defer client.close()
+	client := newTestClient(defaultTestConfig(), srv)
+	defer client.Close()
 
 	resp, err := client.Do(NewCommand(CmdSleep, []byte("10")))
 	checkError(t, err)
 	checkRespOK(t, resp)
 }
+
+// func TestServerReplicate(t *testing.T) {
+// 	srv := newTestServer(testConfig(newMemLogger()))
+// 	defer closeTestServer(t, srv)
+
+// 	client := newTestClient(defaultTestConfig(), srv)
+// 	defer client.Close()
+
+// 	// resp, err := client.Do(NewCommand(CmdSleep, []byte("10")))
+// 	// checkError(t, err)
+// 	// checkRespOK(t, resp)
+// }

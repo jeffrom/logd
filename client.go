@@ -4,6 +4,7 @@ package logd
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"time"
@@ -36,7 +37,10 @@ func DialConfig(addr string, config *Config, conns ...net.Conn) (*Client, error)
 	} else {
 		conn, err = net.Dial("tcp", addr)
 		if err != nil {
-			conn.Close()
+			if conn != nil {
+				conn.Close()
+			}
+
 			return nil, err
 		}
 	}
@@ -85,44 +89,59 @@ func (c *Client) readResponse() (*Response, error) {
 
 func (c *Client) readScanResponse() (*Scanner, error) {
 	resp, err := c.pr.readResponse()
-	if err != nil {
+	if c.handleErr(err) != nil {
 		return nil, err
 	}
 
 	debugf(c.config, "initial scan response: %s", resp.status)
 
-	return newProtoScanner(c.pr.br, c.conn, c.config), nil
+	return newScanner(c.pr.br, c.conn, c.config), nil
 }
 
-func (c *Client) close() error {
+// Close closes the client connection.
+func (c *Client) Close() error {
 	debugf(c.config, "closing %s->%s", c.conn.LocalAddr(), c.conn.RemoteAddr())
 
 	err := c.writeCommand(NewCommand(CmdClose))
-	if err != nil {
+	if c.handleErr(err) != nil {
 		log.Printf("close error: %s", err)
 		c.conn.Close()
 		return err
 	}
 
 	_, err = c.readResponse()
-	if err != nil {
+	if c.handleErr(err) != nil {
 		log.Printf("close error: %s", err)
 		c.conn.Close()
 		return err
 	}
 
 	debugf(c.config, "closing conn")
-	return c.conn.Close()
+	return c.handleErr(c.conn.Close())
+}
+
+func (c *Client) handleErr(err error) error {
+	if err == nil {
+		return err
+	}
+	if err == io.EOF {
+		debugf(c.config, "%s closed the connection", c.conn.RemoteAddr())
+	}
+	if err, ok := err.(net.Error); ok && err.Timeout() {
+		debugf(c.config, "%s timed out", c.conn.RemoteAddr())
+	}
+	return err
 }
 
 // Do executes a command and returns the response.
 func (c *Client) Do(cmds ...*Command) (*Response, error) {
 	for _, cmd := range cmds {
-		if err := c.writeCommand(cmd); err != nil {
+		if err := c.writeCommand(cmd); c.handleErr(err) != nil {
+
 			return nil, err
 		}
 	}
-	if err := c.flush(); err != nil {
+	if err := c.flush(); c.handleErr(err) != nil {
 		return nil, err
 	}
 	return c.readResponse()
@@ -135,14 +154,14 @@ func (c *Client) DoRead(id uint64, limit int) (*Scanner, error) {
 		[]byte(fmt.Sprintf("%d", id)),
 		[]byte(fmt.Sprintf("%d", limit)),
 	)
-	if err := c.writeCommand(cmd); err != nil {
+	if err := c.writeCommand(cmd); c.handleErr(err) != nil {
 		return nil, err
 	}
 	return c.readScanResponse()
 }
 
 func (c *Client) Write(p []byte) (int, error) {
-	if err := c.writeCommand(NewCommand(CmdMessage, p)); err != nil {
+	if err := c.writeCommand(NewCommand(CmdMessage, p)); c.handleErr(err) != nil {
 		return 0, err
 	}
 	return len(p), nil

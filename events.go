@@ -1,9 +1,9 @@
 package logd
 
 import (
+	"errors"
 	"fmt"
 	"log"
-	"strconv"
 	"time"
 )
 
@@ -19,11 +19,12 @@ import (
 // eventQ manages the receiving, processing, and responding to events.
 type eventQ struct {
 	config        *Config
+	currID        uint64
 	in            chan *Command
 	close         chan struct{}
 	subscriptions map[chan *Response]*Subscription
 	log           Logger
-	// srv           Server
+	client        *Client
 }
 
 func newEventQ(config *Config) *eventQ {
@@ -33,12 +34,17 @@ func newEventQ(config *Config) *eventQ {
 		close:         make(chan struct{}),
 		subscriptions: make(map[chan *Response]*Subscription),
 		log:           config.Logger,
-		// srv:           config.Server,
 	}
 	return q
 }
 
 func (q *eventQ) start() error {
+	currID, err := q.log.Head()
+	if err != nil {
+		return err
+	}
+	q.currID = currID + 1
+
 	go q.loop()
 	return nil
 }
@@ -52,6 +58,10 @@ func (q *eventQ) loop() {
 			switch cmd.name {
 			case CmdMessage:
 				q.handleMsg(cmd)
+			case CmdReplicate:
+				q.handleReplicate(cmd)
+			case CmdRawMessage:
+				q.handleRawMsg(cmd)
 			case CmdRead:
 				q.handleRead(cmd)
 			case CmdHead:
@@ -90,15 +100,21 @@ func (q *eventQ) stop() error {
 }
 
 func (q *eventQ) handleMsg(cmd *Command) {
-	var id uint64
+	// TODO make the messages bytes once and reuse
+	var msgs [][]byte
+	id := q.currID - 1
+
 	for _, msg := range cmd.args {
-		_, currID, err := q.log.WriteMessage(msg)
+		id++
+		msgb := NewMessage(id, msg).bytes()
+		msgs = append(msgs, msgb)
+		_, err := q.log.Write(msgb)
 		if err != nil {
 			cmd.respond(newResponse(respErr))
 			return
 		}
-		id = currID
 	}
+	q.currID = id + 1
 
 	resp := newResponse(respOK)
 	resp.id = id
@@ -106,36 +122,56 @@ func (q *eventQ) handleMsg(cmd *Command) {
 
 	for _, sub := range q.subscriptions {
 		go func(sub *Subscription) {
-			for _, msg := range cmd.args {
-				sub.send(NewMessage(id, msg))
+			for i := range cmd.args {
+				sub.send(msgs[i])
 			}
 		}(sub)
 	}
 }
 
-func (q *eventQ) handleRead(cmd *Command) {
-	if len(cmd.args) != 2 {
+// handleReplicate basically does the same thing as handleRead now.
+func (q *eventQ) handleReplicate(cmd *Command) {
+	startID, err := q.parseReplicate(cmd)
+	if err != nil {
+		debugf(q.config, "invalid: %v", err)
 		cmd.respond(newResponse(respErr))
 		return
 	}
 
-	startID, err := strconv.ParseUint(string(cmd.args[0]), 10, 64)
-	if err != nil {
-		cmd.respond(newResponse(respErr))
-		return
-	}
+	q.doRead(cmd, startID, 0)
+}
 
-	limit, err := strconv.ParseUint(string(cmd.args[1]), 10, 64)
-	if err != nil {
-		cmd.respond(newResponse(respErr))
-		return
+func (q *eventQ) parseReplicate(cmd *Command) (uint64, error) {
+	if len(cmd.args) != 1 {
+		return 0, errInvalidFormat
 	}
+	return parseNumber(cmd.args[0])
+}
+
+// handleRawMsg receives a chunk of data from a master and writes it to the log
+func (q *eventQ) handleRawMsg(cmd *Command) {
 
 	resp := newResponse(respOK)
-	resp.msgC = make(chan *Message, 0)
+	cmd.respond(resp)
+}
+
+func (q *eventQ) handleRead(cmd *Command) {
+	startID, limit, err := q.parseRead(cmd)
+	if err != nil {
+		debugf(q.config, "invalid: %v", err)
+		cmd.respond(newResponse(respErr))
+		return
+	}
+
+	q.doRead(cmd, startID, limit)
+}
+
+func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
+	resp := newResponse(respOK)
+	resp.msgC = make(chan []byte)
 	cmd.respond(resp)
 
-	err = q.log.ReadFromID(resp.msgC, startID, int(limit))
+	err := q.log.ReadFromID(resp.msgC, startID, int(limit))
 	panicOnError(err)
 
 	if limit == 0 { // read forever
@@ -143,6 +179,26 @@ func (q *eventQ) handleRead(cmd *Command) {
 	} else {
 		cmd.finish()
 	}
+}
+
+var errInvalidFormat = errors.New("Invalid command format")
+
+func (q *eventQ) parseRead(cmd *Command) (uint64, uint64, error) {
+	if len(cmd.args) != 2 {
+		// cmd.respond(newResponse(respErr))
+		return 0, 0, errInvalidFormat
+	}
+
+	startID, err := parseNumber(cmd.args[0])
+	if err != nil {
+		return 0, 0, err
+	}
+
+	limit, err := parseNumber(cmd.args[1])
+	if err != nil {
+		return 0, 0, err
+	}
+	return startID, limit, nil
 }
 
 func (q *eventQ) handleHead(cmd *Command) {

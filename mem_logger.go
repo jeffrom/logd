@@ -5,35 +5,38 @@ import (
 )
 
 type memLogger struct {
-	messages  [][]byte
-	headC     chan []byte
-	returnErr bool
-	discard   bool
+	messages      [][]byte
+	headC         chan []byte
+	returnErr     bool
+	headReturnErr error
+	discard       bool
 }
 
 func newMemLogger() *memLogger {
-	return &memLogger{headC: make(chan []byte, 1024*1024)}
+	return &memLogger{headC: make(chan []byte, 1024)}
 }
 
-func (log *memLogger) WriteMessage(msg []byte) (int, uint64, error) {
+func (log *memLogger) Write(b []byte) (int, error) {
 	if log.returnErr {
-		return 0, 0, errors.New("hey it's an error")
+		return 0, errors.New("hey it's an error")
 	}
 	if !log.discard {
-		cp := make([]byte, len(msg))
-		copy(cp, msg)
+		cp := make([]byte, len(b))
+		copy(cp, b)
 		log.messages = append(log.messages, cp)
 	}
 
-	id, err := log.Head()
-	if err != nil {
-		return 0, 0, err
-	}
-
-	return len(msg), id, nil
+	return len(b), nil
 }
 
-func (log *memLogger) ReadFromID(c chan *Message, id uint64, limit int) error {
+func (log *memLogger) Flush() error {
+	if log.returnErr {
+		return errors.New("hey it's an error")
+	}
+	return nil
+}
+
+func (log *memLogger) ReadFromID(c chan []byte, id uint64, limit int) error {
 	if log.returnErr {
 		return errors.New("hey it's an error")
 	}
@@ -42,9 +45,10 @@ func (log *memLogger) ReadFromID(c chan *Message, id uint64, limit int) error {
 	}
 	forever := limit == 0
 
-	// TODO read forever in a goroutine that can be closed
 	for i := id - 1; i < uint64(len(log.messages)); i++ {
-		c <- NewMessage(i+1, log.messages[i])
+		msgBytes := make([]byte, len(log.messages[i]))
+		copy(msgBytes, log.messages[i])
+		c <- msgBytes
 
 		if !forever {
 			limit--
@@ -58,8 +62,8 @@ func (log *memLogger) ReadFromID(c chan *Message, id uint64, limit int) error {
 }
 
 func (log *memLogger) Head() (uint64, error) {
-	if log.returnErr {
-		return 0, errors.New("hey it's an error")
+	if log.headReturnErr != nil {
+		return 0, log.headReturnErr
 	}
 
 	return uint64(len(log.messages)), nil

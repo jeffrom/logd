@@ -2,6 +2,7 @@ package logd
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"net"
 	"testing"
@@ -30,6 +31,17 @@ func dialTestConn(r io.Reader, w io.Writer) *Client {
 	return conn
 }
 
+func newMockClient(config *Config, srv *SocketServer) (*Client, *mockConn) {
+	c, err := net.Dial("tcp", srv.ln.Addr().String())
+	if err != nil {
+		panic(err)
+	}
+	mc := newMockConn(c)
+	client, _ := DialConfig(srv.ln.Addr().String(), config, mc)
+
+	return client, mc
+}
+
 func TestConnProtocolWriter(t *testing.T) {
 	r := &bytes.Buffer{}
 	w := &bytes.Buffer{}
@@ -48,4 +60,25 @@ func TestConnProtocolWriter(t *testing.T) {
 	checkError(t, err)
 
 	checkGoldenFile(t, "conn_test", w.Bytes(), golden)
+}
+
+func TestClientWriteFails(t *testing.T) {
+	config := defaultTestConfig()
+
+	srv := newTestServer(testConfig(newMemLogger()))
+	defer closeTestServer(t, srv)
+	client, mockConn := newMockClient(config, srv)
+	defer client.Close()
+
+	mockConn.failWriteWith(&net.OpError{
+		Source: srv.ln.Addr(),
+		Net:    "tcp",
+		Op:     "dial",
+		Err:    errors.New("unknown host"),
+	})
+
+	_, err := client.Do(NewCommand(CmdPing))
+	if err == nil {
+		t.Fatalf("Expected error but got none")
+	}
 }

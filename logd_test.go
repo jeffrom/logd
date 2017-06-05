@@ -42,7 +42,7 @@ func checkGoldenFile(t *testing.T, filename string, b []byte, golden bool) {
 
 func checkError(t *testing.T, err error) {
 	if err != nil {
-		debug.PrintStack()
+		t.Logf("%s", debug.Stack())
 		t.Fatalf("Unexpected error %v", err)
 	}
 }

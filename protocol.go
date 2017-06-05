@@ -94,7 +94,7 @@ func (pr *protoReader) readCommand() (*Command, error) {
 			return nil, errors.New("Badly formatted argument")
 		}
 
-		_, err := strconv.ParseUint(string(parts[0]), 10, 64)
+		_, err := parseNumber(parts[0])
 		if err != nil {
 			return nil, errors.New("Badly formatted argument length")
 		}
@@ -142,7 +142,7 @@ type Scanner struct {
 	msg    *Message
 }
 
-func newProtoScanner(r io.Reader, conn net.Conn, config *Config) *Scanner {
+func newScanner(r io.Reader, conn net.Conn, config *Config) *Scanner {
 	return &Scanner{br: bufio.NewReader(r), conn: conn, config: config}
 }
 
@@ -188,6 +188,7 @@ func (ps *Scanner) readMessage() (*Message, error) {
 		return nil, err
 	}
 
+	// fmt.Printf("%q\n", line)
 	if line[0] != '+' {
 		return nil, errors.New("invalid first byte")
 	}

@@ -38,7 +38,7 @@ type Response struct {
 	status respType
 	id     uint64
 	body   []byte
-	msgC   chan *Message
+	msgC   chan []byte
 }
 
 func newResponse(status respType) *Response {
@@ -74,11 +74,4 @@ func (r *Response) Bytes() []byte {
 
 	buf.WriteString("\r\n")
 	return buf.Bytes()
-}
-
-type scanner struct {
-}
-
-func newScanner() *scanner {
-	return &scanner{}
 }

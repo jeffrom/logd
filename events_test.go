@@ -2,16 +2,17 @@ package logd
 
 import (
 	"bytes"
+	"errors"
 	"runtime/debug"
 	"testing"
 	"time"
 )
 
-func testConfig(loggerShouldErr bool) *Config {
+func testConfig(logger Logger) *Config {
 	config := NewConfig()
 
-	logger := newMemLogger()
-	logger.returnErr = loggerShouldErr
+	// logger := newMemLogger()
+	// logger.returnErr = loggerShouldErr
 
 	config.Verbose = true
 	config.Logger = logger
@@ -19,8 +20,8 @@ func testConfig(loggerShouldErr bool) *Config {
 	return config
 }
 
-func startQ(t *testing.T, loggerShouldErr bool) *eventQ {
-	q := newEventQ(testConfig(loggerShouldErr))
+func startQ(t *testing.T, logger Logger) *eventQ {
+	q := newEventQ(testConfig(logger))
 	if err := q.start(); err != nil {
 		t.Logf("%s", debug.Stack())
 		t.Fatalf("error starting queue: %v", err)
@@ -51,11 +52,16 @@ func checkNoErrAndSuccess(t *testing.T, resp *Response, err error) {
 }
 
 func checkMessageReceived(t *testing.T, resp *Response, expectedID uint64, expectedMsg []byte) {
-	msg, ok := <-resp.msgC
+	msgb, ok := <-resp.msgC
 	if !ok {
 		t.Logf("%s", debug.Stack())
 		t.Fatal("Expected to read message but got none")
 	}
+	msg, err := fromBytes(msgb)
+	if err != nil {
+		t.Fatalf("Unexpected error: %s", err)
+	}
+
 	if msg.id != expectedID {
 		t.Logf("%s", debug.Stack())
 		t.Fatalf("Expected message with id %d but got %d", expectedID, msg.id)
@@ -84,12 +90,12 @@ func finishCommand(cmd *Command) {
 }
 
 func TestEventQStartStop(t *testing.T) {
-	q := startQ(t, false)
+	q := startQ(t, newMemLogger())
 	stopQ(t, q)
 }
 
 func TestEventQAdd(t *testing.T) {
-	q := startQ(t, false)
+	q := startQ(t, newMemLogger())
 	defer stopQ(t, q)
 
 	resp, err := q.pushCommand(NewCommand(CmdPing))
@@ -97,7 +103,7 @@ func TestEventQAdd(t *testing.T) {
 }
 
 func TestEventQLog(t *testing.T) {
-	q := startQ(t, false)
+	q := startQ(t, newMemLogger())
 	defer stopQ(t, q)
 
 	resp, err := q.pushCommand(NewCommand(CmdMessage, []byte("Hello, log!")))
@@ -108,7 +114,9 @@ func TestEventQLog(t *testing.T) {
 }
 
 func TestEventQLogErr(t *testing.T) {
-	q := startQ(t, true)
+	memLogger := newMemLogger()
+	memLogger.returnErr = true
+	q := startQ(t, memLogger)
 	defer stopQ(t, q)
 
 	resp, _ := q.pushCommand(NewCommand(CmdMessage, []byte("Hello, log!")))
@@ -116,7 +124,7 @@ func TestEventQLogErr(t *testing.T) {
 }
 
 func TestEventQHead(t *testing.T) {
-	q := startQ(t, false)
+	q := startQ(t, newMemLogger())
 	defer stopQ(t, q)
 
 	resp, err := q.pushCommand(NewCommand(CmdHead))
@@ -139,15 +147,46 @@ func TestEventQHead(t *testing.T) {
 }
 
 func TestEventQHeadErr(t *testing.T) {
-	q := startQ(t, true)
+	memLogger := newMemLogger()
+	q := startQ(t, memLogger)
 	defer stopQ(t, q)
 
+	memLogger.headReturnErr = errors.New("cool error")
 	resp, _ := q.pushCommand(NewCommand(CmdHead))
 	checkErrResp(t, resp)
+
+	anotherQ := newEventQ(testConfig(memLogger))
+	if err := anotherQ.start(); err == nil {
+		t.Fatalf("expected error starting queue but got none")
+	}
+}
+
+func TestEventQReplicate(t *testing.T) {
+	q := startQ(t, newMemLogger())
+	defer stopQ(t, q)
+
+	expectedMsg := []byte("Hello, log!")
+
+	resp, err := q.pushCommand(NewCommand(CmdMessage, expectedMsg))
+	checkNoErrAndSuccess(t, resp, err)
+
+	cmd := NewCommand(CmdReplicate, []byte("1"))
+	tailResp, err := q.pushCommand(cmd)
+	checkNoErrAndSuccess(t, tailResp, err)
+	checkMessageReceived(t, tailResp, 1, expectedMsg)
+
+	resp, err = q.pushCommand(NewCommand(CmdMessage, expectedMsg))
+	checkNoErrAndSuccess(t, resp, err)
+
+	checkMessageReceived(t, tailResp, 2, expectedMsg)
+
+	closeCmd := newCloseCommand(cmd.respC)
+	closeResp, err := q.pushCommand(closeCmd)
+	checkNoErrAndSuccess(t, closeResp, err)
 }
 
 func TestEventQRead(t *testing.T) {
-	q := startQ(t, false)
+	q := startQ(t, newMemLogger())
 	defer stopQ(t, q)
 
 	expectedMsg := []byte("Hello, log!")
@@ -176,7 +215,7 @@ func TestEventQRead(t *testing.T) {
 }
 
 func TestEventQReadFromEmpty(t *testing.T) {
-	q := startQ(t, false)
+	q := startQ(t, newMemLogger())
 	defer stopQ(t, q)
 
 	expectedMsg := []byte("Hello, log!")
@@ -191,7 +230,9 @@ func TestEventQReadFromEmpty(t *testing.T) {
 }
 
 func TestEventQReadErr(t *testing.T) {
-	q := startQ(t, true)
+	memLogger := newMemLogger()
+	memLogger.returnErr = true
+	q := startQ(t, memLogger)
 	defer stopQ(t, q)
 
 	resp, _ := q.pushCommand(NewCommand(CmdRead))
@@ -199,7 +240,7 @@ func TestEventQReadErr(t *testing.T) {
 }
 
 func TestEventQReadClose(t *testing.T) {
-	q := startQ(t, false)
+	q := startQ(t, newMemLogger())
 	defer stopQ(t, q)
 
 	expectedMsg := []byte("Hello, log!")
@@ -225,7 +266,7 @@ func TestEventQReadClose(t *testing.T) {
 }
 
 func TestEventQReadInvalidParams(t *testing.T) {
-	q := startQ(t, false)
+	q := startQ(t, newMemLogger())
 	defer stopQ(t, q)
 
 	resp, _ := q.pushCommand(NewCommand(CmdRead, []byte("asdf"), []byte("1")))
@@ -239,7 +280,7 @@ func TestEventQReadInvalidParams(t *testing.T) {
 }
 
 func TestEventQUnknownCommand(t *testing.T) {
-	q := startQ(t, false)
+	q := startQ(t, newMemLogger())
 	defer stopQ(t, q)
 
 	resp, _ := q.pushCommand(NewCommand(100))
@@ -247,7 +288,7 @@ func TestEventQUnknownCommand(t *testing.T) {
 }
 
 func TestEventQSleep(t *testing.T) {
-	q := startQ(t, false)
+	q := startQ(t, newMemLogger())
 	defer stopQ(t, q)
 
 	resp, err := q.pushCommand(NewCommand(CmdSleep, []byte("0")))

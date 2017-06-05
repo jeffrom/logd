@@ -7,7 +7,7 @@ package logd
 import "testing"
 
 func TestEventQShutdown(t *testing.T) {
-	q := startQ(t, false)
+	q := startQ(t, newMemLogger())
 	resp, err := q.pushCommand(NewCommand(CmdShutdown))
 	checkNoErrAndSuccess(t, resp, err)
 
