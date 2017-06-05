@@ -181,9 +181,9 @@ func (s *SocketServer) shutdown() error {
 				case <-time.After(1 * time.Second): // XXX config timeout
 					log.Printf("%s timed out", c.RemoteAddr())
 				}
-			} else {
-				c.Conn.Close()
 			}
+
+			c.Conn.Close()
 
 			s.connMu.Lock()
 			delete(s.conns, c)
