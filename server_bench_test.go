@@ -163,7 +163,7 @@ func BenchmarkServerTailTwenty(b *testing.B) {
 
 func BenchmarkServerLoadTest(b *testing.B) {
 	b.StopTimer()
-	config := serverBenchConfig()
+	config := serverBenchConfigWithOpts(true)
 	srv := newTestServer(config)
 	defer closeTestServer(b, srv)
 

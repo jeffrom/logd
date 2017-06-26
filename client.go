@@ -41,6 +41,14 @@ func DialConfig(addr string, config *Config, conns ...net.Conn) (*Client, error)
 				conn.Close()
 			}
 
+			// if nerr, ok := err.(*net.OpError); ok {
+			// 	if nerr.Op == "dial" {
+			// 		// unknown host
+			// 	} else if nerr.Op == "read" {
+			// 		// connection refused
+			// 	}
+			// }
+
 			return nil, err
 		}
 	}
