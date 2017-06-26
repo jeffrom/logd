@@ -2,7 +2,3 @@ package: github.com/jeffrom/logd
 import:
 - package: github.com/pkg/errors
   version: ^0.8.0
-- package: github.com/spf13/cobra
-  subpackages:
-  - cobra
-- package: github.com/spf13/viper

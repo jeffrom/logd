@@ -1,12 +1,6 @@
-hash: be4e28c97ef778c45d5f7611dbc3f0b54e94572178316a10f9cd4ec8a7db8a6b
-updated: 2017-03-25T11:46:50.858066169-04:00
+hash: 8b96b67421593258353ecc5a65e7a78083be477ac240e5736d7eeee25a504873
+updated: 2017-06-25T23:19:16.474297075-04:00
 imports:
 - name: github.com/pkg/errors
   version: 645ef00459ed84a119197bfb8d8205042c6df63d
-- name: github.com/spf13/cobra
-  version: 7be4beda01ec05d0b93d80b3facd2b6f44080d94
-  subpackages:
-  - cobra
-- name: github.com/spf13/viper
-  version: 84f94806c67f59dd7ae87bc5351f7a9c94a4558d
 testImports: []
