@@ -1,25 +1,25 @@
 package logd
 
-// Config contains configuration variables
-type Config struct {
+// ServerConfig contains configuration variables
+type ServerConfig struct {
 	Verbose bool
 	Logger  Logger
 	// Server  Server
 }
 
-// NewConfig returns a new configuration object
-func NewConfig() *Config {
-	return &Config{}
+// NewServerConfig returns a new configuration object
+func NewServerConfig() *ServerConfig {
+	return &ServerConfig{}
 }
 
-// DefaultConfig is the default application config
-var DefaultConfig *Config
+// DefaultServerConfig is the default application config
+var DefaultServerConfig *ServerConfig
 
 func init() {
-	DefaultConfig = NewConfig()
-	DefaultConfig.Verbose = true
+	DefaultServerConfig = NewServerConfig()
+	DefaultServerConfig.Verbose = true
 
 	logger := newMemLogger()
 	logger.discard = true
-	DefaultConfig.Logger = logger
+	DefaultServerConfig.Logger = logger
 }

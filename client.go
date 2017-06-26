@@ -13,7 +13,7 @@ import (
 // Client represents a connection to the database
 type Client struct {
 	conn   net.Conn
-	config *Config
+	config *ServerConfig
 
 	readTimeout time.Duration
 	pr          *protoReader
@@ -24,11 +24,11 @@ type Client struct {
 
 // Dial returns a new instance of Conn
 func Dial(addr string, conns ...net.Conn) (*Client, error) {
-	return DialConfig(addr, DefaultConfig, conns...)
+	return DialConfig(addr, DefaultServerConfig, conns...)
 }
 
 // DialConfig returns a configured Conn
-func DialConfig(addr string, config *Config, conns ...net.Conn) (*Client, error) {
+func DialConfig(addr string, config *ServerConfig, conns ...net.Conn) (*Client, error) {
 	var conn net.Conn
 	var err error
 

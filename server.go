@@ -18,7 +18,7 @@ type Server interface {
 
 // SocketServer handles socket connections
 type SocketServer struct {
-	config *Config
+	config *ServerConfig
 
 	addr string
 	ln   net.Listener
@@ -44,7 +44,7 @@ type SocketServer struct {
 }
 
 // NewServer will return a new instance of a log server
-func NewServer(addr string, config *Config) *SocketServer {
+func NewServer(addr string, config *ServerConfig) *SocketServer {
 	q := newEventQ(config)
 	q.start()
 

@@ -24,12 +24,12 @@ import (
 //					 +EOF\r\n
 
 type protoWriter struct {
-	config *Config
+	config *ServerConfig
 	w      io.Writer
 	bw     *bufio.Writer
 }
 
-func newProtoWriter(w io.Writer, config *Config) *protoWriter {
+func newProtoWriter(w io.Writer, config *ServerConfig) *protoWriter {
 	return &protoWriter{w: w, bw: bufio.NewWriter(w), config: config}
 }
 
@@ -52,12 +52,12 @@ func (pw *protoWriter) writeResponse(resp *Response) (int, error) {
 
 // turns a []byte of socket data into a *response or *readResponse
 type protoReader struct {
-	config *Config
+	config *ServerConfig
 	br     *bufio.Reader
 	r      io.Reader
 }
 
-func newProtoReader(r io.Reader, config *Config) *protoReader {
+func newProtoReader(r io.Reader, config *ServerConfig) *protoReader {
 	return &protoReader{r: r, br: bufio.NewReader(r), config: config}
 }
 
@@ -135,14 +135,14 @@ func (pr *protoReader) readResponse() (*Response, error) {
 
 // Scanner is used to loop over the result of a READ command
 type Scanner struct {
-	config *Config
+	config *ServerConfig
 	br     *bufio.Reader
 	conn   net.Conn
 	err    error
 	msg    *Message
 }
 
-func newScanner(r io.Reader, conn net.Conn, config *Config) *Scanner {
+func newScanner(r io.Reader, conn net.Conn, config *ServerConfig) *Scanner {
 	return &Scanner{br: bufio.NewReader(r), conn: conn, config: config}
 }
 

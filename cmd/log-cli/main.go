@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	config := logd.DefaultConfig
+	config := logd.DefaultServerConfig
 	client, err := logd.DialConfig("127.0.0.1:1774", config)
 	if err != nil {
 		panic(err)

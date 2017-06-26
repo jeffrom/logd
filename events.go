@@ -18,7 +18,7 @@ import (
 
 // eventQ manages the receiving, processing, and responding to events.
 type eventQ struct {
-	config        *Config
+	config        *ServerConfig
 	currID        uint64
 	in            chan *Command
 	close         chan struct{}
@@ -27,7 +27,7 @@ type eventQ struct {
 	client        *Client
 }
 
-func newEventQ(config *Config) *eventQ {
+func newEventQ(config *ServerConfig) *eventQ {
 	q := &eventQ{
 		config:        config,
 		in:            make(chan *Command, 0),

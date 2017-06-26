@@ -8,8 +8,8 @@ import (
 	"time"
 )
 
-func testConfig(logger Logger) *Config {
-	config := NewConfig()
+func testConfig(logger Logger) *ServerConfig {
+	config := NewServerConfig()
 
 	// logger := newMemLogger()
 	// logger.returnErr = loggerShouldErr

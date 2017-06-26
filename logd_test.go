@@ -15,8 +15,8 @@ func init() {
 	flag.Parse()
 }
 
-func defaultTestConfig() *Config {
-	return &Config{
+func defaultTestConfig() *ServerConfig {
+	return &ServerConfig{
 		Verbose: testing.Verbose(),
 		Logger:  newMemLogger(),
 	}

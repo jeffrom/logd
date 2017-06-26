@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func eventQBenchConfig() *Config {
-	config := NewConfig()
+func eventQBenchConfig() *ServerConfig {
+	config := NewServerConfig()
 
 	logger := newMemLogger()
 	// logger.returnErr = loggerShouldErr

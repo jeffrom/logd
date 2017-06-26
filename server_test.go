@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func newTestClient(config *Config, srv *SocketServer) *Client {
+func newTestClient(config *ServerConfig, srv *SocketServer) *Client {
 	if config == nil {
 		config = defaultTestConfig()
 	}
@@ -18,7 +18,7 @@ func newTestClient(config *Config, srv *SocketServer) *Client {
 	return conn
 }
 
-func newTestServer(config *Config) *SocketServer {
+func newTestServer(config *ServerConfig) *SocketServer {
 	srv := NewServer("127.0.0.1:0", config)
 	srv.goServe()
 
