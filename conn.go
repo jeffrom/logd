@@ -49,7 +49,7 @@ func (cs connState) String() string {
 type conn struct {
 	net.Conn
 
-	config *ServerConfig
+	config *Config
 
 	pr           *protoReader
 	readTimeout  time.Duration
@@ -62,14 +62,15 @@ type conn struct {
 	mu   sync.Mutex
 }
 
-func newConn(c net.Conn, conf *ServerConfig) *conn {
+func newServerConn(c net.Conn, config *Config) *conn {
+	timeout := time.Duration(time.Duration(config.ServerTimeout) * time.Millisecond)
 	conn := &conn{
-		config:       conf,
+		config:       config,
 		Conn:         c,
-		pr:           newProtoReader(c, conf),
-		readTimeout:  time.Duration(500 * time.Millisecond),
-		pw:           newProtoWriter(c, conf),
-		writeTimeout: time.Duration(500 * time.Millisecond),
+		pr:           newProtoReader(c, config),
+		readTimeout:  timeout,
+		pw:           newProtoWriter(c, config),
+		writeTimeout: timeout,
 		done:         make(chan struct{}),
 	}
 

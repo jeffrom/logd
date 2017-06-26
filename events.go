@@ -18,7 +18,7 @@ import (
 
 // eventQ manages the receiving, processing, and responding to events.
 type eventQ struct {
-	config        *ServerConfig
+	config        *Config
 	currID        uint64
 	in            chan *Command
 	close         chan struct{}
@@ -27,7 +27,7 @@ type eventQ struct {
 	client        *Client
 }
 
-func newEventQ(config *ServerConfig) *eventQ {
+func newEventQ(config *Config) *eventQ {
 	q := &eventQ{
 		config:        config,
 		in:            make(chan *Command, 0),
@@ -74,15 +74,15 @@ func (q *eventQ) loop() {
 				q.handleSleep(cmd)
 			case CmdShutdown:
 				if err := q.handleShutdown(cmd); err != nil {
-					cmd.respC <- newResponse(respErr)
+					cmd.respC <- newResponse(RespErr)
 				} else {
-					cmd.respC <- newResponse(respOK)
+					cmd.respC <- newResponse(RespOK)
 					close(q.close)
 					close(q.in)
 				}
 				return
 			default:
-				cmd.respC <- newResponse(respErr)
+				cmd.respC <- newResponse(RespErr)
 			}
 		case <-q.close:
 			return
@@ -110,14 +110,14 @@ func (q *eventQ) handleMsg(cmd *Command) {
 		msgs = append(msgs, msgb)
 		_, err := q.log.Write(msgb)
 		if err != nil {
-			cmd.respond(newResponse(respErr))
+			cmd.respond(newResponse(RespErr))
 			return
 		}
 	}
 	q.currID = id + 1
 
-	resp := newResponse(respOK)
-	resp.id = id
+	resp := newResponse(RespOK)
+	resp.ID = id
 	cmd.respond(resp)
 
 	for _, sub := range q.subscriptions {
@@ -134,7 +134,7 @@ func (q *eventQ) handleReplicate(cmd *Command) {
 	startID, err := q.parseReplicate(cmd)
 	if err != nil {
 		debugf(q.config, "invalid: %v", err)
-		cmd.respond(newResponse(respErr))
+		cmd.respond(newResponse(RespErr))
 		return
 	}
 
@@ -151,7 +151,7 @@ func (q *eventQ) parseReplicate(cmd *Command) (uint64, error) {
 // handleRawMsg receives a chunk of data from a master and writes it to the log
 func (q *eventQ) handleRawMsg(cmd *Command) {
 
-	resp := newResponse(respOK)
+	resp := newResponse(RespOK)
 	cmd.respond(resp)
 }
 
@@ -159,7 +159,7 @@ func (q *eventQ) handleRead(cmd *Command) {
 	startID, limit, err := q.parseRead(cmd)
 	if err != nil {
 		debugf(q.config, "invalid: %v", err)
-		cmd.respond(newResponse(respErr))
+		cmd.respond(newResponse(RespErr))
 		return
 	}
 
@@ -167,7 +167,7 @@ func (q *eventQ) handleRead(cmd *Command) {
 }
 
 func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
-	resp := newResponse(respOK)
+	resp := newResponse(RespOK)
 	resp.msgC = make(chan []byte)
 	cmd.respond(resp)
 
@@ -203,16 +203,16 @@ func (q *eventQ) parseRead(cmd *Command) (uint64, uint64, error) {
 
 func (q *eventQ) handleHead(cmd *Command) {
 	if id, err := q.log.Head(); err != nil {
-		cmd.respond(newResponse(respErr))
+		cmd.respond(newResponse(RespErr))
 	} else {
-		resp := newResponse(respOK)
-		resp.id = id
+		resp := newResponse(RespOK)
+		resp.ID = id
 		cmd.respond(resp)
 	}
 }
 
 func (q *eventQ) handlePing(cmd *Command) {
-	cmd.respC <- newResponse(respOK)
+	cmd.respC <- newResponse(RespOK)
 }
 
 func (q *eventQ) handleClose(cmd *Command) {
@@ -221,7 +221,7 @@ func (q *eventQ) handleClose(cmd *Command) {
 	}
 
 	delete(q.subscriptions, cmd.respC)
-	cmd.respond(newResponse(respOK))
+	cmd.respond(newResponse(RespOK))
 	// cmd.finish()
 }
 
@@ -235,7 +235,7 @@ func (q *eventQ) handleSleep(cmd *Command) {
 	case <-cmd.wake:
 	}
 
-	cmd.respond(newResponse(respOK))
+	cmd.respond(newResponse(RespOK))
 }
 
 func (q *eventQ) handleShutdown(cmd *Command) error {

@@ -1,25 +1,28 @@
 package logd
 
-// ServerConfig contains configuration variables
-type ServerConfig struct {
-	Verbose bool
-	Logger  Logger
-	// Server  Server
+// Config contains configuration variables
+type Config struct {
+	Verbose       bool
+	Logger        Logger
+	Hostport      string
+	ServerTimeout uint
+	ClientTimeout uint
 }
 
-// NewServerConfig returns a new configuration object
-func NewServerConfig() *ServerConfig {
-	return &ServerConfig{}
+// NewConfig returns a new configuration object
+func NewConfig() *Config {
+	return &Config{}
 }
 
-// DefaultServerConfig is the default application config
-var DefaultServerConfig *ServerConfig
+// DefaultConfig is the default application config
+var DefaultConfig *Config
 
 func init() {
-	DefaultServerConfig = NewServerConfig()
-	DefaultServerConfig.Verbose = true
+	DefaultConfig = NewConfig()
+	DefaultConfig.ServerTimeout = 500
+	DefaultConfig.ClientTimeout = 500
 
 	logger := newMemLogger()
 	logger.discard = true
-	DefaultServerConfig.Logger = logger
+	DefaultConfig.Logger = logger
 }

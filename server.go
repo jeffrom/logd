@@ -18,7 +18,7 @@ type Server interface {
 
 // SocketServer handles socket connections
 type SocketServer struct {
-	config *ServerConfig
+	config *Config
 
 	addr string
 	ln   net.Listener
@@ -44,18 +44,19 @@ type SocketServer struct {
 }
 
 // NewServer will return a new instance of a log server
-func NewServer(addr string, config *ServerConfig) *SocketServer {
+func NewServer(addr string, config *Config) *SocketServer {
 	q := newEventQ(config)
 	q.start()
 
+	timeout := time.Duration(time.Duration(config.ServerTimeout) * time.Millisecond)
 	return &SocketServer{
 		config:       config,
 		addr:         addr,
 		readyC:       make(chan struct{}),
 		conns:        make(map[*conn]bool),
 		connIn:       make(chan *conn, 0),
-		readTimeout:  time.Duration(500 * time.Millisecond),
-		writeTimeout: time.Duration(500 * time.Millisecond),
+		readTimeout:  timeout,
+		writeTimeout: timeout,
 		stopC:        make(chan struct{}),
 		shutdownC:    make(chan struct{}),
 		q:            q,
@@ -141,7 +142,7 @@ func (s *SocketServer) accept() {
 
 		debugf(s.config, "accept: %s", rawConn.RemoteAddr())
 
-		conn := newConn(rawConn, s.config)
+		conn := newServerConn(rawConn, s.config)
 		s.addConn(conn)
 
 		s.connIn <- conn

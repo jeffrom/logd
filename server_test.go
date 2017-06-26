@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func newTestClient(config *ServerConfig, srv *SocketServer) *Client {
+func newTestClient(config *Config, srv *SocketServer) *Client {
 	if config == nil {
 		config = defaultTestConfig()
 	}
@@ -18,7 +18,7 @@ func newTestClient(config *ServerConfig, srv *SocketServer) *Client {
 	return conn
 }
 
-func newTestServer(config *ServerConfig) *SocketServer {
+func newTestServer(config *Config) *SocketServer {
 	srv := NewServer("127.0.0.1:0", config)
 	srv.goServe()
 
@@ -59,7 +59,7 @@ func checkScan(t *testing.T, scanner *Scanner, msg []byte) {
 }
 
 func checkRespOK(t *testing.T, resp *Response) {
-	if !reflect.DeepEqual(resp, newResponse(respOK)) {
+	if !reflect.DeepEqual(resp, newResponse(RespOK)) {
 		t.Logf("%s", debug.Stack())
 		t.Fatalf("response was not OK: %q", resp.Bytes())
 	}
@@ -80,7 +80,7 @@ func TestPingServer(t *testing.T) {
 	resp, err := client.Do(NewCommand(CmdPing))
 	checkError(t, err)
 
-	if !reflect.DeepEqual(resp, newResponse(respOK)) {
+	if !reflect.DeepEqual(resp, newResponse(RespOK)) {
 		t.Fatalf("response was not OK: %+v", resp)
 	}
 }
@@ -95,7 +95,7 @@ func TestMsgServer(t *testing.T) {
 	resp, err := client.Do(NewCommand(CmdMessage, []byte("cool message")))
 	checkError(t, err)
 
-	if !reflect.DeepEqual(resp, newResponse(respOK)) {
+	if !reflect.DeepEqual(resp, newResponse(RespOK)) {
 		t.Fatalf("response was not OK: %q", resp.Bytes())
 	}
 }

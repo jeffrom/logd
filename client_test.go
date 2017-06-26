@@ -31,7 +31,7 @@ func dialTestConn(r io.Reader, w io.Writer) *Client {
 	return conn
 }
 
-func newMockClient(config *ServerConfig, srv *SocketServer) (*Client, *mockConn) {
+func newMockClient(config *Config, srv *SocketServer) (*Client, *mockConn) {
 	c, err := net.Dial("tcp", srv.ln.Addr().String())
 	if err != nil {
 		panic(err)

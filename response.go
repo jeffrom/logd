@@ -5,29 +5,41 @@ import (
 	"strconv"
 )
 
-type respType uint8
+// RespType is the response status return type
+type RespType uint8
 
 const (
-	_ respType = iota
+	_ RespType = iota
 
-	respOK
-	respEOF
-	respContinue
-	respErr
-	respErrClient
+	// RespOK indicates a successful client request.
+	RespOK
+
+	// RespEOF indicates a client's read request has been closed by the
+	// server.
+	RespEOF
+
+	// RespContinue indicates a read request has been closed but additional
+	// requests can be handled. Not yet in use.
+	RespContinue
+
+	// RespErr indicates a failed response.
+	RespErr
+
+	// RespErrClient indicates a failed response due to client error.
+	RespErrClient
 )
 
-func (resp respType) String() string {
+func (resp RespType) String() string {
 	switch resp {
-	case respOK:
+	case RespOK:
 		return "OK"
-	case respEOF:
+	case RespEOF:
 		return "EOF"
-	case respContinue:
+	case RespContinue:
 		return "CONTINUE"
-	case respErr:
+	case RespErr:
 		return "ERR"
-	case respErrClient:
+	case RespErrClient:
 		return "ERR_CLIENT"
 	}
 	return "<unknown_resp_type>"
@@ -35,37 +47,37 @@ func (resp respType) String() string {
 
 // Response is returned to the caller
 type Response struct {
-	status respType
-	id     uint64
+	Status RespType
+	ID     uint64
 	body   []byte
 	msgC   chan []byte
 }
 
-func newResponse(status respType) *Response {
-	r := &Response{status: status}
+func newResponse(status RespType) *Response {
+	r := &Response{Status: status}
 	return r
 }
 
 func newErrResponse(body []byte) *Response {
-	return &Response{status: respErr, body: body}
+	return &Response{Status: RespErr, body: body}
 }
 
 func newClientErrResponse(body []byte) *Response {
-	return &Response{status: respErrClient, body: body}
+	return &Response{Status: RespErrClient, body: body}
 }
 
 // Bytes returns a byte representation of the response
 func (r *Response) Bytes() []byte {
 	buf := bytes.Buffer{}
-	buf.WriteString(r.status.String())
+	buf.WriteString(r.Status.String())
 
-	if r.id > 0 && r.body != nil {
+	if r.ID > 0 && r.body != nil {
 		panic("response id and body both set")
 	}
 
-	if r.id != 0 {
+	if r.ID != 0 {
 		buf.WriteByte(' ')
-		buf.WriteString(strconv.FormatUint(r.id, 10))
+		buf.WriteString(strconv.FormatUint(r.ID, 10))
 	}
 	if r.body != nil {
 		buf.WriteByte(' ')

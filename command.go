@@ -9,10 +9,11 @@ import (
 
 var errUnknownCmdType = errors.New("unknown command type")
 
-type cmdType uint8
+// CmdType is the type for logd commands.
+type CmdType uint8
 
 const (
-	_ cmdType = iota
+	_ CmdType = iota
 
 	// CmdMessage is a message command type.
 	CmdMessage
@@ -42,7 +43,7 @@ const (
 	CmdShutdown
 )
 
-func (cmd *cmdType) String() string {
+func (cmd *CmdType) String() string {
 	switch *cmd {
 	case CmdMessage:
 		return "MSG"
@@ -68,7 +69,7 @@ func (cmd *cmdType) String() string {
 
 // Command is an input received by a caller
 type Command struct {
-	name  cmdType
+	name  CmdType
 	args  [][]byte
 	respC chan *Response
 	done  chan struct{}
@@ -76,7 +77,7 @@ type Command struct {
 }
 
 // NewCommand returns a new instance of a command type
-func NewCommand(name cmdType, args ...[]byte) *Command {
+func NewCommand(name CmdType, args ...[]byte) *Command {
 	c := &Command{
 		name:  name,
 		args:  args,
@@ -130,7 +131,7 @@ func (cmd *Command) cancelSleep() {
 	cmd.wake <- struct{}{}
 }
 
-func cmdNamefromBytes(b []byte) cmdType {
+func cmdNamefromBytes(b []byte) CmdType {
 	if bytes.Equal(b, []byte("MSG")) {
 		return CmdMessage
 	}

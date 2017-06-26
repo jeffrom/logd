@@ -24,12 +24,12 @@ import (
 //					 +EOF\r\n
 
 type protoWriter struct {
-	config *ServerConfig
+	config *Config
 	w      io.Writer
 	bw     *bufio.Writer
 }
 
-func newProtoWriter(w io.Writer, config *ServerConfig) *protoWriter {
+func newProtoWriter(w io.Writer, config *Config) *protoWriter {
 	return &protoWriter{w: w, bw: bufio.NewWriter(w), config: config}
 }
 
@@ -52,12 +52,12 @@ func (pw *protoWriter) writeResponse(resp *Response) (int, error) {
 
 // turns a []byte of socket data into a *response or *readResponse
 type protoReader struct {
-	config *ServerConfig
+	config *Config
 	br     *bufio.Reader
 	r      io.Reader
 }
 
-func newProtoReader(r io.Reader, config *ServerConfig) *protoReader {
+func newProtoReader(r io.Reader, config *Config) *protoReader {
 	return &protoReader{r: r, br: bufio.NewReader(r), config: config}
 }
 
@@ -116,11 +116,11 @@ func (pr *protoReader) readResponse() (*Response, error) {
 	parts := bytes.SplitN(line, []byte(" "), 2)
 	var resp *Response
 	if bytes.Equal(parts[0], []byte("OK")) {
-		resp = newResponse(respOK)
+		resp = newResponse(RespOK)
 	} else if bytes.Equal(parts[0], []byte("+EOF")) {
-		resp = newResponse(respEOF)
+		resp = newResponse(RespEOF)
 		// } else if parts[0][0] == '+' {
-		// 	resp = newResponse(respContinue)
+		// 	resp = newResponse(RespContinue)
 	} else if bytes.Equal(parts[0], []byte("ERR")) {
 		resp = newErrResponse(parts[1])
 	} else if bytes.Equal(parts[0], []byte("ERR_CLIENT")) {
@@ -135,14 +135,14 @@ func (pr *protoReader) readResponse() (*Response, error) {
 
 // Scanner is used to loop over the result of a READ command
 type Scanner struct {
-	config *ServerConfig
+	config *Config
 	br     *bufio.Reader
 	conn   net.Conn
 	err    error
 	msg    *Message
 }
 
-func newScanner(r io.Reader, conn net.Conn, config *ServerConfig) *Scanner {
+func newScanner(r io.Reader, conn net.Conn, config *Config) *Scanner {
 	return &Scanner{br: bufio.NewReader(r), conn: conn, config: config}
 }
 

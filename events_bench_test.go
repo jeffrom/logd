@@ -5,8 +5,10 @@ import (
 	"testing"
 )
 
-func eventQBenchConfig() *ServerConfig {
-	config := NewServerConfig()
+func eventQBenchConfig() *Config {
+	config := NewConfig()
+	config.ServerTimeout = 500
+	config.ClientTimeout = 500
 
 	logger := newMemLogger()
 	// logger.returnErr = loggerShouldErr

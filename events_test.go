@@ -8,8 +8,10 @@ import (
 	"time"
 )
 
-func testConfig(logger Logger) *ServerConfig {
-	config := NewServerConfig()
+func testConfig(logger Logger) *Config {
+	config := NewConfig()
+	config.ServerTimeout = 500
+	config.ClientTimeout = 500
 
 	// logger := newMemLogger()
 	// logger.returnErr = loggerShouldErr
@@ -45,9 +47,9 @@ func checkNoErrAndSuccess(t *testing.T, resp *Response, err error) {
 		t.Logf("%s", debug.Stack())
 		t.Fatal("Expected response but got nil")
 	}
-	if resp.status != respOK {
+	if resp.Status != RespOK {
 		t.Logf("%s", debug.Stack())
-		t.Fatalf("Expected OK response but got %s", resp.status.String())
+		t.Fatalf("Expected OK response but got %s", resp.Status.String())
 	}
 }
 
@@ -73,9 +75,9 @@ func checkMessageReceived(t *testing.T, resp *Response, expectedID uint64, expec
 }
 
 func checkErrResp(t *testing.T, resp *Response) {
-	if resp.status != respErr {
+	if resp.Status != RespErr {
 		t.Logf("%s", debug.Stack())
-		t.Fatalf("Expected error result but got %v", resp.status)
+		t.Fatalf("Expected error result but got %v", resp.Status)
 	}
 }
 
@@ -108,8 +110,8 @@ func TestEventQLog(t *testing.T) {
 
 	resp, err := q.pushCommand(NewCommand(CmdMessage, []byte("Hello, log!")))
 	checkNoErrAndSuccess(t, resp, err)
-	if resp.id != 1 {
-		t.Fatalf("Expected response with id 1 but got %d", resp.id)
+	if resp.ID != 1 {
+		t.Fatalf("Expected response with id 1 but got %d", resp.ID)
 	}
 }
 
@@ -129,20 +131,20 @@ func TestEventQHead(t *testing.T) {
 
 	resp, err := q.pushCommand(NewCommand(CmdHead))
 	checkNoErrAndSuccess(t, resp, err)
-	if resp.id != 0 {
-		t.Fatalf("Expected response with id 0 but got %d", resp.id)
+	if resp.ID != 0 {
+		t.Fatalf("Expected response with id 0 but got %d", resp.ID)
 	}
 
 	resp, err = q.pushCommand(NewCommand(CmdMessage, []byte("Hello, log!")))
 	checkNoErrAndSuccess(t, resp, err)
-	if resp.id != 1 {
-		t.Fatalf("Expected response with id 1 but got %d", resp.id)
+	if resp.ID != 1 {
+		t.Fatalf("Expected response with id 1 but got %d", resp.ID)
 	}
 
 	resp, err = q.pushCommand(NewCommand(CmdHead))
 	checkNoErrAndSuccess(t, resp, err)
-	if resp.id != 1 {
-		t.Fatalf("Expected response with id 1 but got %d", resp.id)
+	if resp.ID != 1 {
+		t.Fatalf("Expected response with id 1 but got %d", resp.ID)
 	}
 }
 

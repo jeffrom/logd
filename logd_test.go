@@ -15,10 +15,12 @@ func init() {
 	flag.Parse()
 }
 
-func defaultTestConfig() *ServerConfig {
-	return &ServerConfig{
-		Verbose: testing.Verbose(),
-		Logger:  newMemLogger(),
+func defaultTestConfig() *Config {
+	return &Config{
+		Verbose:       testing.Verbose(),
+		Logger:        newMemLogger(),
+		ServerTimeout: 500,
+		ClientTimeout: 500,
 	}
 }
 

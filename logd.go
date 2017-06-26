@@ -16,7 +16,7 @@ func init() {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 }
 
-func debugf(config *ServerConfig, s string, args ...interface{}) {
+func debugf(config *Config, s string, args ...interface{}) {
 	if !config.Verbose {
 		return
 	}

@@ -13,7 +13,7 @@ import (
 // Client represents a connection to the database
 type Client struct {
 	conn   net.Conn
-	config *ServerConfig
+	config *Config
 
 	readTimeout time.Duration
 	pr          *protoReader
@@ -24,11 +24,11 @@ type Client struct {
 
 // Dial returns a new instance of Conn
 func Dial(addr string, conns ...net.Conn) (*Client, error) {
-	return DialConfig(addr, DefaultServerConfig, conns...)
+	return DialConfig(addr, DefaultConfig, conns...)
 }
 
 // DialConfig returns a configured Conn
-func DialConfig(addr string, config *ServerConfig, conns ...net.Conn) (*Client, error) {
+func DialConfig(addr string, config *Config, conns ...net.Conn) (*Client, error) {
 	var conn net.Conn
 	var err error
 
@@ -53,13 +53,14 @@ func DialConfig(addr string, config *ServerConfig, conns ...net.Conn) (*Client, 
 		}
 	}
 
+	timeout := time.Duration(time.Duration(config.ClientTimeout) * time.Millisecond)
 	return &Client{
 		config:       config,
 		conn:         conn,
 		pr:           newProtoReader(conn, config),
-		readTimeout:  time.Duration(500 * time.Millisecond),
+		readTimeout:  timeout,
 		pw:           newProtoWriter(conn, config),
-		writeTimeout: time.Duration(500 * time.Millisecond),
+		writeTimeout: timeout,
 	}, nil
 
 }
@@ -101,7 +102,7 @@ func (c *Client) readScanResponse() (*Scanner, error) {
 		return nil, err
 	}
 
-	debugf(c.config, "initial scan response: %s", resp.status)
+	debugf(c.config, "initial scan response: %s", resp.Status)
 
 	return newScanner(c.pr.br, c.conn, c.config), nil
 }

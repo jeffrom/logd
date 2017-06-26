@@ -10,12 +10,14 @@ import (
 
 var someMessage = []byte("cool, reasonably-sized message. something about the length of an access log, or a json object displaying some information about a request. Not too big, not too small. Probably about 200 bytes, maybe more. I mean, these things are pretty arbitrary, really. In many instances, 200 bytes would be far too small. In others, too large.")
 
-func serverBenchConfig() *ServerConfig {
+func serverBenchConfig() *Config {
 	return serverBenchConfigWithOpts(true)
 }
 
-func serverBenchConfigWithOpts(discard bool) *ServerConfig {
-	config := NewServerConfig()
+func serverBenchConfigWithOpts(discard bool) *Config {
+	config := NewConfig()
+	config.ServerTimeout = 500
+	config.ClientTimeout = 500
 
 	logger := newMemLogger()
 	logger.discard = discard
@@ -32,7 +34,7 @@ func startServerForBench(b *testing.B) *SocketServer {
 	return startServerForBenchWithConfig(b, serverBenchConfig())
 }
 
-func startServerForBenchWithConfig(b *testing.B, config *ServerConfig) *SocketServer {
+func startServerForBenchWithConfig(b *testing.B, config *Config) *SocketServer {
 	srv := NewServer("127.0.0.1:0", config)
 	if err := srv.ListenAndServe(); err != nil {
 		b.Logf("%s", debug.Stack())
