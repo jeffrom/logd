@@ -3,12 +3,13 @@ package logd
 import (
 	"bufio"
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"net"
 	"strconv"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 // text protocol works as follows:
@@ -117,12 +118,21 @@ func (pr *protoReader) readResponse() (*Response, error) {
 	var resp *Response
 	if bytes.Equal(parts[0], []byte("OK")) {
 		resp = newResponse(RespOK)
+		if len(parts) > 1 {
+			if _, err := fmt.Sscanf(string(parts[1]), "%d", &resp.ID); err != nil {
+				return nil, errors.Wrap(err, "failed to parse response id")
+			}
+		}
 	} else if bytes.Equal(parts[0], []byte("+EOF")) {
 		resp = newResponse(RespEOF)
 		// } else if parts[0][0] == '+' {
 		// 	resp = newResponse(RespContinue)
 	} else if bytes.Equal(parts[0], []byte("ERR")) {
-		resp = newErrResponse(parts[1])
+		var arg []byte
+		if len(parts) > 1 {
+			arg = parts[1]
+		}
+		resp = newErrResponse(arg)
 	} else if bytes.Equal(parts[0], []byte("ERR_CLIENT")) {
 		resp = newClientErrResponse(parts[1])
 	} else {

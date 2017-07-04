@@ -2,11 +2,8 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"os"
 	"testing"
-
-	"github.com/jeffrom/loggerd/cmd"
 )
 
 var integrationTest *bool
@@ -27,12 +24,12 @@ func getArgStart() int {
 // XXX this doesn't work with cli library api
 func TestMain(t *testing.T) {
 	if *integrationTest {
-		args := os.Args[getArgStart():]
+		// args := os.Args[getArgStart():]
 		// fmt.Printf("%+v (%d)\n", args, getArgStart())
-		cmd.RootCmd.SetArgs(args)
+		// cmd.RootCmd.SetArgs(args)
 		// cmd.RootCmd.DebugFlags()
-		if err := cmd.RootCmd.Execute(); err != nil {
-			fmt.Println(err)
-		}
+		// if err := cmd.RootCmd.Execute(); err != nil {
+		// 	fmt.Println(err)
+		// }
 	}
 }

@@ -1,2 +1,10 @@
-*.actual.golden
 vendor/
+
+# ignore any logs created in development
+__log*
+
+# files generated in tests to compare to golden files
+*.actual.golden
+
+# files outputting by tools
+*.out

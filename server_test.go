@@ -45,7 +45,7 @@ func checkScan(t *testing.T, scanner *Scanner, msg []byte) {
 	}
 	if err := scanner.Err(); err != nil {
 		t.Logf("%s", debug.Stack())
-		t.Fatalf("unexpected error scanning: %v", err)
+		t.Fatalf("unexpected error scanning: %+v", err)
 	}
 
 	if respMsg := scanner.Message(); respMsg == nil || !reflect.DeepEqual(respMsg.body, msg) {
@@ -60,6 +60,15 @@ func checkScan(t *testing.T, scanner *Scanner, msg []byte) {
 
 func checkRespOK(t *testing.T, resp *Response) {
 	if !reflect.DeepEqual(resp, newResponse(RespOK)) {
+		t.Logf("%s", debug.Stack())
+		t.Fatalf("response was not OK: %q", resp.Bytes())
+	}
+}
+
+func checkRespOKID(t *testing.T, resp *Response, id uint64) {
+	expected := newResponse(RespOK)
+	expected.ID = id
+	if !reflect.DeepEqual(resp, expected) {
 		t.Logf("%s", debug.Stack())
 		t.Fatalf("response was not OK: %q", resp.Bytes())
 	}
@@ -95,9 +104,7 @@ func TestMsgServer(t *testing.T) {
 	resp, err := client.Do(NewCommand(CmdMessage, []byte("cool message")))
 	checkError(t, err)
 
-	if !reflect.DeepEqual(resp, newResponse(RespOK)) {
-		t.Fatalf("response was not OK: %q", resp.Bytes())
-	}
+	checkRespOKID(t, resp, 1)
 }
 
 func TestReadServer(t *testing.T) {
@@ -110,7 +117,7 @@ func TestReadServer(t *testing.T) {
 	msg := []byte("cool message")
 	resp, err := client.Do(NewCommand(CmdMessage, msg))
 	checkError(t, err)
-	checkRespOK(t, resp)
+	checkRespOKID(t, resp, 1)
 
 	scanner, err := client.DoRead(1, 1)
 	checkError(t, err)
@@ -134,7 +141,7 @@ func TestTailServer(t *testing.T) {
 	msg := []byte("cool message")
 	resp, err := writerClient.Do(NewCommand(CmdMessage, msg))
 	checkError(t, err)
-	checkRespOK(t, resp)
+	checkRespOKID(t, resp, 1)
 
 	checkScan(t, scanner, msg)
 
@@ -148,7 +155,7 @@ func TestTailServer(t *testing.T) {
 	msg = []byte("another cool message")
 	resp, err = writerClient.Do(NewCommand(CmdMessage, msg))
 	checkError(t, err)
-	checkRespOK(t, resp)
+	checkRespOKID(t, resp, 2)
 
 	checkScan(t, scanner, msg)
 	checkScan(t, secondScanner, msg)

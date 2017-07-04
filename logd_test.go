@@ -16,11 +16,15 @@ func init() {
 }
 
 func defaultTestConfig() *Config {
+
 	return &Config{
 		Verbose:       testing.Verbose(),
 		Logger:        newMemLogger(),
 		ServerTimeout: 500,
 		ClientTimeout: 500,
+		LogFileMode:   0644,
+		MaxChunkSize:  1024 * 1024 * 2,
+		PartitionSize: 1024 * 1024 * 500,
 	}
 }
 

@@ -30,7 +30,8 @@ func cmdAction(config *logd.Config, cmd logd.CmdType) func(c *cli.Context) error
 			return cli.NewExitError(err, 1)
 		}
 
-		fmt.Printf("%s\n", bytes.Trim(resp.Bytes(), "\r\n"))
+		respBytes := bytes.Trim(resp.Bytes(), "\r\n")
+		fmt.Printf("%s\n", respBytes)
 
 		if resp.Status == logd.RespErr {
 			return cli.NewExitError("Server error", 2)

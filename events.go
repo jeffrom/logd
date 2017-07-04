@@ -4,6 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -28,6 +31,10 @@ type eventQ struct {
 }
 
 func newEventQ(config *Config) *eventQ {
+	if config.Logger == nil {
+		config.Logger = newFileLogger(config)
+	}
+
 	q := &eventQ{
 		config:        config,
 		in:            make(chan *Command, 0),
@@ -35,15 +42,26 @@ func newEventQ(config *Config) *eventQ {
 		subscriptions: make(map[chan *Response]*Subscription),
 		log:           config.Logger,
 	}
+
+	q.handleSignals()
+
+	if manager, ok := q.log.(logManager); ok {
+		if err := manager.Setup(); err != nil {
+			panic(err)
+		}
+	}
+
 	return q
 }
 
 func (q *eventQ) start() error {
-	currID, err := q.log.Head()
+	head, err := q.log.Head()
 	if err != nil {
 		return err
 	}
-	q.currID = currID + 1
+	q.currID = head + 1
+
+	log.Printf("Starting at log id %d", q.currID)
 
 	go q.loop()
 	return nil
@@ -110,6 +128,7 @@ func (q *eventQ) handleMsg(cmd *Command) {
 		msgs = append(msgs, msgb)
 		_, err := q.log.Write(msgb)
 		if err != nil {
+			log.Printf("Error: %+v", err)
 			cmd.respond(newResponse(RespErr))
 			return
 		}
@@ -171,8 +190,30 @@ func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 	resp.msgC = make(chan []byte)
 	cmd.respond(resp)
 
-	err := q.log.ReadFromID(resp.msgC, startID, int(limit))
-	panicOnError(err)
+	if err := q.log.SeekToID(startID); err != nil {
+		panic(err)
+	}
+
+	// b := make([]byte, q.config.MaxChunkSize)
+	var b []byte
+	numMsg := 0
+	scanner := newLogScanner(q.config, q.log)
+	for scanner.Scan() {
+		msg := scanner.Msg()
+		b = append(b, msg.bytes()...)
+
+		numMsg++
+		if limit > 0 && uint64(numMsg) >= limit {
+			break
+		}
+	}
+	if err := scanner.Error(); err != nil {
+		panic(err)
+	}
+
+	if len(b) > 0 {
+		resp.msgC <- b
+	}
 
 	if limit == 0 { // read forever
 		q.subscriptions[cmd.respC] = newSubscription(resp.msgC, cmd.done)
@@ -241,6 +282,11 @@ func (q *eventQ) handleSleep(cmd *Command) {
 func (q *eventQ) handleShutdown(cmd *Command) error {
 	// check if shutdown command is allowed and wait to finish any outstanding
 	// work here
+	if manager, ok := q.log.(logManager); ok {
+		if err := manager.Shutdown(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -249,3 +295,21 @@ func (q *eventQ) pushCommand(cmd *Command) (*Response, error) {
 	resp := <-cmd.respC
 	return resp, nil
 }
+
+func (q *eventQ) handleSignals() {
+	go q.handleKill()
+}
+
+func (q *eventQ) handleKill() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+
+	for range c {
+		log.Print("Caught signal. Exiting...")
+		q.handleShutdown(nil)
+		os.Exit(0)
+	}
+}
+
+// func (q *eventQ) handleHup() {
+// }

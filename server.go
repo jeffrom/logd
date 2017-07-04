@@ -46,7 +46,9 @@ type SocketServer struct {
 // NewServer will return a new instance of a log server
 func NewServer(addr string, config *Config) *SocketServer {
 	q := newEventQ(config)
-	q.start()
+	if err := q.start(); err != nil {
+		panic(err)
+	}
 
 	timeout := time.Duration(time.Duration(config.ServerTimeout) * time.Millisecond)
 	return &SocketServer{
@@ -103,14 +105,14 @@ func (s *SocketServer) listenAndServe(wait bool) error {
 }
 
 // Respond satisfies Server interface
-func (s *SocketServer) Respond(cmd *Command, resp *Response) error {
-	return nil
-}
+// func (s *SocketServer) Respond(cmd *Command, resp *Response) error {
+// 	return nil
+// }
 
 // Send satisfies Server interface
-func (s *SocketServer) Send(sub *Subscription, msg *Message) error {
-	return nil
-}
+// func (s *SocketServer) Send(sub *Subscription, msg *Message) error {
+// 	return nil
+// }
 
 // ready signals that the application is ready to serve on this host:port
 func (s *SocketServer) ready() {

@@ -3,10 +3,15 @@ package logd
 // Config contains configuration variables
 type Config struct {
 	Verbose       bool
+	CanShutdown   bool
 	Logger        Logger
 	Hostport      string
 	ServerTimeout uint
 	ClientTimeout uint
+	LogFile       string
+	LogFileMode   int
+	MaxChunkSize  int
+	PartitionSize int
 }
 
 // NewConfig returns a new configuration object
@@ -21,8 +26,15 @@ func init() {
 	DefaultConfig = NewConfig()
 	DefaultConfig.ServerTimeout = 500
 	DefaultConfig.ClientTimeout = 500
+	DefaultConfig.LogFile = "__log"
+	DefaultConfig.LogFileMode = 0644
+	DefaultConfig.MaxChunkSize = 1024 * 1024 * 2
+	DefaultConfig.PartitionSize = 1024 * 1024 * 500
 
-	logger := newMemLogger()
-	logger.discard = true
-	DefaultConfig.Logger = logger
+	// XXX just for dev
+	DefaultConfig.CanShutdown = true
+
+	// logger := newFileLogger(DefaultConfig)
+	// logger.discard = true
+	// DefaultConfig.Logger = logger
 }

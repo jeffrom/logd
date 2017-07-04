@@ -9,6 +9,7 @@ func eventQBenchConfig() *Config {
 	config := NewConfig()
 	config.ServerTimeout = 500
 	config.ClientTimeout = 500
+	config.MaxChunkSize = 1024 * 10
 
 	logger := newMemLogger()
 	// logger.returnErr = loggerShouldErr

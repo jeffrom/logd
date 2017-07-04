@@ -50,6 +50,40 @@ func main() {
 			Value:       500,
 			Destination: &config.ServerTimeout,
 		},
+		cli.StringFlag{
+			Name:        "log_file",
+			Usage:       "Log file name",
+			EnvVar:      "LOGD_FILE",
+			Value:       "__log",
+			Destination: &config.LogFile,
+		},
+		cli.IntFlag{
+			Name:        "log_file_mode",
+			Usage:       "Integer representation of file mode",
+			EnvVar:      "LOGD_FILE_MODE",
+			Value:       0644,
+			Destination: &config.LogFileMode,
+		},
+		cli.IntFlag{
+			Name:        "max_chunk_size",
+			Usage:       "Size, in bytes, of maximum chunk length",
+			EnvVar:      "LOGD_MAX_CHUNK_SIZE",
+			Value:       1024 * 1024 * 2,
+			Destination: &config.MaxChunkSize,
+		},
+		cli.IntFlag{
+			Name:        "partition_size",
+			Usage:       "Size, in bytes, of partition",
+			EnvVar:      "LOGD_PARTITION_SIZE",
+			Value:       1024 * 1024 * 500,
+			Destination: &config.PartitionSize,
+		},
+		cli.BoolFlag{
+			Name:        "can_shutdown",
+			Usage:       "Server can be shut down via command",
+			EnvVar:      "LOGD_CAN_SHUTDOWN",
+			Destination: &config.CanShutdown,
+		},
 	}
 
 	app.Action = func(c *cli.Context) error {

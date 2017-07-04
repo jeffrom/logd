@@ -12,6 +12,9 @@ func testConfig(logger Logger) *Config {
 	config := NewConfig()
 	config.ServerTimeout = 500
 	config.ClientTimeout = 500
+	config.MaxChunkSize = 1024 * 10
+	config.PartitionSize = 1024 * 1024 * 500
+	config.LogFileMode = 0644
 
 	// logger := newMemLogger()
 	// logger.returnErr = loggerShouldErr
@@ -26,7 +29,7 @@ func startQ(t *testing.T, logger Logger) *eventQ {
 	q := newEventQ(testConfig(logger))
 	if err := q.start(); err != nil {
 		t.Logf("%s", debug.Stack())
-		t.Fatalf("error starting queue: %v", err)
+		t.Fatalf("error starting queue: %+v", err)
 	}
 	return q
 }
@@ -34,14 +37,14 @@ func startQ(t *testing.T, logger Logger) *eventQ {
 func stopQ(t testing.TB, q *eventQ) {
 	if err := q.stop(); err != nil {
 		t.Logf("%s", debug.Stack())
-		t.Fatalf("error stopping queue: %v", err)
+		t.Fatalf("error stopping queue: %+v", err)
 	}
 }
 
 func checkNoErrAndSuccess(t *testing.T, resp *Response, err error) {
 	if err != nil {
 		t.Logf("%s", debug.Stack())
-		t.Fatalf("error adding command to queue: %v", err)
+		t.Fatalf("error adding command to queue: %+v", err)
 	}
 	if resp == nil {
 		t.Logf("%s", debug.Stack())
@@ -59,7 +62,8 @@ func checkMessageReceived(t *testing.T, resp *Response, expectedID uint64, expec
 		t.Logf("%s", debug.Stack())
 		t.Fatal("Expected to read message but got none")
 	}
-	msg, err := fromBytes(msgb)
+
+	msg, err := msgFromBytes(msgb)
 	if err != nil {
 		t.Fatalf("Unexpected error: %s", err)
 	}
@@ -77,7 +81,7 @@ func checkMessageReceived(t *testing.T, resp *Response, expectedID uint64, expec
 func checkErrResp(t *testing.T, resp *Response) {
 	if resp.Status != RespErr {
 		t.Logf("%s", debug.Stack())
-		t.Fatalf("Expected error result but got %v", resp.Status)
+		t.Fatalf("Expected error result but got %+v", resp.Status)
 	}
 }
 
