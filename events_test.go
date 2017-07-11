@@ -85,6 +85,13 @@ func checkErrResp(t *testing.T, resp *Response) {
 	}
 }
 
+func checkClientErrResp(t *testing.T, resp *Response) {
+	if resp.Status != RespErrClient {
+		t.Logf("%s", debug.Stack())
+		t.Fatalf("Expected client error result but got %+v", resp.Status)
+	}
+}
+
 // use this to help debug deadlocks, more helpful probably to just use:
 // kill -ABRT <pid>
 func finishCommand(cmd *Command) {
@@ -242,7 +249,7 @@ func TestEventQReadErr(t *testing.T) {
 	defer stopQ(t, q)
 
 	resp, _ := q.pushCommand(NewCommand(CmdRead))
-	checkErrResp(t, resp)
+	checkClientErrResp(t, resp)
 }
 
 func TestEventQReadClose(t *testing.T) {
@@ -276,13 +283,13 @@ func TestEventQReadInvalidParams(t *testing.T) {
 	defer stopQ(t, q)
 
 	resp, _ := q.pushCommand(NewCommand(CmdRead, []byte("asdf"), []byte("1")))
-	checkErrResp(t, resp)
+	checkClientErrResp(t, resp)
 
 	resp, _ = q.pushCommand(NewCommand(CmdRead, []byte("1"), []byte("asdf")))
-	checkErrResp(t, resp)
+	checkClientErrResp(t, resp)
 
 	resp, _ = q.pushCommand(NewCommand(CmdRead, []byte("1")))
-	checkErrResp(t, resp)
+	checkClientErrResp(t, resp)
 }
 
 func TestEventQUnknownCommand(t *testing.T) {

@@ -29,6 +29,12 @@ const (
 	RespErrClient
 )
 
+var (
+	errRespNoArguments  = []byte("must supply an argument")
+	errRespInvalid      = []byte("invalid request")
+	errRespEmptyMessage = []byte("empty message not allowed")
+)
+
 func (resp RespType) String() string {
 	switch resp {
 	case RespOK:
@@ -58,11 +64,13 @@ func newResponse(status RespType) *Response {
 	return r
 }
 
-func newErrResponse(body []byte) *Response {
+// NewErrResponse returns a new server error response
+func NewErrResponse(body []byte) *Response {
 	return &Response{Status: RespErr, body: body}
 }
 
-func newClientErrResponse(body []byte) *Response {
+// NewClientErrResponse returns a new validation error reponse
+func NewClientErrResponse(body []byte) *Response {
 	return &Response{Status: RespErrClient, body: body}
 }
 
@@ -86,4 +94,8 @@ func (r *Response) Bytes() []byte {
 
 	buf.WriteString("\r\n")
 	return buf.Bytes()
+}
+
+func (r *Response) String() string {
+	return string(r.Bytes())
 }

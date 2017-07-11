@@ -122,7 +122,18 @@ func (q *eventQ) handleMsg(cmd *Command) {
 	var msgs [][]byte
 	id := q.currID - 1
 
+	if len(cmd.args) == 0 {
+		cmd.respond(NewClientErrResponse(errRespNoArguments))
+		return
+	}
+
+	// TODO if any messages are invalid, throw out the whole bunch
 	for _, msg := range cmd.args {
+		if len(msg) == 0 {
+			cmd.respond(NewClientErrResponse(errRespEmptyMessage))
+			return
+		}
+
 		id++
 		msgb := NewMessage(id, msg).bytes()
 		msgs = append(msgs, msgb)
@@ -178,7 +189,7 @@ func (q *eventQ) handleRead(cmd *Command) {
 	startID, limit, err := q.parseRead(cmd)
 	if err != nil {
 		debugf(q.config, "invalid: %v", err)
-		cmd.respond(newResponse(RespErr))
+		cmd.respond(NewClientErrResponse(errRespInvalid))
 		return
 	}
 
@@ -243,6 +254,11 @@ func (q *eventQ) parseRead(cmd *Command) (uint64, uint64, error) {
 }
 
 func (q *eventQ) handleHead(cmd *Command) {
+	if len(cmd.args) != 0 {
+		cmd.respond(NewClientErrResponse(errRespInvalid))
+		return
+	}
+
 	if id, err := q.log.Head(); err != nil {
 		cmd.respond(newResponse(RespErr))
 	} else {
@@ -253,10 +269,20 @@ func (q *eventQ) handleHead(cmd *Command) {
 }
 
 func (q *eventQ) handlePing(cmd *Command) {
-	cmd.respC <- newResponse(RespOK)
+	if len(cmd.args) != 0 {
+		cmd.respond(NewClientErrResponse(errRespInvalid))
+		return
+	}
+
+	cmd.respond(newResponse(RespOK))
 }
 
 func (q *eventQ) handleClose(cmd *Command) {
+	if len(cmd.args) != 0 {
+		cmd.respond(NewClientErrResponse(errRespInvalid))
+		return
+	}
+
 	if sub, ok := q.subscriptions[cmd.respC]; ok {
 		sub.finish()
 	}
@@ -267,9 +293,17 @@ func (q *eventQ) handleClose(cmd *Command) {
 }
 
 func (q *eventQ) handleSleep(cmd *Command) {
+	if len(cmd.args) != 1 {
+		cmd.respond(NewClientErrResponse(errRespInvalid))
+		return
+	}
+
 	var msecs int
 	_, err := fmt.Sscanf(string(cmd.args[0]), "%d", &msecs)
-	panicOnError(err)
+	if err != nil {
+		cmd.respond(NewClientErrResponse(errRespInvalid))
+		return
+	}
 
 	select {
 	case <-time.After(time.Duration(msecs) * time.Millisecond):

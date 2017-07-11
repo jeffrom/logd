@@ -1,6 +1,7 @@
 package logd
 
 import (
+	"bytes"
 	"reflect"
 	"runtime/debug"
 	"testing"
@@ -184,3 +185,68 @@ func TestServerSleep(t *testing.T) {
 // 	// checkError(t, err)
 // 	// checkRespOK(t, resp)
 // }
+
+func TestServerInvalidRequests(t *testing.T) {
+	srv := newTestServer(testConfig(newMemLogger()))
+	defer closeTestServer(t, srv)
+
+	client := newTestClient(defaultTestConfig(), srv)
+	defer client.Close()
+
+	var tests = []struct {
+		cmd      *Command
+		expected *Response
+		reason   string
+	}{
+		{
+			NewCommand(CmdMessage, []byte("")),
+			NewClientErrResponse([]byte("empty message not allowed")),
+			"Server should not accept empty messages",
+		},
+		{
+			NewCommand(CmdMessage),
+			NewClientErrResponse([]byte("must supply an argument")),
+			"Server should not accept missing message argument",
+		},
+
+		{
+			NewCommand(CmdRead),
+			NewClientErrResponse([]byte("invalid request")),
+			"Server should not accept missing read argument",
+		},
+
+		{
+			NewCommand(CmdHead, []byte("0")),
+			NewClientErrResponse([]byte("invalid request")),
+			"Server should not accept extra head argument",
+		},
+
+		{
+			NewCommand(CmdPing, []byte("0")),
+			NewClientErrResponse([]byte("invalid request")),
+			"Server should not accept extra ping argument",
+		},
+
+		{
+			NewCommand(CmdClose, []byte("0")),
+			NewClientErrResponse([]byte("invalid request")),
+			"Server should not accept extra close argument",
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Log(testCase.reason)
+		t.Logf("\t  Sending: %s", testCase.cmd)
+		t.Logf("\tExpecting: %s", testCase.expected)
+
+		resp, err := client.Do(testCase.cmd)
+		checkError(t, err)
+		if resp.Status != testCase.expected.Status {
+			t.Fatalf("Incorrect response type: wanted %s, got %s", testCase.expected.Status, resp.Status)
+		}
+
+		if !bytes.Equal(resp.body, testCase.expected.body) {
+			t.Fatalf("Incorrect response body: \nwanted:\n%q, \ngot:\n%q", testCase.expected.body, resp.body)
+		}
+	}
+}

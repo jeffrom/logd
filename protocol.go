@@ -132,9 +132,9 @@ func (pr *protoReader) readResponse() (*Response, error) {
 		if len(parts) > 1 {
 			arg = parts[1]
 		}
-		resp = newErrResponse(arg)
+		resp = NewErrResponse(arg)
 	} else if bytes.Equal(parts[0], []byte("ERR_CLIENT")) {
-		resp = newClientErrResponse(parts[1])
+		resp = NewClientErrResponse(parts[1])
 	} else {
 		debugf(pr.config, "invalid response: %q", line)
 		return nil, errors.New("Invalid response")
