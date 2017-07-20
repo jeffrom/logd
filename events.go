@@ -150,12 +150,14 @@ func (q *eventQ) handleMsg(cmd *Command) {
 	resp.ID = id
 	cmd.respond(resp)
 
+	go q.publishMessages(cmd, msgs)
+}
+
+func (q *eventQ) publishMessages(cmd *Command, msgs [][]byte) {
 	for _, sub := range q.subscriptions {
-		go func(sub *Subscription) {
-			for i := range cmd.args {
-				sub.send(msgs[i])
-			}
-		}(sub)
+		for i := range msgs {
+			sub.send(msgs[i])
+		}
 	}
 }
 
