@@ -30,7 +30,8 @@ func cmdAction(config *logd.Config, cmd logd.CmdType) func(c *cli.Context) error
 			return cli.NewExitError(err, 1)
 		}
 
-		respBytes := bytes.Trim(resp.Bytes(), "\r\n")
+		respBytes := bytes.TrimRight(resp.Bytes(), "\r\n")
+		respBytes = bytes.TrimLeft(respBytes, "OK ")
 		fmt.Printf("%s\n", respBytes)
 
 		if resp.Status == logd.RespErr {
