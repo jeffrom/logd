@@ -52,39 +52,46 @@ func msgFromBytes(b []byte) (*Message, error) {
 	return NewMessage(id, body[:length]), nil
 }
 
-func msgFromReader(r *bufio.Reader) (*Message, error) {
+func msgFromReader(r *bufio.Reader) (int, *Message, error) {
+	var err error
+	var n int
+	var read int
+
 	idBytes, err := scanTo(r, ' ')
+	read += len(idBytes) + 1
 	if err == io.EOF {
-		return nil, io.EOF
+		return 0, nil, io.EOF
 	}
 	if err != nil {
-		return nil, errors.Wrap(err, "failed reading id bytes")
+		return 0, nil, errors.Wrap(err, "failed reading id bytes")
 	}
 
 	var id uint64
 	_, err = fmt.Sscanf(string(idBytes), "%d", &id)
 	if err != nil {
-		return nil, errors.Wrap(err, "invalid id bytes")
+		return read, nil, errors.Wrap(err, "invalid id bytes")
 	}
 
 	lenBytes, err := scanTo(r, ' ')
+	read += len(lenBytes) + 1
 	if err != nil {
-		return nil, err
+		return read, nil, err
 	}
 
 	var length uint64
 	_, err = fmt.Sscanf(string(lenBytes), "%d", &length)
 	if err != nil {
-		return nil, errors.Wrap(err, "invalid length bytes")
+		return read, nil, errors.Wrap(err, "invalid length bytes")
 	}
 
 	buf := make([]byte, length+2)
-	_, err = r.Read(buf)
+	n, err = r.Read(buf)
+	read += n
 	if err != nil {
-		return nil, errors.Wrap(err, "failed reading body")
+		return read, nil, errors.Wrap(err, "failed reading body")
 	}
 
-	return NewMessage(id, bytes.TrimRight(buf, "\r\n")), nil
+	return read, NewMessage(id, bytes.TrimRight(buf, "\r\n")), nil
 }
 
 func scanTo(r *bufio.Reader, delim byte) ([]byte, error) {

@@ -13,6 +13,7 @@ type Logger interface {
 type logWriter interface {
 	io.Writer
 	Flush() error
+	SetID(id uint64)
 }
 
 // TODO read methods should take a ReaderFrom instead of a []byte. Want to

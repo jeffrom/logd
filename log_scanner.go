@@ -10,6 +10,7 @@ type logScanner struct {
 	err    error
 	msg    *Message
 	br     *bufio.Reader
+	read   int
 }
 
 func newLogScanner(config *Config, r io.Reader) *logScanner {
@@ -20,7 +21,8 @@ func newLogScanner(config *Config, r io.Reader) *logScanner {
 }
 
 func (s *logScanner) Scan() bool {
-	msg, err := msgFromReader(s.br)
+	n, msg, err := msgFromReader(s.br)
+	s.read += n
 	s.err = err
 	if err == io.EOF {
 		s.err = nil

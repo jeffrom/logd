@@ -20,6 +20,7 @@ func serverBenchConfigWithOpts(discard bool) *Config {
 	config.ClientTimeout = 500
 	config.MaxChunkSize = 1024 * 10
 	config.PartitionSize = 1024 * 1024 * 500
+	config.IndexCursorSize = 1000
 
 	logger := newMemLogger()
 	logger.discard = discard

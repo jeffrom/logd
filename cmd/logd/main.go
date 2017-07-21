@@ -13,6 +13,8 @@ func main() {
 	config := &logd.Config{}
 	*config = *logd.DefaultConfig
 
+	var check bool
+
 	cli.VersionFlag = cli.BoolFlag{
 		Name:  "version",
 		Usage: "Print only the version",
@@ -78,18 +80,39 @@ func main() {
 			Value:       1024 * 1024 * 500,
 			Destination: &config.PartitionSize,
 		},
+		cli.Uint64Flag{
+			Name:        "index_cursor_size",
+			Usage:       "Distance between index entries",
+			EnvVar:      "LOGD_INDEX_CURSOR_SIZE",
+			Value:       1000,
+			Destination: &config.IndexCursorSize,
+		},
 		cli.BoolFlag{
 			Name:        "can_shutdown",
 			Usage:       "Server can be shut down via command",
 			EnvVar:      "LOGD_CAN_SHUTDOWN",
 			Destination: &config.CanShutdown,
 		},
+
+		// TODO make action for this instead of flag
+		cli.BoolFlag{
+			Name:        "check",
+			Usage:       "Check index for errors",
+			EnvVar:      "LOGD_CHECK",
+			Destination: &check,
+		},
 	}
 
 	app.Action = func(c *cli.Context) error {
-		srv := logd.NewServer(config.Hostport, config)
-		if err := srv.ListenAndServe(); err != nil {
-			return err
+		if check {
+			if err := logd.CheckIndex(config); err != nil {
+				panic(err)
+			}
+		} else {
+			srv := logd.NewServer(config.Hostport, config)
+			if err := srv.ListenAndServe(); err != nil {
+				return err
+			}
 		}
 		return nil
 	}

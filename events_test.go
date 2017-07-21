@@ -15,11 +15,12 @@ func testConfig(logger Logger) *Config {
 	config.MaxChunkSize = 1024 * 10
 	config.PartitionSize = 1024 * 1024 * 500
 	config.LogFileMode = 0644
+	config.IndexCursorSize = 1000
 
 	// logger := newMemLogger()
 	// logger.returnErr = loggerShouldErr
 
-	config.Verbose = true
+	config.Verbose = testing.Verbose()
 	config.Logger = logger
 
 	return config

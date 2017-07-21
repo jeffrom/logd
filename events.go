@@ -45,23 +45,21 @@ func newEventQ(config *Config) *eventQ {
 
 	q.handleSignals()
 
+	return q
+}
+
+func (q *eventQ) start() error {
 	if manager, ok := q.log.(logManager); ok {
 		if err := manager.Setup(); err != nil {
 			panic(err)
 		}
 	}
 
-	return q
-}
-
-func (q *eventQ) start() error {
 	head, err := q.log.Head()
 	if err != nil {
 		return err
 	}
 	q.currID = head + 1
-
-	log.Printf("Starting at log id %d", q.currID)
 
 	go q.loop()
 	return nil
@@ -137,6 +135,8 @@ func (q *eventQ) handleMsg(cmd *Command) {
 		id++
 		msgb := NewMessage(id, msg).bytes()
 		msgs = append(msgs, msgb)
+
+		q.log.SetID(id)
 		_, err := q.log.Write(msgb)
 		if err != nil {
 			log.Printf("Error: %+v", err)
@@ -150,14 +150,17 @@ func (q *eventQ) handleMsg(cmd *Command) {
 	resp.ID = id
 	cmd.respond(resp)
 
-	go q.publishMessages(cmd, msgs)
+	q.publishMessages(cmd, msgs)
 }
 
 func (q *eventQ) publishMessages(cmd *Command, msgs [][]byte) {
 	for _, sub := range q.subscriptions {
-		for i := range msgs {
-			sub.send(msgs[i])
-		}
+		go func(sub *Subscription) {
+			for i := range msgs {
+				sub.send(msgs[i])
+			}
+
+		}(sub)
 	}
 }
 

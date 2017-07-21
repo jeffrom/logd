@@ -31,6 +31,10 @@ func (l *memLogger) Write(b []byte) (int, error) {
 	return len(b), nil
 }
 
+func (l *memLogger) SetID(id uint64) {
+	l.currID = id
+}
+
 func (l *memLogger) Flush() error {
 	if l.returnErr {
 		return errors.New("hey it's an error")
