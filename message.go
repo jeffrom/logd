@@ -57,10 +57,10 @@ func msgFromReader(r *bufio.Reader) (int, *Message, error) {
 	var n int
 	var read int
 
-	idBytes, err := scanTo(r, ' ')
+	idBytes, err := r.ReadBytes(' ')
 	read += len(idBytes) + 1
 	if err == io.EOF {
-		return 0, nil, io.EOF
+		return 0, nil, err
 	}
 	if err != nil {
 		return 0, nil, errors.Wrap(err, "failed reading id bytes")
@@ -72,7 +72,7 @@ func msgFromReader(r *bufio.Reader) (int, *Message, error) {
 		return read, nil, errors.Wrap(err, "invalid id bytes")
 	}
 
-	lenBytes, err := scanTo(r, ' ')
+	lenBytes, err := r.ReadBytes(' ')
 	read += len(lenBytes) + 1
 	if err != nil {
 		return read, nil, err
@@ -92,22 +92,4 @@ func msgFromReader(r *bufio.Reader) (int, *Message, error) {
 	}
 
 	return read, NewMessage(id, bytes.TrimRight(buf, "\r\n")), nil
-}
-
-func scanTo(r *bufio.Reader, delim byte) ([]byte, error) {
-	n := 0
-	var b bytes.Buffer
-	for {
-		ch, err := r.ReadByte()
-		// fmt.Println(err)
-		if err != nil {
-			return nil, err
-		}
-		if ch == delim {
-			return b.Bytes(), nil
-		}
-
-		b.WriteByte(ch)
-		n++
-	}
 }

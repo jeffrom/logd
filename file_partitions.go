@@ -96,6 +96,9 @@ func (p *filePartitions) setWriteHandle(n uint64) error {
 }
 
 func (p *filePartitions) setReadHandle(n uint64) error {
+	if n == p.currReadPart && p.r != nil {
+		return nil
+	}
 	path := fmt.Sprintf("%s.%d", p.config.LogFile, n)
 
 	if p.r != nil {

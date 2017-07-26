@@ -213,9 +213,9 @@ func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 	// b := make([]byte, q.config.MaxChunkSize)
 	var b []byte
 	numMsg := 0
-	scanner := newLogScanner(q.config, q.log)
+	scanner := newFileLogScanner(q.config, q.log)
 	for scanner.Scan() {
-		msg := scanner.Msg()
+		msg := scanner.Message()
 		b = append(b, msg.bytes()...)
 
 		numMsg++

@@ -25,6 +25,10 @@ type logReader interface {
 	Head() (uint64, error)
 }
 
+type logScannable interface {
+	Scanner() logScanner
+}
+
 type logManager interface {
 	Setup() error
 	Shutdown() error
@@ -47,4 +51,10 @@ type logWriteableFile interface {
 type logIndexFile interface {
 	io.ReadWriteSeeker
 	io.Closer
+}
+
+type logScanner interface {
+	Scan() bool
+	Message() *Message
+	Error() error
 }

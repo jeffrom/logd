@@ -40,3 +40,7 @@ func init() {
 	// logger.discard = true
 	// DefaultConfig.Logger = logger
 }
+
+func (c *Config) indexFileName() string {
+	return c.LogFile + ".index"
+}

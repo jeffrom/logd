@@ -131,6 +131,7 @@ func (l *fileLogger) Read(b []byte) (int, error) {
 				if oerr := l.parts.setReadHandle(l.parts.currReadPart + 1); oerr != nil {
 					return read, oerr
 				}
+				debugf(l.config, "now using part %d", l.parts.currReadPart)
 				continue
 			} else {
 				return read, err
@@ -150,26 +151,34 @@ func (l *fileLogger) SeekToID(id uint64) error {
 	part, offset := l.index.Get(id)
 
 	if err := l.parts.setReadHandle(part); err != nil {
-		return err
+		return errors.Wrap(err, "failed setting read handle")
 	}
 
-	if _, err := l.parts.r.Seek(0, int(offset)); err != nil {
-		return err
+	if _, err := l.parts.r.Seek(int64(offset), io.SeekStart); err != nil {
+		return errors.Wrap(err, "failed seeking in partition")
 	}
 
 	if id <= 1 {
 		return nil
 	}
 
-	scanner := newLogScanner(l.config, l.parts.r)
+	scanner := newFileLogScanner(l.config, l)
 	for scanner.Scan() {
-		msg := scanner.Msg()
+		msg := scanner.Message()
 		if msg.id == id-1 {
-			return scanner.Error()
+			break
+		}
+		if msg.id > id-1 {
+			return errors.New("failed to scan to id")
 		}
 	}
 
-	return io.EOF
+	off := int64(offset) + int64(scanner.read) - int64(scanner.lastRead)
+	if _, err := l.parts.r.Seek(off, io.SeekStart); err != nil {
+		return errors.Wrap(err, "failed to seek in partition after scanning")
+	}
+
+	return nil
 }
 
 func (l *fileLogger) Head() (uint64, error) {
@@ -181,11 +190,10 @@ func (l *fileLogger) Head() (uint64, error) {
 		return 0, err
 	}
 
-	scanner := newLogScanner(l.config, l.parts.r)
+	scanner := newFileLogScanner(l.config, l)
 	for scanner.Scan() {
-
 	}
-	msg := scanner.Msg()
+	msg := scanner.Message()
 	if msg == nil {
 		return 0, scanner.Error()
 	}
@@ -193,7 +201,7 @@ func (l *fileLogger) Head() (uint64, error) {
 }
 
 func (l *fileLogger) getNewIndex() error {
-	idxFileName := l.config.LogFile + ".index"
+	idxFileName := l.config.indexFileName()
 	w, err := os.OpenFile(idxFileName, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.FileMode(l.config.LogFileMode))
 	if err != nil {
 		return errors.Wrap(err, "failed to open log index for writing")
@@ -214,14 +222,14 @@ func (l *fileLogger) loadState() error {
 	// 	c = l.index.data[len(l.index.data)-1]
 	// }
 
-	scanner := newLogScanner(l.config, l.parts.r)
+	scanner := newFileLogScanner(l.config, l)
 	for scanner.Scan() {
 	}
 	if err := scanner.Error(); err != nil {
 		return err
 	}
 
-	msg := scanner.Msg()
+	msg := scanner.Message()
 	if msg != nil {
 		l.currID = msg.id + 1
 		l.written = scanner.read
@@ -251,14 +259,14 @@ func CheckIndex(config *Config) error {
 			return err
 		}
 
-		scanner := newLogScanner(logger.config, logger.parts.r)
+		scanner := newFileLogScanner(logger.config, logger.parts.r)
 		scanner.Scan()
 		if err := scanner.Error(); err != nil {
 			log.Printf("Failed to scan. id: %d, partition: %d, offset: %d", c.id, c.part, c.offset)
 			return err
 		}
 
-		msg := scanner.Msg()
+		msg := scanner.Message()
 		if msg.id != c.id {
 			log.Printf("Read incorrect id at id: %d, partition: %d, offset: %d", c.id, c.part, c.offset)
 			return fmt.Errorf("expected id %d but got %d", c.id, msg.id)
