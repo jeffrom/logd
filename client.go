@@ -29,6 +29,7 @@ func Dial(addr string, conns ...net.Conn) (*Client, error) {
 
 // DialConfig returns a configured Conn
 func DialConfig(addr string, config *Config, conns ...net.Conn) (*Client, error) {
+	debugf(config, "starting options: %s", config)
 	var conn net.Conn
 	var err error
 

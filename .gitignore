@@ -8,3 +8,9 @@ __log*
 
 # files outputting by tools
 *.out
+
+# test binaries
+log*.test
+
+# tool output directory
+report/

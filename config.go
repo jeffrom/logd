@@ -1,5 +1,7 @@
 package logd
 
+import "encoding/json"
+
 // Config contains configuration variables
 type Config struct {
 	Verbose         bool
@@ -18,6 +20,11 @@ type Config struct {
 // NewConfig returns a new configuration object
 func NewConfig() *Config {
 	return &Config{}
+}
+
+func (c *Config) String() string {
+	b, _ := json.Marshal(c)
+	return string(b)
 }
 
 // DefaultConfig is the default application config

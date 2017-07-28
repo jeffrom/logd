@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"os"
 
+	"gopkg.in/urfave/cli.v1"
+
 	"github.com/jeffrom/logd"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/altsrc"
 )
 
 func toBytes(args []string) [][]byte {
@@ -84,7 +86,7 @@ func cmdAction(config *logd.Config, cmd logd.CmdType) func(c *cli.Context) error
 	}
 }
 
-func main() {
+func runApp(args []string) {
 	config := &logd.Config{}
 	*config = *logd.DefaultConfig
 
@@ -103,29 +105,32 @@ func main() {
 		cli.StringFlag{
 			Name:   "config, c",
 			Usage:  "Load configuration from `FILE`",
+			Value:  "logd_conf.yml",
 			EnvVar: "LOGD_CONFIG",
 		},
-		cli.BoolFlag{
+		altsrc.NewBoolFlag(cli.BoolFlag{
 			Name:        "verbose, v",
 			Usage:       "print debug output",
 			EnvVar:      "LOGD_VERBOSE",
 			Destination: &config.Verbose,
-		},
-		cli.StringFlag{
+		}),
+		altsrc.NewStringFlag(cli.StringFlag{
 			Name:        "host",
 			Usage:       "A `HOST:PORT` combination to connect to",
 			EnvVar:      "LOGD_HOST",
 			Value:       "127.0.0.1:1774",
 			Destination: &config.Hostport,
-		},
-		cli.UintFlag{
+		}),
+		altsrc.NewUintFlag(cli.UintFlag{
 			Name:        "timeout",
 			Usage:       "Time, in milliseconds, to wait for a response",
 			EnvVar:      "LOGD_TIMEOUT",
 			Value:       500,
 			Destination: &config.ClientTimeout,
-		},
+		}),
 	}
+
+	app.Before = altsrc.InitInputSourceWithContext(app.Flags, altsrc.NewYamlSourceFromFlagFunc("config"))
 
 	app.Commands = []cli.Command{
 		{
@@ -150,6 +155,10 @@ func main() {
 		},
 	}
 
-	if err := app.Run(os.Args); err != nil {
+	if err := app.Run(args); err != nil {
 	}
+}
+
+func main() {
+	runApp(os.Args)
 }

@@ -45,6 +45,7 @@ type SocketServer struct {
 
 // NewServer will return a new instance of a log server
 func NewServer(addr string, config *Config) *SocketServer {
+	debugf(config, "starting options: %s", config)
 	q := newEventQ(config)
 	if err := q.start(); err != nil {
 		panic(err)

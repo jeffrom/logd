@@ -87,7 +87,6 @@ func TestFileLoggerReadSeek(t *testing.T) {
 	fileWriteLog(t, logger, 2, "two")
 	fileWriteLog(t, logger, 3, "three")
 	fileWriteLog(t, logger, 4, "four")
-	// logger.Flush()
 
 	if head, err := logger.Head(); err != nil {
 		t.Fatalf("failed getting head of log: %+v", err)
@@ -101,10 +100,7 @@ func TestFileLoggerReadSeek(t *testing.T) {
 		t.Fatalf("unexpected error seeking: %+v", err)
 	}
 
-	// XXX
 	out := getLogOutput(config, logger)
-	// fmt.Printf("%q\n", out)
-
 	checkGoldenFile(t, "file_logger_read_seek", out, golden)
 }
 
