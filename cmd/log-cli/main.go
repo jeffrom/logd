@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"os"
@@ -18,6 +19,35 @@ func toBytes(args []string) [][]byte {
 	return b
 }
 
+func checkErrResp(resp *logd.Response) error {
+	if resp.Status == logd.RespErr {
+		return cli.NewExitError("Server error", 2)
+	}
+	if resp.Status == logd.RespErrClient {
+		return cli.NewExitError("Client error", 3)
+	}
+	return nil
+}
+
+func formatResp(resp *logd.Response, args []string) string {
+	respBytes := bytes.TrimRight(resp.Bytes(), "\r\n")
+	isOk := bytes.HasPrefix(respBytes, []byte("OK "))
+	respBytes = bytes.TrimLeft(respBytes, "OK ")
+	var out bytes.Buffer
+	if isOk && args != nil {
+		var lastID uint64
+		if _, err := fmt.Sscanf(string(respBytes), "%d", &lastID); err != nil {
+			panic(err)
+		}
+
+		for i := lastID - uint64(len(args)-1); i < lastID; i++ {
+			out.WriteString(fmt.Sprintf("%d\n", i))
+		}
+	}
+	out.Write(respBytes)
+	return out.String()
+}
+
 func cmdAction(config *logd.Config, cmd logd.CmdType) func(c *cli.Context) error {
 	return func(c *cli.Context) error {
 		client, err := logd.DialConfig(config.Hostport, config)
@@ -25,21 +55,31 @@ func cmdAction(config *logd.Config, cmd logd.CmdType) func(c *cli.Context) error
 			return cli.NewExitError(err, 1)
 		}
 
-		resp, err := client.Do(logd.NewCommand(cmd, toBytes(c.Args())...))
-		if err != nil {
-			return cli.NewExitError(err, 1)
+		if len(c.Args()) > 0 {
+			resp, err := client.Do(logd.NewCommand(cmd, toBytes(c.Args())...))
+			if err != nil {
+				return cli.NewExitError(err, 1)
+			}
+			fmt.Println(formatResp(resp, c.Args()))
+			if err := checkErrResp(resp); err != nil {
+				return err
+			}
 		}
 
-		respBytes := bytes.TrimRight(resp.Bytes(), "\r\n")
-		respBytes = bytes.TrimLeft(respBytes, "OK ")
-		fmt.Printf("%s\n", respBytes)
+		scanner := bufio.NewScanner(os.Stdin)
+		scanner.Split(bufio.ScanLines)
+		for scanner.Scan() {
+			b := scanner.Bytes()
+			resp, err := client.Do(logd.NewCommand(cmd, b))
+			if err != nil {
+				panic(err)
+			}
+			fmt.Println(formatResp(resp, nil))
+			if err := checkErrResp(resp); err != nil {
+				return err
+			}
+		}
 
-		if resp.Status == logd.RespErr {
-			return cli.NewExitError("Server error", 2)
-		}
-		if resp.Status == logd.RespErrClient {
-			return cli.NewExitError("Client error", 3)
-		}
 		return nil
 	}
 }
