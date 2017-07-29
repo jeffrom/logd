@@ -76,6 +76,11 @@ func (q *eventQ) loop() {
 				q.handleMsg(cmd)
 			case CmdReplicate:
 				q.handleReplicate(cmd)
+			// TODO maybe remove rawmessage and change replicate? It would be
+			// best if both readers and replicas got the same optimizations.
+			// For example, stream messages as they come in, but if partitions
+			// are being written fast enough, wait until a partition has been
+			// written and then just sendfile it.
 			case CmdRawMessage:
 				q.handleRawMsg(cmd)
 			case CmdRead:
