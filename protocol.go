@@ -165,13 +165,13 @@ func (ps *Scanner) Scan() bool {
 	}
 
 	msg, err := ps.readMessage()
+	ps.msg = msg
 	if err != nil {
 		ps.err = err
 		return false
 	}
 
 	ps.err = nil
-	ps.msg = msg
 	return true
 }
 

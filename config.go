@@ -2,7 +2,7 @@ package logd
 
 import "encoding/json"
 
-// Config contains configuration variables
+// Config holds configuration variables
 type Config struct {
 	Verbose         bool
 	CanShutdown     bool
@@ -15,6 +15,9 @@ type Config struct {
 	MaxChunkSize    int
 	PartitionSize   int
 	IndexCursorSize uint64
+	StartID         uint64
+	ReadLimit       uint64
+	ReadForever     bool
 }
 
 // NewConfig returns a new configuration object
@@ -39,6 +42,8 @@ func init() {
 	DefaultConfig.MaxChunkSize = 1024 * 1024 * 2
 	DefaultConfig.PartitionSize = 1024 * 1024 * 500
 	DefaultConfig.IndexCursorSize = 1000
+
+	DefaultConfig.ReadLimit = 15
 
 	// XXX just for dev
 	DefaultConfig.CanShutdown = true

@@ -25,7 +25,7 @@ type filePartitions struct {
 	currReadPart uint64
 }
 
-func newPartitions(config *Config) *filePartitions {
+func newFilePartitions(config *Config) *filePartitions {
 	return &filePartitions{
 		config: config,
 	}

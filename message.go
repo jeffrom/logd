@@ -11,17 +11,17 @@ import (
 
 // Message is a log message type.
 type Message struct {
-	id   uint64
-	body []byte
+	ID   uint64
+	Body []byte
 }
 
 // NewMessage returns a new instance of a Message.
 func NewMessage(id uint64, body []byte) *Message {
-	return &Message{id: id, body: body}
+	return &Message{ID: id, Body: body}
 }
 
 func (m *Message) bytes() []byte {
-	return []byte(fmt.Sprintf("%d %d %s\r\n", m.id, len(m.body), m.body))
+	return []byte(fmt.Sprintf("%d %d %s\r\n", m.ID, len(m.Body), m.Body))
 }
 
 func msgFromBytes(b []byte) (*Message, error) {

@@ -25,7 +25,7 @@ type flusher interface {
 func newFileLogger(config *Config) *fileLogger {
 	l := &fileLogger{
 		config: config,
-		parts:  newPartitions(config),
+		parts:  newFilePartitions(config),
 	}
 
 	return l
@@ -165,10 +165,10 @@ func (l *fileLogger) SeekToID(id uint64) error {
 	scanner := newFileLogScanner(l.config, l)
 	for scanner.Scan() {
 		msg := scanner.Message()
-		if msg.id == id-1 {
+		if msg.ID == id-1 {
 			break
 		}
-		if msg.id > id-1 {
+		if msg.ID > id-1 {
 			return errors.New("failed to scan to id")
 		}
 	}
@@ -197,7 +197,7 @@ func (l *fileLogger) Head() (uint64, error) {
 	if msg == nil {
 		return 0, scanner.Error()
 	}
-	return msg.id, scanner.Error()
+	return msg.ID, scanner.Error()
 }
 
 func (l *fileLogger) getNewIndex() error {
@@ -231,7 +231,7 @@ func (l *fileLogger) loadState() error {
 
 	msg := scanner.Message()
 	if msg != nil {
-		l.currID = msg.id + 1
+		l.currID = msg.ID + 1
 		l.written = scanner.read
 
 		log.Printf("Starting at log id %d, offset %d", l.currID, l.written)
@@ -267,9 +267,9 @@ func CheckIndex(config *Config) error {
 		}
 
 		msg := scanner.Message()
-		if msg.id != c.id {
+		if msg.ID != c.id {
 			log.Printf("Read incorrect id at id: %d, partition: %d, offset: %d", c.id, c.part, c.offset)
-			return fmt.Errorf("expected id %d but got %d", c.id, msg.id)
+			return fmt.Errorf("expected id %d but got %d", c.id, msg.ID)
 		}
 	}
 	return nil

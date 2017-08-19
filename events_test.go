@@ -69,13 +69,13 @@ func checkMessageReceived(t *testing.T, resp *Response, expectedID uint64, expec
 		t.Fatalf("Unexpected error: %s", err)
 	}
 
-	if msg.id != expectedID {
+	if msg.ID != expectedID {
 		t.Logf("%s", debug.Stack())
-		t.Fatalf("Expected message with id %d but got %d", expectedID, msg.id)
+		t.Fatalf("Expected message with id %d but got %d", expectedID, msg.ID)
 	}
-	if !bytes.Equal(msg.body, expectedMsg) {
+	if !bytes.Equal(msg.Body, expectedMsg) {
 		t.Logf("%s", debug.Stack())
-		t.Fatalf("Expected message %q but got %q", expectedMsg, msg.body)
+		t.Fatalf("Expected message %q but got %q", expectedMsg, msg.Body)
 	}
 }
 

@@ -66,6 +66,21 @@ func cmdAction(config *logd.Config, cmd logd.CmdType) func(c *cli.Context) error
 			if err := checkErrResp(resp); err != nil {
 				return err
 			}
+		} else {
+			resp, err := client.Do(logd.NewCommand(cmd))
+			if err != nil {
+				return cli.NewExitError(err, 1)
+			}
+			fmt.Println(formatResp(resp, c.Args()))
+			if err := checkErrResp(resp); err != nil {
+				return err
+			}
+		}
+
+		// check if there's data in stdin
+		stat, _ := os.Stdin.Stat()
+		if (stat.Mode() & os.ModeCharDevice) != 0 {
+			return nil
 		}
 
 		scanner := bufio.NewScanner(os.Stdin)
@@ -80,6 +95,51 @@ func cmdAction(config *logd.Config, cmd logd.CmdType) func(c *cli.Context) error
 			if err := checkErrResp(resp); err != nil {
 				return err
 			}
+		}
+
+		return nil
+	}
+}
+
+func doReadCmdAction(config *logd.Config) func(c *cli.Context) error {
+	return func(c *cli.Context) error {
+		start := config.StartID
+		limit := int(config.ReadLimit)
+
+		client, err := logd.DialConfig(config.Hostport, config)
+		if err != nil {
+			return cli.NewExitError(err, 1)
+		}
+
+		if start == 0 && !config.ReadForever {
+			resp, headErr := client.Do(logd.NewCommand(logd.CmdHead))
+			if err != nil {
+				return cli.NewExitError(headErr, 2)
+			}
+
+			if resp.ID < uint64(limit) {
+				limit -= (int(resp.ID))
+				start = 1
+			} else {
+				start = resp.ID - uint64(limit)
+			}
+		}
+
+		scanner, err := client.DoRead(start, limit)
+		if err != nil {
+			return cli.NewExitError(err, 2)
+		}
+
+		for scanner.Scan() {
+			if scanner.Err() != nil {
+				return cli.NewExitError(scanner.Err(), 3)
+			}
+
+			msg := scanner.Message()
+			fmt.Printf("%d %s\n", msg.ID, msg.Body)
+		}
+		if scanner.Err() != nil {
+			return cli.NewExitError(scanner.Err(), 3)
 		}
 
 		return nil
@@ -101,7 +161,7 @@ func runApp(args []string) {
 	app.Version = "0.0.1"
 	app.EnableBashCompletion = true
 
-	app.Flags = []cli.Flag{
+	flags := []cli.Flag{
 		cli.StringFlag{
 			Name:   "config, c",
 			Usage:  "Load configuration from `FILE`",
@@ -123,12 +183,14 @@ func runApp(args []string) {
 		}),
 		altsrc.NewUintFlag(cli.UintFlag{
 			Name:        "timeout",
-			Usage:       "Time, in milliseconds, to wait for a response",
+			Usage:       "`MILLISECONDS` to wait for a response",
 			EnvVar:      "LOGD_TIMEOUT",
 			Value:       500,
 			Destination: &config.ClientTimeout,
 		}),
 	}
+
+	app.Flags = flags
 
 	app.Before = altsrc.InitInputSourceWithContext(app.Flags, altsrc.NewYamlSourceFromFlagFunc("config"))
 
@@ -152,6 +214,30 @@ func runApp(args []string) {
 			Name:   "msg",
 			Usage:  "write a message to the log",
 			Action: cmdAction(config, logd.CmdMessage),
+		},
+		{
+			Name:  "read",
+			Usage: "read from the log",
+			Flags: append([]cli.Flag{
+				cli.Uint64Flag{
+					Name:        "start, s",
+					Usage:       "Starting `ID`",
+					Value:       0,
+					Destination: &config.StartID,
+				},
+				cli.Uint64Flag{
+					Name:        "limit, n",
+					Usage:       "`NUMBER` of message to read",
+					Value:       15,
+					Destination: &config.ReadLimit,
+				},
+				cli.BoolFlag{
+					Name:        "forever, f",
+					Usage:       "read forever",
+					Destination: &config.ReadForever,
+				},
+			}, flags...),
+			Action: doReadCmdAction(config),
 		},
 	}
 

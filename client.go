@@ -160,6 +160,7 @@ func (c *Client) Do(cmds ...*Command) (*Response, error) {
 // DoRead returns a scanner that can be used to loop over messages, similar to
 // bufio.Scanner
 func (c *Client) DoRead(id uint64, limit int) (*Scanner, error) {
+	debugf(c.config, "DoRead(%d, %d)", id, limit)
 	cmd := NewCommand(CmdRead,
 		[]byte(fmt.Sprintf("%d", id)),
 		[]byte(fmt.Sprintf("%d", limit)),

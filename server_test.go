@@ -49,12 +49,12 @@ func checkScan(t *testing.T, scanner *Scanner, msg []byte) {
 		t.Fatalf("unexpected error scanning: %+v", err)
 	}
 
-	if respMsg := scanner.Message(); respMsg == nil || !reflect.DeepEqual(respMsg.body, msg) {
+	if respMsg := scanner.Message(); respMsg == nil || !reflect.DeepEqual(respMsg.Body, msg) {
 		t.Logf("%s", debug.Stack())
 		if respMsg == nil {
 			t.Fatalf("Expected %q response but got nil message", msg)
 		} else {
-			t.Fatalf("Expected %q response but got %q", msg, respMsg.body)
+			t.Fatalf("Expected %q response but got %q", msg, respMsg.Body)
 		}
 	}
 }
