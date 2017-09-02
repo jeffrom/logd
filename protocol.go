@@ -205,6 +205,9 @@ func (ps *Scanner) readMessage() (*Message, error) {
 
 	parts := bytes.SplitN(line, []byte(" "), 3)
 	if len(parts) != 3 {
+		if len(parts) == 1 && bytes.Equal(parts[0], []byte("+EOF")) {
+			return nil, io.EOF
+		}
 		return nil, errors.New("invalid protocol line")
 	}
 

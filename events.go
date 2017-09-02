@@ -215,25 +215,23 @@ func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 		panic(err)
 	}
 
-	// b := make([]byte, q.config.MaxChunkSize)
-	var b []byte
 	numMsg := 0
 	scanner := newFileLogScanner(q.config, q.log)
+	// TODO chunking
 	for scanner.Scan() {
 		msg := scanner.Message()
-		b = append(b, msg.bytes()...)
 
-		numMsg++
+		if msg.ID >= startID {
+			resp.msgC <- msg.bytes()
+			numMsg++
+		}
+
 		if limit > 0 && uint64(numMsg) >= limit {
 			break
 		}
 	}
 	if err := scanner.Error(); err != nil {
 		panic(err)
-	}
-
-	if len(b) > 0 {
-		resp.msgC <- b
 	}
 
 	if limit == 0 { // read forever

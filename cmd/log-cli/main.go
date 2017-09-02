@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 
 	"gopkg.in/urfave/cli.v1"
@@ -139,6 +140,9 @@ func doReadCmdAction(config *logd.Config) func(c *cli.Context) error {
 			fmt.Printf("%d %s\n", msg.ID, msg.Body)
 		}
 		if scanner.Err() != nil {
+			if scanner.Err() == io.EOF {
+				return nil
+			}
 			return cli.NewExitError(scanner.Err(), 3)
 		}
 
