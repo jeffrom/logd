@@ -220,11 +220,12 @@ func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 	// TODO chunking
 	for scanner.Scan() {
 		msg := scanner.Message()
-
-		if msg.ID >= startID {
-			resp.msgC <- msg.bytes()
-			numMsg++
+		if msg.ID < startID {
+			continue
 		}
+
+		resp.msgC <- msg.bytes()
+		numMsg++
 
 		if limit > 0 && uint64(numMsg) >= limit {
 			break

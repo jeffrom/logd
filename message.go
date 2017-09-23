@@ -24,6 +24,10 @@ func (m *Message) bytes() []byte {
 	return []byte(fmt.Sprintf("%d %d %s\r\n", m.ID, len(m.Body), m.Body))
 }
 
+func (m *Message) String() string {
+	return string(m.bytes())
+}
+
 func msgFromBytes(b []byte) (*Message, error) {
 	var id uint64
 	var length uint64
@@ -58,13 +62,14 @@ func msgFromReader(r *bufio.Reader) (int, *Message, error) {
 	var read int
 
 	idBytes, err := r.ReadBytes(' ')
-	read += len(idBytes) + 1
+	read += len(idBytes)
 	if err == io.EOF {
 		return 0, nil, err
 	}
 	if err != nil {
 		return 0, nil, errors.Wrap(err, "failed reading id bytes")
 	}
+	// fmt.Printf("id: %q\n", idBytes)
 
 	var id uint64
 	_, err = fmt.Sscanf(string(idBytes), "%d", &id)
@@ -73,7 +78,8 @@ func msgFromReader(r *bufio.Reader) (int, *Message, error) {
 	}
 
 	lenBytes, err := r.ReadBytes(' ')
-	read += len(lenBytes) + 1
+	// fmt.Printf("length: %q\n", lenBytes)
+	read += len(lenBytes)
 	if err != nil {
 		return read, nil, err
 	}
@@ -86,6 +92,7 @@ func msgFromReader(r *bufio.Reader) (int, *Message, error) {
 
 	buf := make([]byte, length+2)
 	n, err = r.Read(buf)
+	// fmt.Printf("msg: (%d) %q\n", length, buf)
 	read += n
 	if err != nil {
 		return read, nil, errors.Wrap(err, "failed reading body")

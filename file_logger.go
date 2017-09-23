@@ -174,6 +174,7 @@ func (l *fileLogger) SeekToID(id uint64) error {
 	}
 
 	off := int64(offset) + int64(scanner.read) - int64(scanner.lastRead)
+	debugf(l.config, "seeking to offset %d", off)
 	if _, err := l.parts.r.Seek(off, io.SeekStart); err != nil {
 		return errors.Wrap(err, "failed to seek in partition after scanning")
 	}
