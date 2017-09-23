@@ -303,6 +303,10 @@ func (s *SocketServer) handleClient(conn *conn) {
 			debugf(s.config, "sending log messages to %s", conn.RemoteAddr())
 			conn.setState(connStateReading)
 			// continue the loop to accept additional commands
+
+			if err := conn.SetWriteDeadline(time.Time{}); err != nil {
+				panic(err)
+			}
 			go s.handleSubscriber(conn, cmd, resp)
 		} else {
 			conn.setState(connStateInactive)
@@ -321,6 +325,7 @@ func (s *SocketServer) handleSubscriber(conn *conn, cmd *Command, resp *Response
 			// serialized := []byte(fmt.Sprintf("+%d %d %s\r\n", msg.id, len(msg.body), msg.body))
 			conn.write(append([]byte("+"), msg...))
 		case <-cmd.done:
+			debugf(s.config, "%s +EOF", conn.RemoteAddr())
 			conn.write([]byte("+EOF\r\n"))
 			return
 		}

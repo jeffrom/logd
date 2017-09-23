@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"gopkg.in/urfave/cli.v1"
 
@@ -126,6 +127,10 @@ func doReadCmdAction(config *logd.Config) func(c *cli.Context) error {
 			}
 		}
 
+		if config.ReadForever {
+			limit = 0
+		}
+
 		scanner, err := client.DoRead(start, limit)
 		if err != nil {
 			return cli.NewExitError(err, 2)
@@ -139,11 +144,23 @@ func doReadCmdAction(config *logd.Config) func(c *cli.Context) error {
 			msg := scanner.Message()
 			fmt.Printf("%d %s\n", msg.ID, msg.Body)
 		}
-		if scanner.Err() != nil {
-			if scanner.Err() == io.EOF {
-				return nil
-			}
+
+		if err := scanner.Err(); err != io.EOF && err != nil {
 			return cli.NewExitError(scanner.Err(), 3)
+		}
+
+		if config.ReadForever {
+			for {
+				time.Sleep(200)
+				for scanner.Scan() {
+					if scanner.Err() != nil {
+						return cli.NewExitError(scanner.Err(), 3)
+					}
+
+					msg := scanner.Message()
+					fmt.Printf("%d %s\n", msg.ID, msg.Body)
+				}
+			}
 		}
 
 		return nil

@@ -168,6 +168,12 @@ func (c *Client) DoRead(id uint64, limit int) (*Scanner, error) {
 	if err := c.writeCommand(cmd); c.handleErr(err) != nil {
 		return nil, err
 	}
+
+	if limit == 0 {
+		if err := c.conn.SetReadDeadline(time.Time{}); err != nil {
+			return nil, err
+		}
+	}
 	return c.readScanResponse()
 }
 
