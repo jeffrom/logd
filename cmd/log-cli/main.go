@@ -68,7 +68,7 @@ func cmdAction(config *logd.Config, cmd logd.CmdType) func(c *cli.Context) error
 			if err := checkErrResp(resp); err != nil {
 				return err
 			}
-		} else {
+		} else if cmd != logd.CmdMessage {
 			resp, err := client.Do(logd.NewCommand(cmd))
 			if err != nil {
 				return cli.NewExitError(err, 1)
@@ -232,7 +232,7 @@ func runApp(args []string) {
 			Action: cmdAction(config, logd.CmdHead),
 		},
 		{
-			Name:   "msg",
+			Name:   "write",
 			Usage:  "write a message to the log",
 			Action: cmdAction(config, logd.CmdMessage),
 		},
