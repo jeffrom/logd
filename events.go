@@ -138,7 +138,7 @@ func (q *eventQ) handleMsg(cmd *Command) {
 		}
 
 		id++
-		msgb := NewMessage(id, msg).bytes()
+		msgb := NewMessage(id, msg).logBytes()
 		msgs = append(msgs, msgb)
 
 		q.log.SetID(id)
@@ -224,7 +224,7 @@ func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 			continue
 		}
 
-		resp.msgC <- msg.bytes()
+		resp.msgC <- msg.logBytes()
 		numMsg++
 
 		if limit > 0 && uint64(numMsg) >= limit {

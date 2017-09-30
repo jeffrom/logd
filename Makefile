@@ -2,19 +2,23 @@
 BENCHFLAGS ?= -cpuprofile=cpu.pprof -memprofile=mem.pprof -benchmem
 PKGS ?= $(shell glide novendor)
 
+GENERATED_FILES ?= __log* testdata/*.actual.golden logd.test log-cli.test
+
 .PHONY: all
 all: cover test
 
 .PHONY: clean
 clean:
 	@echo "Cleaning generated development files..."
-	rm -f __log*
-	rm -f testdata/*.actual.golden
-	rm -f logd.test
-	rm -f log-cli.test
+	rm -f $(GENERATED_FILES)
 
-.PHONY: dependencies
-dependencies:
+.PHONY: ls.tmp
+ls.tmp:
+	@echo "Listing temporary files..."
+	ls $(GENERATED_FILES)
+
+.PHONY: deps
+deps:
 	@echo "Installing Glide and dependencies..."
 	glide --version || go get -u -f github.com/Masterminds/glide
 	glide install

@@ -49,6 +49,7 @@ func (l *fileLogger) Setup() error {
 		}
 
 		if err := l.loadState(); err != nil {
+			fmt.Printf("%+v\n", err)
 			return err
 		}
 	}
@@ -69,7 +70,7 @@ func (l *fileLogger) Shutdown() error {
 }
 
 func (l *fileLogger) Write(b []byte) (int, error) {
-	debugf(l.config, "LOG <- %s", bytes.Trim(b, "\n"))
+	debugf(l.config, "LOG <- %s (%d)", bytes.Trim(b, "\n"), len(b))
 
 	written := l.written + len(b)
 	madeNewPartition := false

@@ -17,12 +17,13 @@ type fileLogScanner struct {
 func newFileLogScanner(config *Config, r io.Reader) *fileLogScanner {
 	return &fileLogScanner{
 		config: config,
-		br:     bufio.NewReader(r),
+		br:     bufio.NewReaderSize(r, config.MaxChunkSize),
 	}
 }
 
 func (s *fileLogScanner) Scan() bool {
 	n, msg, err := msgFromReader(s.br)
+	// fmt.Printf("scanned: %+v\n", msg)
 	s.lastRead = n
 	s.read += n
 	s.err = err

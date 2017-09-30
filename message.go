@@ -20,12 +20,12 @@ func NewMessage(id uint64, body []byte) *Message {
 	return &Message{ID: id, Body: body}
 }
 
-func (m *Message) bytes() []byte {
+func (m *Message) logBytes() []byte {
 	return []byte(fmt.Sprintf("%d %d %s\r\n", m.ID, len(m.Body), m.Body))
 }
 
 func (m *Message) String() string {
-	return string(m.bytes())
+	return string(m.logBytes())
 }
 
 func msgFromBytes(b []byte) (*Message, error) {

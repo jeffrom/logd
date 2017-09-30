@@ -76,10 +76,11 @@ func runApp(args []string) {
 			Destination: &config.MaxChunkSize,
 		}),
 		altsrc.NewIntFlag(cli.IntFlag{
-			Name:        "partition_size",
-			Usage:       "Size, in bytes, of partition",
-			EnvVar:      "LOGD_PARTITION_SIZE",
-			Value:       1024 * 1024 * 500,
+			Name:   "partition_size",
+			Usage:  "Size, in bytes, of partition",
+			EnvVar: "LOGD_PARTITION_SIZE",
+			// Value:       1024 * 1024 * 500,
+			Value:       1024 * 50,
 			Destination: &config.PartitionSize,
 		}),
 		altsrc.NewUint64Flag(cli.Uint64Flag{

@@ -134,7 +134,7 @@ func repeat(s string, n int) string {
 
 func fileWriteLog(t *testing.T, logger Logger, id uint64, body string) (int, error) {
 	logger.SetID(id)
-	n, err := logger.Write(NewMessage(id, []byte(body)).bytes())
+	n, err := logger.Write(NewMessage(id, []byte(body)).logBytes())
 	if err != nil {
 		t.Fatalf("unexpectedly failed to write to log: %+v", err)
 		return n, err

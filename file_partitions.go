@@ -125,7 +125,7 @@ func maxUint64(args ...uint64) uint64 {
 }
 
 func (p *filePartitions) matches() []string {
-	matches, err := filepath.Glob(p.config.LogFile + ".[0-9]")
+	matches, err := filepath.Glob(p.config.LogFile + ".[0-9]*")
 	if err != nil {
 		panic(err)
 	}
