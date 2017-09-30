@@ -65,20 +65,14 @@ func (p *filePartitions) setCurrentFileHandles(create bool) error {
 	if err := p.setWriteHandle(curr); err != nil {
 		return err
 	}
-	if err := p.setReadHandle(curr); err != nil {
-		return err
-	}
-	return nil
+	return p.setReadHandle(curr)
 }
 
 func (p *filePartitions) setHandles(n uint64) error {
 	if err := p.setWriteHandle(n); err != nil {
 		return err
 	}
-	if err := p.setReadHandle(n); err != nil {
-		return err
-	}
-	return nil
+	return p.setReadHandle(n)
 }
 
 func (p *filePartitions) setWriteHandle(n uint64) error {
