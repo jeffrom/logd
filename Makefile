@@ -27,6 +27,10 @@ deps:
 test:
 	go test -race $(PKGS)
 
+.PHONY: test.golden
+test.golden:
+	go test -golden $(PKGS)
+
 .PHONY: cover
 cover:
 	go test -cover $(PKGS)
