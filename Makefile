@@ -5,7 +5,7 @@ PKGS ?= $(shell glide novendor)
 GENERATED_FILES ?= __log* testdata/*.actual.golden logd.test log-cli.test
 
 .PHONY: all
-all: cover test
+all: test.cover test build
 
 .PHONY: clean
 clean:
@@ -23,6 +23,10 @@ deps:
 	glide --version || go get -u -f github.com/Masterminds/glide
 	glide install
 
+.PHONY: build
+build:
+	go install ./...
+
 .PHONY: test
 test:
 	go test -race $(PKGS)
@@ -31,8 +35,8 @@ test:
 test.golden:
 	go test -golden $(PKGS)
 
-.PHONY: cover
-cover:
+.PHONY: test.cover
+test.cover:
 	go test -cover $(PKGS)
 
 .PHONY: lint
