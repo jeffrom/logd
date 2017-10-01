@@ -49,7 +49,7 @@ func (l *fileLogger) Setup() error {
 		}
 
 		if err := l.loadState(); err != nil {
-			fmt.Printf("%+v\n", err)
+			log.Printf("error loading state: %+v\n", err)
 			return err
 		}
 	}
@@ -120,29 +120,29 @@ func (l *fileLogger) Flush() error {
 	return nil
 }
 
+// TODO break this out into a Read and ReadPartition function, the latter of
+// which stops on the current partition. we need this to accurately seek
 func (l *fileLogger) Read(b []byte) (int, error) {
 	var err error
 	var read int
 	for {
 		var n int
-		n, err = l.parts.r.Read(b)
+		n, err = l.parts.r.Read(b[read:])
+		// fmt.Printf("total buf:\n\"%s\"curr: \"%s\"\nerr: %v\n", b, b[read:], err)
 		read += n
 		if err == io.EOF {
 			if l.parts.currReadPart < l.parts.head() {
 				if oerr := l.parts.setReadHandle(l.parts.currReadPart + 1); oerr != nil {
 					return read, oerr
 				}
-				debugf(l.config, "now using part %d", l.parts.currReadPart)
-				continue
+				debugf(l.config, "switched to partition %d", l.parts.currReadPart)
+				err = nil
 			} else {
 				return read, err
 			}
 		}
 
-		if n > 0 || err != io.EOF {
-			if err == io.EOF && l.parts.currReadPart < l.parts.head() {
-				err = nil // more readers remain
-			}
+		if err != nil {
 			return read, err
 		}
 	}
@@ -150,6 +150,7 @@ func (l *fileLogger) Read(b []byte) (int, error) {
 
 func (l *fileLogger) SeekToID(id uint64) error {
 	part, offset := l.index.Get(id)
+	debugf(l.config, "index.Get(%d) -> (part %d, offset %d)", id, part, offset)
 
 	if err := l.parts.setReadHandle(part); err != nil {
 		return errors.Wrap(err, "failed setting read handle")
@@ -163,19 +164,40 @@ func (l *fileLogger) SeekToID(id uint64) error {
 		return nil
 	}
 
-	scanner := newFileLogScanner(l.config, l)
-	for scanner.Scan() {
-		msg := scanner.Message()
-		if msg.ID == id-1 {
-			break
+	var scanner *fileLogScanner
+
+Loop:
+	for {
+		scanner = newFileLogScanner(l.config, l.parts.r)
+
+		for scanner.Scan() {
+			msg := scanner.Message()
+			// fmt.Println(scanner.Error(), msg.String())
+			if msg.ID == id-1 {
+				break Loop
+			}
+			if msg.ID > id-1 {
+				return errors.New("failed to scan to id")
+			}
 		}
-		if msg.ID > id-1 {
-			return errors.New("failed to scan to id")
+
+		if err := scanner.Error(); err == io.EOF {
+			if l.parts.currReadPart < l.parts.head() {
+				if oerr := l.parts.setReadHandle(l.parts.currReadPart + 1); oerr != nil {
+					return oerr
+				}
+				continue
+			} else {
+				return err
+			}
+		} else if err != nil {
+			panic(err)
 		}
+
 	}
 
 	off := int64(offset) + int64(scanner.read) - int64(scanner.lastRead)
-	debugf(l.config, "seeking to offset %d", off)
+	debugf(l.config, "seeking to offset %d, partition %d", off, l.parts.currReadPart)
 	if _, err := l.parts.r.Seek(off, io.SeekStart); err != nil {
 		return errors.Wrap(err, "failed to seek in partition after scanning")
 	}
@@ -192,14 +214,26 @@ func (l *fileLogger) Head() (uint64, error) {
 		return 0, err
 	}
 
+	var msg *Message
 	scanner := newFileLogScanner(l.config, l)
 	for scanner.Scan() {
+		if scanned := scanner.Message(); scanned != nil {
+			msg = scanned
+		}
 	}
-	msg := scanner.Message()
+	err := scanner.Error()
+	if err == io.EOF {
+		err = nil
+	}
+
 	if msg == nil {
-		return 0, scanner.Error()
+		return 0, err
 	}
-	return msg.ID, scanner.Error()
+	return msg.ID, err
+}
+
+func (l *fileLogger) Copy() Logger {
+	return newFileLogger(l.config)
 }
 
 func (l *fileLogger) getNewIndex() error {
@@ -227,7 +261,7 @@ func (l *fileLogger) loadState() error {
 	scanner := newFileLogScanner(l.config, l)
 	for scanner.Scan() {
 	}
-	if err := scanner.Error(); err != nil {
+	if err := scanner.Error(); err != nil && err != io.EOF {
 		return err
 	}
 

@@ -18,14 +18,12 @@ func getTempdir() string {
 	return dir
 }
 
-func setupFileLogger(t *testing.T) (*Config, Logger, func()) {
-	config := testConfig(nil)
-	config.IndexCursorSize = 10
-	config.PartitionSize = 2048
+func tmpLog() string {
 	tmpdir := getTempdir()
-	tmplog := path.Join(tmpdir, "__log")
-	config.LogFile = tmplog
+	return path.Join(tmpdir, "__log")
+}
 
+func setupFileLoggerConfig(t testing.TB, config *Config) (*Config, Logger, func()) {
 	var logger Logger
 	logger = newFileLogger(config)
 	config.Logger = newFileLogger(config)
@@ -35,7 +33,7 @@ func setupFileLogger(t *testing.T) (*Config, Logger, func()) {
 	}
 
 	return config, logger, func() {
-		os.RemoveAll(tmpdir)
+		os.RemoveAll(path.Dir(config.LogFile))
 
 		if err := logger.(logManager).Shutdown(); err != nil {
 			t.Fatalf("error shutting down: %+v", err)
@@ -43,18 +41,20 @@ func setupFileLogger(t *testing.T) (*Config, Logger, func()) {
 	}
 }
 
+func setupFileLogger(t testing.TB) (*Config, Logger, func()) {
+	config := testConfig(nil)
+	config.IndexCursorSize = 10
+	config.PartitionSize = 2048
+	config.LogFile = tmpLog()
+
+	return setupFileLoggerConfig(t, config)
+}
+
 func getLogOutput(config *Config, l io.Reader) []byte {
 	b, err := ioutil.ReadAll(l)
 	if err != nil {
 		panic(err)
 	}
-
-	// var b []byte
-	// scanner := newLogScanner(config, l)
-	// for scanner.Scan() {
-	// 	msg := scanner.Msg()
-	// 	b = append(b, msg.bytes()...)
-	// }
 	return b
 }
 
@@ -90,10 +90,8 @@ func TestFileLoggerReadSeek(t *testing.T) {
 
 	if head, err := logger.Head(); err != nil {
 		t.Fatalf("failed getting head of log: %+v", err)
-	} else {
-		if head != 4 {
-			t.Fatalf("expected head to be 4 but was %d", head)
-		}
+	} else if head != 4 {
+		t.Fatalf("expected head to be 4 but was %d", head)
 	}
 
 	if err := logger.SeekToID(2); err != nil {
@@ -121,6 +119,31 @@ func TestFileLoggerIndex(t *testing.T) {
 
 	out, _ := ioutil.ReadFile(config.indexFileName())
 	checkGoldenFile(t, "file_logger_index", out, golden)
+}
+
+func TestFilePartitionWrites(t *testing.T) {
+	config := testConfig(nil)
+	config.IndexCursorSize = 10
+	config.PartitionSize = 500
+	config.LogFile = tmpLog()
+	config, logger, teardown := setupFileLoggerConfig(t, config)
+	defer teardown()
+
+	msg := []byte(repeat("A", 50))
+	for i := 0; i < 10; i++ {
+		truncated := msg[:len(msg)-(10%(i+1))]
+		logger.Write(truncated)
+	}
+	logger.Flush()
+
+	part1, _ := ioutil.ReadFile(config.LogFile + ".0")
+	checkGoldenFile(t, "file_partition_write.0", part1, golden)
+	part2, _ := ioutil.ReadFile(config.LogFile + ".1")
+	checkGoldenFile(t, "file_partition_write.1", part2, golden)
+	_, err := ioutil.ReadFile(config.LogFile + ".2")
+	if err == nil {
+		t.Fatal("Expected no third partition")
+	}
 }
 
 func repeat(s string, n int) string {

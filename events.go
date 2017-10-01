@@ -3,6 +3,7 @@ package logd
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -211,13 +212,21 @@ func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 	resp.msgC = make(chan []byte)
 	cmd.respond(resp)
 
-	if err := q.log.SeekToID(startID); err != nil {
+	log := q.log.Copy()
+	if manager, ok := log.(logManager); ok {
+		if err := manager.Setup(); err != nil {
+			panic(err)
+		}
+		defer manager.Shutdown()
+	}
+
+	if err := log.SeekToID(startID); err != nil {
 		panic(err)
 	}
 
 	numMsg := 0
-	scanner := newFileLogScanner(q.config, q.log)
-	// TODO chunking
+	scanner := newFileLogScanner(q.config, log)
+	// TODO chunking, scanner interface
 	for scanner.Scan() {
 		msg := scanner.Message()
 		if msg.ID < startID {
@@ -231,7 +240,7 @@ func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 			break
 		}
 	}
-	if err := scanner.Error(); err != nil {
+	if err := scanner.Error(); err != nil && err != io.EOF {
 		panic(err)
 	}
 

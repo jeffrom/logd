@@ -3,6 +3,9 @@ package logd
 import (
 	"bytes"
 	"errors"
+	"fmt"
+	"io/ioutil"
+	"path"
 	"runtime/debug"
 	"testing"
 	"time"
@@ -26,13 +29,17 @@ func testConfig(logger Logger) *Config {
 	return config
 }
 
-func startQ(t *testing.T, logger Logger) *eventQ {
-	q := newEventQ(testConfig(logger))
+func startQConfig(t testing.TB, config *Config) *eventQ {
+	q := newEventQ(config)
 	if err := q.start(); err != nil {
 		t.Logf("%s", debug.Stack())
 		t.Fatalf("error starting queue: %+v", err)
 	}
 	return q
+}
+
+func startQ(t *testing.T, logger Logger) *eventQ {
+	return startQConfig(t, testConfig(logger))
 }
 
 func stopQ(t testing.TB, q *eventQ) {
@@ -58,7 +65,16 @@ func checkNoErrAndSuccess(t *testing.T, resp *Response, err error) {
 }
 
 func checkMessageReceived(t *testing.T, resp *Response, expectedID uint64, expectedMsg []byte) {
-	msgb, ok := <-resp.msgC
+	var msgb []byte
+	var ok bool
+	select {
+	case b, recvd := <-resp.msgC:
+		msgb = b
+		ok = recvd
+	case <-time.After(time.Millisecond * 100):
+		t.Fatal("timed out waiting for message on channel")
+	}
+
 	if !ok {
 		t.Logf("%s", debug.Stack())
 		t.Fatal("Expected to read message but got none")
@@ -116,7 +132,7 @@ func TestEventQAdd(t *testing.T) {
 	checkNoErrAndSuccess(t, resp, err)
 }
 
-func TestEventQLog(t *testing.T) {
+func TestEventQWrite(t *testing.T) {
 	q := startQ(t, newMemLogger())
 	defer stopQ(t, q)
 
@@ -127,7 +143,7 @@ func TestEventQLog(t *testing.T) {
 	}
 }
 
-func TestEventQLogErr(t *testing.T) {
+func TestEventQWriteErr(t *testing.T) {
 	memLogger := newMemLogger()
 	memLogger.returnErr = true
 	q := startQ(t, memLogger)
@@ -135,6 +151,67 @@ func TestEventQLogErr(t *testing.T) {
 
 	resp, _ := q.pushCommand(NewCommand(CmdMessage, []byte("Hello, log!")))
 	checkErrResp(t, resp)
+}
+
+func TestEventQWriteFilePartitions(t *testing.T) {
+	config := testConfig(nil)
+	config.IndexCursorSize = 10
+	config.PartitionSize = 500
+	config.LogFile = tmpLog()
+	config, _, teardown := setupFileLoggerConfig(t, config)
+	defer teardown()
+
+	q := startQConfig(t, config)
+	defer stopQ(t, q)
+
+	msg := []byte(repeat("A", 50))
+	for i := 0; i < 10; i++ {
+		truncated := msg[:len(msg)-(10%(i+1))]
+		resp, err := q.pushCommand(NewCommand(CmdMessage, truncated))
+		checkNoErrAndSuccess(t, resp, err)
+	}
+
+	part1, _ := ioutil.ReadFile(config.LogFile + ".0")
+	checkGoldenFile(t, "events.file_partition_write.0", part1, golden)
+	part2, _ := ioutil.ReadFile(config.LogFile + ".1")
+	checkGoldenFile(t, "events.file_partition_write.1", part2, golden)
+	part3, _ := ioutil.ReadFile(config.LogFile + ".2")
+	checkGoldenFile(t, "events.file_partition_write.2", part3, golden)
+	_, err := ioutil.ReadFile(config.LogFile + ".3")
+	if err == nil {
+		t.Fatal("Expected no fourth partition")
+	}
+
+	index, _ := ioutil.ReadFile(config.LogFile + ".index")
+	checkGoldenFile(t, "events.file_partition_write.index", index, golden)
+}
+
+// TODO this is maybe too tightly coupled to the prev test
+// It's copied from the golden file the events.file_partition_write.[0-3]
+func TestEventQReadFilePartitions(t *testing.T) {
+	config := testConfig(nil)
+	config.IndexCursorSize = 10
+	config.PartitionSize = 500
+	config.LogFile = path.Join("testdata", "q.read_file_test_log")
+	logger := newFileLogger(config)
+	config.Logger = logger
+
+	q := startQConfig(t, config)
+	defer stopQ(t, q)
+
+	msg := []byte(repeat("A", 50))
+	for i := 0; i < 10; i++ {
+		truncated := msg[:len(msg)-(10%(i+1))]
+		id := i + 1
+		idStr := fmt.Sprintf("%d", id)
+
+		// log.Printf("Reading id %d", id)
+
+		cmd := NewCommand(CmdRead, []byte(idStr), []byte("1"))
+		resp, err := q.pushCommand(cmd)
+		checkNoErrAndSuccess(t, resp, err)
+		checkMessageReceived(t, resp, uint64(id), truncated)
+	}
 }
 
 func TestEventQHead(t *testing.T) {

@@ -6,6 +6,7 @@
 - [ ] partitioning, including removing old partitions with hooks
     - reading doesn't work near partition boundaries
     - can't read last few messages
+- [ ] index isn't being written to disk, probably other issues too
 - [ ] test suite that runs the same set of tests with different configurations,
   but also supports expected failures in some cases
 - [ ] test suite should also include system-level tests with coverage

@@ -46,6 +46,10 @@ test.cover:
 .PHONY: test.golden
 test.golden:
 	go test -golden $(PKGS)
+	cp testdata/events.file_partition_write.0.golden testdata/q.read_file_test_log.0
+	cp testdata/events.file_partition_write.1.golden testdata/q.read_file_test_log.1
+	cp testdata/events.file_partition_write.2.golden testdata/q.read_file_test_log.2
+	cp testdata/events.file_partition_write.index.golden testdata/q.read_file_test_log.index
 
 .PHONY: lint
 lint:

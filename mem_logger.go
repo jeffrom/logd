@@ -81,3 +81,9 @@ func (l *memLogger) Head() (uint64, error) {
 
 	return uint64(len(l.messages)), nil
 }
+
+func (l *memLogger) Copy() Logger {
+	ml := newMemLogger()
+	ml.messages = l.messages
+	return ml
+}

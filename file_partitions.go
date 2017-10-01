@@ -90,6 +90,7 @@ func (p *filePartitions) setWriteHandle(n uint64) error {
 }
 
 func (p *filePartitions) setReadHandle(n uint64) error {
+	debugf(p.config, "setReadHandle(%d)", n)
 	if n == p.currReadPart && p.r != nil {
 		return nil
 	}

@@ -23,6 +23,7 @@ type logReader interface {
 	io.Reader
 	SeekToID(id uint64) error
 	Head() (uint64, error)
+	Copy() Logger
 }
 
 type logScannable interface {

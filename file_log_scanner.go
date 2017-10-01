@@ -22,20 +22,15 @@ func newFileLogScanner(config *Config, r io.Reader) *fileLogScanner {
 }
 
 func (s *fileLogScanner) Scan() bool {
+	s.msg = nil
 	n, msg, err := msgFromReader(s.br)
-	// fmt.Printf("scanned: %+v\n", msg)
+	// fmt.Printf("scanned (%d): %+v %v\n", n, msg, err)
 	s.lastRead = n
 	s.read += n
 	s.err = err
-	if err == io.EOF {
-		s.err = nil
-	}
-	if err != nil {
-		return false
-	}
 
 	s.msg = msg
-	return true
+	return err == nil
 }
 
 func (s *fileLogScanner) Message() *Message {

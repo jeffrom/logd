@@ -81,7 +81,7 @@ func msgFromReader(r *bufio.Reader) (int, *Message, error) {
 	// fmt.Printf("length: %q\n", lenBytes)
 	read += len(lenBytes)
 	if err != nil {
-		return read, nil, err
+		return read, nil, errors.Wrap(err, "failed reading length bytes")
 	}
 
 	var length uint64
