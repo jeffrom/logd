@@ -84,10 +84,11 @@ func runApp(args []string) {
 			Destination: &config.PartitionSize,
 		}),
 		altsrc.NewUint64Flag(cli.Uint64Flag{
-			Name:        "index_cursor_size",
-			Usage:       "Distance between index entries",
-			EnvVar:      "LOGD_INDEX_CURSOR_SIZE",
-			Value:       1000,
+			Name:   "index_cursor_size",
+			Usage:  "Distance between index entries",
+			EnvVar: "LOGD_INDEX_CURSOR_SIZE",
+			// Value:       1000,
+			Value:       10,
 			Destination: &config.IndexCursorSize,
 		}),
 		altsrc.NewBoolFlag(cli.BoolFlag{

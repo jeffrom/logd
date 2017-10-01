@@ -41,9 +41,9 @@ func init() {
 	DefaultConfig.LogFileMode = 0644
 	DefaultConfig.MaxChunkSize = 1024 * 1024 * 2
 	DefaultConfig.PartitionSize = 1024 * 50
-	// DefaultConfig.PartitionSize = 1024 * 50
-	DefaultConfig.IndexCursorSize = 1000
-	// DefaultConfig.IndexCursorSize = 100
+	// DefaultConfig.PartitionSize = 1024 * 1024 * 2000
+	// DefaultConfig.IndexCursorSize = 1000
+	DefaultConfig.IndexCursorSize = 10
 
 	DefaultConfig.ReadLimit = 15
 

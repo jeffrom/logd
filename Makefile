@@ -1,6 +1,6 @@
 
 BENCHFLAGS ?= -cpuprofile=cpu.pprof -memprofile=mem.pprof -benchmem
-PKGS ?= $(go list ./...)
+PKGS ?= $(shell go list ./...)
 
 GENERATED_FILES ?= __log* testdata/*.actual.golden logd.test log-cli.test
 
