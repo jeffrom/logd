@@ -7,7 +7,6 @@ import (
 	"io"
 	"net"
 	"strconv"
-	"time"
 
 	"github.com/pkg/errors"
 )
@@ -88,7 +87,7 @@ func (pr *protoReader) readCommand() (*Command, error) {
 		if err != nil {
 			return nil, err
 		}
-		debugf(pr.config, "read arg(raw): %q", line)
+		debugf(pr.config, "read arg(raw): %q", prettybuf(line))
 
 		parts = bytes.SplitN(line, []byte(" "), 2)
 		if len(parts) != 2 {
@@ -158,12 +157,6 @@ func newScanner(r io.Reader, conn net.Conn, config *Config) *Scanner {
 
 // Scan reads the next result from a READ command.
 func (ps *Scanner) Scan() bool {
-	err := ps.conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
-	if err != nil {
-		ps.err = err
-		return false
-	}
-
 	msg, err := ps.readMessage()
 	ps.msg = msg
 	if err != nil {
@@ -213,12 +206,12 @@ func (ps *Scanner) readMessage() (*Message, error) {
 
 	_, err = fmt.Sscanf(string(parts[0]), "+%d", &id)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "scanning id failed")
 	}
 
 	_, err = fmt.Sscanf(string(parts[1]), "%d", &bodylen)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "scanning body length failed")
 	}
 
 	body = parts[2]
@@ -234,8 +227,11 @@ func readLine(br *bufio.Reader) ([]byte, error) {
 	if err == bufio.ErrBufferFull {
 		return nil, protocolError("long response line")
 	}
-	if err != nil {
+	if err == io.EOF {
 		return nil, err
+	}
+	if err != nil {
+		return nil, errors.Wrap(err, "reading line failed")
 	}
 
 	if len(line) < termLen {

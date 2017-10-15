@@ -72,7 +72,7 @@ func (l *fileLogger) Shutdown() error {
 }
 
 func (l *fileLogger) Write(b []byte) (int, error) {
-	debugf(l.config, "LOG <- %s (%d)", bytes.Trim(b, "\n"), len(b))
+	debugf(l.config, "LOG <- %s (%d)", prettybuf(bytes.Trim(b, "\n")), len(b))
 
 	written := l.written + len(b)
 	madeNewPartition := false

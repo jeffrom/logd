@@ -127,6 +127,10 @@ func TestReadServer(t *testing.T) {
 }
 
 func TestTailServer(t *testing.T) {
+	success := make(chan struct{})
+	sent := make(chan struct{})
+	msg := []byte("cool message")
+
 	srv := newTestServer(testConfig(newMemLogger()))
 	defer closeTestServer(t, srv)
 
@@ -139,27 +143,47 @@ func TestTailServer(t *testing.T) {
 	scanner, err := client.DoRead(1, 0)
 	checkError(t, err)
 
-	msg := []byte("cool message")
+	go func() {
+		<-sent
+		checkScan(t, scanner, msg)
+		success <- struct{}{}
+	}()
+
 	resp, err := writerClient.Do(NewCommand(CmdMessage, msg))
 	checkError(t, err)
 	checkRespOKID(t, resp, 1)
 
-	checkScan(t, scanner, msg)
+	sent <- struct{}{}
+	waitForChannel(t, success)
 
 	secondTailClient := newTestClient(defaultTestConfig(), srv)
 	defer secondTailClient.Close()
 
-	secondScanner, err := client.DoRead(1, 0)
-	checkError(t, err)
+	secondScanner, rerr := client.DoRead(1, 0)
+	checkError(t, rerr)
 	checkScan(t, secondScanner, msg)
+
+	go func() {
+		<-sent
+		checkScan(t, secondScanner, msg)
+		success <- struct{}{}
+	}()
 
 	msg = []byte("another cool message")
 	resp, err = writerClient.Do(NewCommand(CmdMessage, msg))
 	checkError(t, err)
 	checkRespOKID(t, resp, 2)
 
-	checkScan(t, scanner, msg)
-	checkScan(t, secondScanner, msg)
+	sent <- struct{}{}
+	waitForChannel(t, success)
+
+	go func() {
+		<-sent
+		checkScan(t, scanner, msg)
+		success <- struct{}{}
+	}()
+	sent <- struct{}{}
+	waitForChannel(t, success)
 }
 
 func TestServerSleep(t *testing.T) {

@@ -81,6 +81,8 @@ func (c *conn) write(bufs ...[]byte) (int, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	debugf(c.config, "->%s: %q", c.RemoteAddr(), prettybuf(bufs...))
+
 	var n int
 	for _, buf := range bufs {
 		wrote, err := c.pw.bw.Write(buf)
@@ -116,4 +118,21 @@ func (c *conn) close() error {
 	err := c.Conn.Close()
 	c.done <- struct{}{}
 	return err
+}
+
+func prettybuf(bufs ...[]byte) []byte {
+	var flat []byte
+	limit := 100
+	for _, b := range bufs {
+		flat = append(flat, b...)
+	}
+	if len(flat) > limit {
+		// flat = flat[:limit-5] + []byte("...") + flat[limit-2:]
+		var final []byte
+		final = append(final, flat[:limit-5]...)
+		final = append(final, []byte("...")...)
+		final = append(final, flat[len(flat)-2:]...)
+		return final
+	}
+	return flat
 }

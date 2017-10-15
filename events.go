@@ -160,6 +160,7 @@ func (q *eventQ) handleMsg(cmd *Command) {
 }
 
 func (q *eventQ) publishMessages(cmd *Command, msgs [][]byte) {
+	debugf(q.config, "publishing to %d subscribers", len(q.subscriptions))
 	for _, sub := range q.subscriptions {
 		go func(sub *Subscription) {
 			for i := range msgs {

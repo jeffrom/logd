@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"time"
 
@@ -110,12 +111,14 @@ func doReadCmdAction(config *logd.Config) func(c *cli.Context) error {
 
 		client, err := logd.DialConfig(config.Hostport, config)
 		if err != nil {
+			log.Printf("%+v", err)
 			return cli.NewExitError(err, 1)
 		}
 
 		if start == 0 && !config.ReadForever {
 			resp, headErr := client.Do(logd.NewCommand(logd.CmdHead))
 			if err != nil {
+				log.Printf("%+v", err)
 				return cli.NewExitError(headErr, 2)
 			}
 
@@ -133,6 +136,7 @@ func doReadCmdAction(config *logd.Config) func(c *cli.Context) error {
 
 		scanner, err := client.DoRead(start, limit)
 		if err != nil {
+			log.Printf("%+v", err)
 			return cli.NewExitError(err, 2)
 		}
 
@@ -146,15 +150,17 @@ func doReadCmdAction(config *logd.Config) func(c *cli.Context) error {
 		}
 
 		if err := scanner.Err(); err != io.EOF && err != nil {
-			return cli.NewExitError(scanner.Err(), 3)
+			log.Printf("%+v", err)
+			return cli.NewExitError(err, 3)
 		}
 
 		if config.ReadForever {
 			for {
 				time.Sleep(200)
 				for scanner.Scan() {
-					if scanner.Err() != nil {
-						return cli.NewExitError(scanner.Err(), 3)
+					if err := scanner.Err(); err != nil {
+						log.Printf("%+v", err)
+						return cli.NewExitError(err, 3)
 					}
 
 					msg := scanner.Message()

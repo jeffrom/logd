@@ -235,7 +235,7 @@ func (s *SocketServer) handleConnErr(err error, conn *conn) error {
 	if err == io.EOF {
 		debugf(s.config, "%s closed the connection", conn.RemoteAddr())
 	} else if err, ok := err.(net.Error); ok && err.Timeout() {
-		log.Printf("%s timed out", conn.RemoteAddr())
+		stdlog(2, "%s timed out", conn.RemoteAddr())
 	} else if err != nil {
 		conn.setState(connStateFailed)
 
@@ -260,12 +260,14 @@ func (s *SocketServer) handleClient(conn *conn) {
 			break
 		}
 
-		err := conn.SetReadDeadline(time.Now().Add(s.readTimeout))
-		if cerr := s.handleConnErr(err, conn); cerr != nil {
-			return
-		}
+		if conn.getState() != connStateReading {
+			err := conn.SetReadDeadline(time.Now().Add(s.readTimeout))
+			if cerr := s.handleConnErr(err, conn); cerr != nil {
+				return
+			}
 
-		conn.setState(connStateActive)
+			conn.setState(connStateActive)
+		}
 		cmd, err := conn.pr.readCommand()
 		if cerr := s.handleConnErr(err, conn); cerr != nil {
 			return
@@ -297,7 +299,7 @@ func (s *SocketServer) handleClient(conn *conn) {
 				return
 			}
 		}
-		debugf(s.config, "%s->%s: %q", conn.LocalAddr(), conn.RemoteAddr(), respBytes)
+		// debugf(s.config, "%s->%s: %q", conn.LocalAddr(), conn.RemoteAddr(), respBytes)
 
 		if cmd.name == CmdRead {
 			debugf(s.config, "sending log messages to %s", conn.RemoteAddr())
@@ -323,9 +325,9 @@ func (s *SocketServer) handleSubscriber(conn *conn, cmd *Command, resp *Response
 		select {
 		case msg := <-resp.msgC:
 			// serialized := []byte(fmt.Sprintf("+%d %d %s\r\n", msg.id, len(msg.body), msg.body))
-			conn.write(append([]byte("+"), msg...))
+			bytes := append([]byte("+"), msg...)
+			conn.write(bytes)
 		case <-cmd.done:
-			debugf(s.config, "%s +EOF", conn.RemoteAddr())
 			conn.write([]byte("+EOF\r\n"))
 			return
 		}

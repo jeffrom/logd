@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"runtime/debug"
 	"testing"
+	"time"
 )
 
 var golden bool
@@ -58,5 +59,14 @@ func checkError(t *testing.T, err error) {
 	if err != nil {
 		t.Logf("%s", debug.Stack())
 		t.Fatalf("Unexpected error %v", err)
+	}
+}
+
+func waitForChannel(t testing.TB, c chan struct{}) {
+	select {
+	case <-c:
+	case <-time.After(500 * time.Millisecond):
+		t.Logf("%s", debug.Stack())
+		t.Fatalf("timed out waiting for receive on channel")
 	}
 }
