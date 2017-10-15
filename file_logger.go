@@ -33,7 +33,6 @@ func newFileLogger(config *Config) *fileLogger {
 
 func (l *fileLogger) Setup() error {
 	if l.config.LogFile != "" {
-		debugf(l.config, "Starting at partition %d", l.parts.head())
 		err := l.parts.setCurrentFileHandles(false)
 		if err != nil {
 			return errors.Wrap(err, "failed to get file handles")
@@ -43,20 +42,23 @@ func (l *fileLogger) Setup() error {
 		if _, err := l.index.loadFromReader(); err != nil {
 			return errors.Wrap(err, "failed to load index file")
 		}
-		if l.config.Verbose {
-			debugf(l.config, "Current index")
-			l.index.dump()
-		}
+		// if l.config.Verbose {
+		// 	debugf(l.config, "Current index")
+		// 	l.index.dump()
+		// }
 
 		if err := l.loadState(); err != nil {
 			log.Printf("error loading state: %+v\n", err)
 			return err
 		}
+
+		log.Printf("Starting at log id %d, partition %d, offset %d", l.currID, l.parts.head(), l.written)
 	}
 	return nil
 }
 
 func (l *fileLogger) Shutdown() error {
+	debugf(l.config, "shutting down file logger")
 	var firstErr error
 	if err := l.index.shutdown(); err != nil {
 		firstErr = err
@@ -259,18 +261,22 @@ func (l *fileLogger) loadState() error {
 	// }
 
 	scanner := newFileLogScanner(l.config, l)
+	var lastMsg *Message
 	for scanner.Scan() {
+		msg := scanner.Message()
+		if msg != nil {
+			lastMsg = msg
+		}
 	}
 	if err := scanner.Error(); err != nil && err != io.EOF {
 		return err
 	}
 
-	msg := scanner.Message()
-	if msg != nil {
-		l.currID = msg.ID + 1
-		l.written = scanner.read
+	l.written = scanner.read
+	if lastMsg != nil {
+		l.currID = lastMsg.ID + 1
 
-		log.Printf("Starting at log id %d, offset %d", l.currID, l.written)
+		// log.Printf("Starting at log id %d, offset %d", l.currID, l.written)
 	}
 
 	return nil

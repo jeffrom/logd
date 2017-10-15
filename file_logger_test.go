@@ -33,7 +33,10 @@ func setupFileLoggerConfig(t testing.TB, config *Config) (*Config, Logger, func(
 	}
 
 	return config, logger, func() {
-		os.RemoveAll(path.Dir(config.LogFile))
+		dir := path.Dir(config.LogFile)
+		if dir != "testdata" {
+			os.RemoveAll(dir)
+		}
 
 		if err := logger.(logManager).Shutdown(); err != nil {
 			t.Fatalf("error shutting down: %+v", err)

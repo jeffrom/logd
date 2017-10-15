@@ -186,6 +186,53 @@ func TestEventQWriteFilePartitions(t *testing.T) {
 	checkGoldenFile(t, "events.file_partition_write.index", index, golden)
 }
 
+func TestEventQWriteAfterRestart(t *testing.T) {
+	config := testConfig(nil)
+	config.IndexCursorSize = 1
+	config.PartitionSize = 5000
+	config.LogFile = tmpLog()
+	config, _, teardown := setupFileLoggerConfig(t, config)
+	defer teardown()
+
+	q := startQConfig(t, config)
+	// defer stopQ(t, q)
+
+	for _, line := range someLines[:2] {
+		resp, err := q.pushCommand(NewCommand(CmdMessage, line))
+		checkNoErrAndSuccess(t, resp, err)
+	}
+
+	if err := CheckIndex(config); err != nil {
+		t.Fatalf("bad index before restart: %+v", err)
+	}
+
+	stopQ(t, q)
+	q = startQConfig(t, config)
+	defer stopQ(t, q)
+
+	for _, line := range someLines {
+		resp, err := q.pushCommand(NewCommand(CmdMessage, line))
+		checkNoErrAndSuccess(t, resp, err)
+	}
+
+	// logger.Flush()
+	if err := CheckIndex(config); err != nil {
+		t.Fatalf("bad index after restart: %+v", err)
+	}
+
+	part1, _ := ioutil.ReadFile(config.LogFile + ".0")
+	checkGoldenFile(t, "events.write_after_restart.0", part1, golden)
+	part2, _ := ioutil.ReadFile(config.LogFile + ".1")
+	checkGoldenFile(t, "events.write_after_restart.1", part2, golden)
+	_, err := ioutil.ReadFile(config.LogFile + ".2")
+	if err == nil {
+		t.Fatal("Expected no third partition")
+	}
+
+	index, _ := ioutil.ReadFile(config.LogFile + ".index")
+	checkGoldenFile(t, "events.write_after_restart.index", index, golden)
+}
+
 // TODO this is maybe too tightly coupled to the prev test
 // It's copied from the golden file the events.file_partition_write.[0-3]
 func TestEventQReadFilePartitions(t *testing.T) {

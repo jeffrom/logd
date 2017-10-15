@@ -8,4 +8,6 @@
 - test/benchmark sockets using a NilLogger
 - test/benchmark with different configs
 - abstract protocol from sockets/events
+- integration test for correct starting id, partition, and offset on startup
+  after writing some data to the log
 
