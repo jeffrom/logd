@@ -104,15 +104,22 @@ func BenchmarkServerRead(b *testing.B) {
 	defer closeTestServer(b, srv)
 
 	client := newTestClient(config, srv)
-	defer client.Close()
-
 	client.Do(NewCommand(CmdMessage, someMessage))
+	client.Close()
 
-	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		scanner, _ := client.DoRead(1, 1)
+		client = newTestClient(config, srv)
+		b.StartTimer()
+
+		scanner, err := client.DoRead(1, 1)
+		if err != nil {
+			b.Fatalf("failed to start scanning: %+v", err)
+		}
 		for scanner.Scan() {
 		}
+
+		b.StopTimer()
+		client.Close()
 	}
 }
 
