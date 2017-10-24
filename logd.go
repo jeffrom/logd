@@ -14,6 +14,7 @@ var counts = expvar.NewMap("logd")
 
 func init() {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
+	log.SetOutput(os.Stdout)
 }
 
 func getFileLine(distance int) (string, int) {
@@ -35,7 +36,7 @@ func stdlog(distance int, s string, args ...interface{}) {
 	s = "%s %s " + s + "\n"
 	linearg := fmt.Sprintf("%s:%d:", file, line)
 	args = append([]interface{}{time.Now().Format("2006/01/02 15:04:05.000"), linearg}, args...)
-	fmt.Fprintf(os.Stderr, s, args...)
+	fmt.Fprintf(os.Stdout, s, args...)
 }
 
 func debugf(config *Config, s string, args ...interface{}) {

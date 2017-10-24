@@ -182,6 +182,7 @@ func (s *SocketServer) shutdown() error {
 			if c.isActive() {
 				select {
 				case <-c.done:
+					debugf(s.config, "%s closed gracefully", c.RemoteAddr())
 				case <-time.After(1 * time.Second): // XXX config timeout
 					log.Printf("%s timed out", c.RemoteAddr())
 				}
@@ -280,6 +281,15 @@ func (s *SocketServer) handleClient(conn *conn) {
 
 		resp, err := s.q.pushCommand(cmd)
 		if cerr := s.handleConnErr(err, conn); cerr != nil {
+			return
+		}
+
+		if cmd.name == CmdShutdown && resp.Status == RespOK {
+			conn.Close()
+			s.connMu.Lock()
+			delete(s.conns, conn)
+			s.connMu.Unlock()
+			s.stop()
 			return
 		}
 

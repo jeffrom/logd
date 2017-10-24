@@ -72,6 +72,9 @@ func cmdAction(config *logd.Config, cmd logd.CmdType) func(c *cli.Context) error
 		} else if cmd != logd.CmdMessage {
 			resp, err := client.Do(logd.NewCommand(cmd))
 			if err != nil {
+				if err == io.EOF && cmd == logd.CmdShutdown {
+					return nil
+				}
 				return cli.NewExitError(err, 1)
 			}
 			fmt.Println(formatResp(resp, c.Args()))
@@ -91,6 +94,9 @@ func cmdAction(config *logd.Config, cmd logd.CmdType) func(c *cli.Context) error
 		for scanner.Scan() {
 			b := scanner.Bytes()
 			resp, err := client.Do(logd.NewCommand(cmd, b))
+			if err == io.EOF {
+				return nil
+			}
 			if err != nil {
 				panic(err)
 			}
@@ -241,6 +247,11 @@ func runApp(args []string) {
 			Name:   "write",
 			Usage:  "write a message to the log",
 			Action: cmdAction(config, logd.CmdMessage),
+		},
+		{
+			Name:   "shutdown",
+			Usage:  "shutdown the server (debug only)",
+			Action: cmdAction(config, logd.CmdShutdown),
 		},
 		{
 			Name:  "read",

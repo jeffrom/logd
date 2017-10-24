@@ -99,10 +99,9 @@ func (q *eventQ) loop() {
 					cmd.respC <- newResponse(RespErr)
 				} else {
 					cmd.respC <- newResponse(RespOK)
-					close(q.close)
-					close(q.in)
+					// close(q.close)
+					// close(q.in)
 				}
-				return
 			default:
 				cmd.respC <- newResponse(RespErr)
 			}

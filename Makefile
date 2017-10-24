@@ -11,17 +11,20 @@ all: test.cover test build
 clean:
 	@echo "Cleaning generated development files..."
 	rm -f $(GENERATED_FILES)
+	rm -rf integration_tests/out/*
 
 .PHONY: ls.tmp
 ls.tmp:
 	@echo "Listing temporary files..."
 	ls $(GENERATED_FILES)
+	ls integration_tests/out
 
 .PHONY: deps
 deps:
 	@echo "Installing dep tool and dependencies..."
 	dep version || go get -u github.com/golang/dep/cmd/dep
 	dep ensure
+	go get github.com/wadey/gocovmerge
 
 .PHONY: deps.dep
 deps.dep:
@@ -42,6 +45,10 @@ test.race:
 .PHONY: test.cover
 test.cover:
 	go test -cover $(PKGS)
+
+.PHONY: test.coverprofile
+test.coverprofile:
+	go test -coverprofile=integration_test/out/unit.cov.out -covermode=count
 
 .PHONY: test.golden
 test.golden:
@@ -71,10 +78,22 @@ bench:
 	@$(foreach pkg,$(PKGS),go test -bench=$(BENCH) -run="^$$" $(BENCH_FLAGS) $(pkg);)
 
 .PHONY: ci
-ci: deps lint.install test.cover test.race lint
+ci: deps lint.install test.coverprofile test.race test.integration.compile test.integration test.report lint test.report.summary
 
-.PHONY: integration
-integration:
+.PHONY: test.integration.compile
+test.integration.compile:
 	mkdir -p report
 	go test -c -o logd.test -covermode=count -coverpkg . ./cmd/logd
 	go test -c -o log-cli.test -covermode=count -coverpkg . ./cmd/log-cli
+
+.PHONY: test.integration
+test.integration:
+	./integration_test/run_integration_test.sh
+
+.PHONY: test.report
+test.report:
+	./integration_test/generate_reports.sh
+
+.PHONY: test.report.summary
+test.report.summary:
+	go tool cover -func=integration_test/out/all.cov.out

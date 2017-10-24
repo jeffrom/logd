@@ -14,3 +14,5 @@ log*.test
 
 # tool output directory
 report/
+
+/integration_test/out
