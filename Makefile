@@ -82,7 +82,7 @@ ci: deps lint.install test.coverprofile test.race test.integration.compile test.
 
 .PHONY: test.integration.compile
 test.integration.compile:
-	mkdir -p report
+	mkdir -p report/out
 	go test -c -o logd.test -covermode=count -coverpkg . ./cmd/logd
 	go test -c -o log-cli.test -covermode=count -coverpkg . ./cmd/log-cli
 
