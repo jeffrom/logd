@@ -7,6 +7,8 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"gopkg.in/urfave/cli.v1"
@@ -121,6 +123,9 @@ func doReadCmdAction(config *logd.Config) func(c *cli.Context) error {
 			return cli.NewExitError(err, 1)
 		}
 
+		sigc := make(chan os.Signal, 1)
+		signal.Notify(sigc, os.Interrupt, syscall.SIGTERM)
+
 		if start == 0 && !config.ReadForever {
 			resp, headErr := client.Do(logd.NewCommand(logd.CmdHead))
 			if err != nil {
@@ -162,7 +167,11 @@ func doReadCmdAction(config *logd.Config) func(c *cli.Context) error {
 
 		if config.ReadForever {
 			for {
-				time.Sleep(200)
+				select {
+				case <-sigc:
+					return nil
+				case <-time.After(200 * time.Millisecond):
+				}
 				for scanner.Scan() {
 					if err := scanner.Err(); err != nil {
 						log.Printf("%+v", err)
@@ -280,6 +289,7 @@ func runApp(args []string) {
 	}
 
 	if err := app.Run(args); err != nil {
+		log.Printf("closed: %+v", err)
 	}
 }
 
