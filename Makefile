@@ -25,6 +25,8 @@ deps:
 	dep version || go get -u github.com/golang/dep/cmd/dep
 	dep ensure
 	go get github.com/wadey/gocovmerge
+	mkdir -p report
+	mkdir -p integration_test/out
 
 .PHONY: deps.dep
 deps.dep:
@@ -82,8 +84,6 @@ ci: deps lint.install test.coverprofile test.race test.integration.compile test.
 
 .PHONY: test.integration.compile
 test.integration.compile:
-	mkdir -p report
-	mkdir -p integration_test/out
 	go test -c -o logd.test -covermode=count -coverpkg . ./cmd/logd
 	go test -c -o log-cli.test -covermode=count -coverpkg . ./cmd/log-cli
 
