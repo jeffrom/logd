@@ -9,9 +9,12 @@ source "$TESTROOT/test_lib.sh"
 
 
 run_test "$0"
+finish() {
+    finish_test "$0"
+}
+trap finish EXIT
+
 
 logd -v
 
 log_cli ping
-
-finish_test "$0"

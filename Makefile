@@ -78,7 +78,7 @@ lint.update:
 .PHONY: bench
 BENCH ?= .
 bench:
-	@$(foreach pkg,$(PKGS),go test -bench=$(BENCH) -run="^$$" $(BENCH_FLAGS) $(pkg);)
+	@$(foreach pkg,$(PKGS),go test -bench=$(BENCH) -benchmem -run="^$$" $(BENCH_FLAGS) $(pkg);)
 
 .PHONY: ci
 ci: deps lint.install test.coverprofile test.race test.integration.compile test.integration test.report lint test.report.summary

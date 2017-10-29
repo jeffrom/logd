@@ -5,7 +5,7 @@ TESTROOT="$( cd "$(dirname "$0")" ; pwd -P )"
 
 
 list_tests() {
-    find "$TESTROOT" -name "[0-9]*_*.test.sh"
+    find "$TESTROOT" -name "[0-9]*_*.test.sh" | cat | sort
 }
 
 run_test() {
@@ -24,10 +24,24 @@ run_test() {
     "$1"
 }
 
+finish_all() {
+    if killall logd.test; then
+        echo "Extra logd.test instances laying around..."
+    fi
+    if killall log-cli.test; then
+        echo "Extra log-cli.test instances laying around..."
+    fi
+}
+
 run_all_tests() {
+    trap finish_all EXIT
+
     echo "Running test suite"
+    list_tests
     for testfile in $(list_tests); do
-        run_test "$testfile"
+        if ! run_test "$testfile"; then
+            exit 1
+        fi
     done
     echo "Completed test suite"
 }
