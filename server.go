@@ -268,6 +268,8 @@ func (s *SocketServer) handleClient(conn *conn) {
 			}
 
 			conn.setState(connStateActive)
+		} else {
+			conn.SetDeadline(time.Time{})
 		}
 		cmd, err := conn.pr.readCommand()
 		if cerr := s.handleConnErr(err, conn); cerr != nil {

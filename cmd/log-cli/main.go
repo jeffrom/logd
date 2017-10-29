@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -14,6 +15,7 @@ import (
 	"gopkg.in/urfave/cli.v1"
 
 	"github.com/jeffrom/logd"
+	"github.com/pkg/errors"
 	"github.com/urfave/cli/altsrc"
 )
 
@@ -61,6 +63,7 @@ func cmdAction(config *logd.Config, cmd logd.CmdType) func(c *cli.Context) error
 		if err != nil {
 			return cli.NewExitError(err, 1)
 		}
+		defer client.Close()
 
 		if len(c.Args()) > 0 {
 			resp, err := client.Do(logd.NewCommand(cmd, toBytes(c.Args())...))
@@ -122,6 +125,7 @@ func doReadCmdAction(config *logd.Config) func(c *cli.Context) error {
 			log.Printf("%+v", err)
 			return cli.NewExitError(err, 1)
 		}
+		defer client.Close()
 
 		sigc := make(chan os.Signal, 1)
 		signal.Notify(sigc, os.Interrupt, syscall.SIGTERM)
@@ -152,17 +156,15 @@ func doReadCmdAction(config *logd.Config) func(c *cli.Context) error {
 		}
 
 		for scanner.Scan() {
-			if scanner.Err() != nil {
-				return cli.NewExitError(scanner.Err(), 3)
-			}
-
 			msg := scanner.Message()
 			fmt.Printf("%d %s\n", msg.ID, msg.Body)
 		}
 
 		if err := scanner.Err(); err != io.EOF && err != nil {
-			log.Printf("%+v", err)
-			return cli.NewExitError(err, 3)
+			if cerr, ok := errors.Cause(err).(net.Error); !ok || !cerr.Timeout() {
+				log.Printf("%+v", err)
+				return cli.NewExitError(err, 3)
+			}
 		}
 
 		if config.ReadForever {
@@ -172,15 +174,19 @@ func doReadCmdAction(config *logd.Config) func(c *cli.Context) error {
 					return nil
 				case <-time.After(200 * time.Millisecond):
 				}
-				for scanner.Scan() {
-					if err := scanner.Err(); err != nil {
-						log.Printf("%+v", err)
-						return cli.NewExitError(err, 3)
-					}
 
+				for scanner.Scan() {
 					msg := scanner.Message()
 					fmt.Printf("%d %s\n", msg.ID, msg.Body)
 				}
+
+				if err := scanner.Err(); err != nil && err != io.EOF {
+					if cerr, ok := errors.Cause(err).(net.Error); !ok || !cerr.Timeout() {
+						log.Printf("%+v", err)
+						return cli.NewExitError(err, 3)
+					}
+				}
+
 			}
 		}
 

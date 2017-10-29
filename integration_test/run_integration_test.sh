@@ -29,6 +29,7 @@ run_all_tests() {
     for testfile in $(list_tests); do
         run_test "$testfile"
     done
+    echo "Completed test suite"
 }
 
 run_all_tests

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"time"
 
 	"github.com/pkg/errors"
 )
@@ -157,6 +158,7 @@ func newScanner(r io.Reader, conn net.Conn, config *Config) *Scanner {
 
 // Scan reads the next result from a READ command.
 func (ps *Scanner) Scan() bool {
+	ps.conn.SetDeadline(time.Now().Add(1 * time.Second))
 	msg, err := ps.readMessage()
 	ps.msg = msg
 	if err != nil {
