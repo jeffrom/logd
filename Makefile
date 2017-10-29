@@ -11,7 +11,7 @@ all: test.cover test build
 clean:
 	@echo "Cleaning generated development files..."
 	rm -f $(GENERATED_FILES)
-	rm -rf integration_tests/out/*
+	rm -rf integration_test/out/*
 
 .PHONY: ls.tmp
 ls.tmp:
