@@ -6,10 +6,11 @@
 - [ ] partitioning, including removing old partitions with hooks
     - reading doesn't work near partition boundaries
     - can't read last few messages
-- [ ] index isn't being written to disk, probably other issues too
+- [X] index isn't being written to disk, probably other issues too
 - [ ] test suite that runs the same set of tests with different configurations,
   but also supports expected failures in some cases
-- [ ] test suite should also include system-level tests with coverage
+- [ ] subscribers are not removed when their connection closes
+- [X] test suite should also include system-level tests with coverage
 - [ ] large benchmarking suite
 - [ ] after the tests are solid, go through all the code and reorg
 - [ ] finish command set, including STATS, REFUSE, ACCEPT
@@ -27,3 +28,4 @@
   client side
 - [ ] same protocol for file storage as network transfer simplifies the app and
   probably makes it easier to leverage sendfile without calling it directly
+- [ ] compression
