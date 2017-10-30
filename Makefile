@@ -1,8 +1,7 @@
 
-BENCHFLAGS ?= -cpuprofile=cpu.pprof -memprofile=mem.pprof -benchmem
 PKGS ?= $(shell go list ./...)
 
-GENERATED_FILES ?= __log* testdata/*.actual.golden logd.test log-cli.test
+GENERATED_FILES ?= __log* testdata/*.actual.golden logd.test log-cli.test *.pprof
 
 .PHONY: all
 all: test.cover test build
@@ -12,6 +11,7 @@ clean:
 	@echo "Cleaning generated development files..."
 	rm -f $(GENERATED_FILES)
 	rm -rf integration_test/out/*
+	rm -rf report/*
 
 .PHONY: ls.tmp
 ls.tmp:
@@ -78,7 +78,9 @@ lint.update:
 .PHONY: bench
 BENCH ?= .
 bench:
-	@$(foreach pkg,$(PKGS),go test -bench=$(BENCH) -benchmem -run="^$$" $(BENCH_FLAGS) $(pkg);)
+	mkdir -p report
+	go test -run="^$$" -bench=. -benchmem -cpuprofile=cpu.pprof -memprofile=mem.pprof -mutexprofile=mutex.pprof -outputdir=report
+	# $(foreach pkg,$(PKGS),go test -bench=$(BENCH) -cpuprofile=cpu.pprof -memprofile=mem.pprof -mutexprofile=mutex.pprof -outputdir=report/ -benchmem -run="^$$" $(pkg);)
 
 .PHONY: ci
 ci: deps lint.install test.coverprofile test.race test.integration.compile test.integration test.report lint test.report.summary
@@ -90,10 +92,12 @@ test.integration.compile:
 
 .PHONY: test.integration
 test.integration:
+	mkdir -p report
 	./integration_test/run_integration_test.sh
 
 .PHONY: test.report
 test.report:
+	mkdir -p report
 	./integration_test/generate_reports.sh
 
 .PHONY: test.report.summary
