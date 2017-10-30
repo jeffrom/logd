@@ -12,6 +12,8 @@
 - [X] subscribers are removed when their connection closes
 - [X] test suite should also include system-level tests with coverage
 - [ ] large benchmarking suite
+    - server/client startup/shutdown
+    - all commands
 - [ ] after the tests are solid, go through all the code and reorg
 - [ ] finish command set, including STATS, REFUSE, ACCEPT
 - [ ] REPLICATE can just call READ internally for now, later it should have a
@@ -19,8 +21,6 @@
 - [ ] make consistency guarantees configurable. fast by default but also force
   disk flush before returning success if that's desired.
 - [ ] audit all panics: we should only panic when there's a fatal error.
-- [ ] detect and finish subscriptions where the connection wasn't closed on the
-  client side
 - [ ] same protocol for file storage as network transfer simplifies the app and
   probably makes it easier to leverage sendfile without calling it directly
 - [ ] compression
