@@ -240,8 +240,7 @@ func (s *SocketServer) handleConnErr(err error, conn *conn) error {
 	} else if err != nil {
 		conn.setState(connStateFailed)
 
-		// XXX
-		panic(err)
+		log.Printf("error handling connection: %+v", err)
 	}
 	return err
 }
@@ -333,12 +332,23 @@ func (s *SocketServer) handleClient(conn *conn) {
 }
 
 func (s *SocketServer) handleSubscriber(conn *conn, cmd *Command, resp *Response) {
+	defer func() {
+		ccmd := newCloseCommand(cmd.respC)
+		_, err := s.q.pushCommand(ccmd)
+		if err != nil {
+			debugf(s.config, "error closing: %+v", err)
+		}
+		conn.close()
+	}()
 	for {
 		select {
 		case msg := <-resp.msgC:
 			// serialized := []byte(fmt.Sprintf("+%d %d %s\r\n", msg.id, len(msg.body), msg.body))
 			bytes := append([]byte("+"), msg...)
-			conn.write(bytes)
+			if _, err := conn.write(bytes); err != nil {
+				log.Printf("%s: %+v", conn.RemoteAddr(), err)
+				return
+			}
 		case <-cmd.done:
 			conn.write([]byte("+EOF\r\n"))
 			return

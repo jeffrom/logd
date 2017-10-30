@@ -128,7 +128,8 @@ failnow() {
     if [[ "x$1" != "x" ]]; then
         msg="FAILED: $1"
     fi
-    printf "*\n**\n*** %s\n**\n*" "$msg"
+    printf "\n\n*\n**\n*** %s\n**\n*\n\n" "$msg"
+    exit 1
 }
 
 assert_equal() {

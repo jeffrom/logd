@@ -60,6 +60,8 @@ type conn struct {
 
 	done chan struct{}
 	mu   sync.Mutex
+
+	written int
 }
 
 func newServerConn(c net.Conn, config *Config) *conn {
@@ -87,6 +89,7 @@ func (c *conn) write(bufs ...[]byte) (int, error) {
 	for _, buf := range bufs {
 		wrote, err := c.pw.bw.Write(buf)
 		n += wrote
+		c.written += wrote
 		if err != nil {
 			return n, err
 		}

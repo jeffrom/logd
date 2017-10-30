@@ -22,7 +22,7 @@ log_cli -v write "first message"
 echo "second message" | log_cli -v write
 echo "fourth message" | log_cli -v write "third message"
 
-actual=$(log_cli -v read | strip_test_output)
+actual=$(log_cli -v read | strip_test_output | grep -v "close error" | tail -n 4)
 
 expected=$(cat <<EOF
 1 first message

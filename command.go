@@ -122,8 +122,6 @@ func (cmd *Command) finish() {
 		case cmd.done <- struct{}{}:
 		default:
 		}
-		close(cmd.respC)
-		close(cmd.done)
 	}
 }
 
