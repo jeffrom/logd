@@ -14,6 +14,7 @@ variables:
 before_script:
   - mkdir -p $GOPATH/src/$REPO_NAME
   - ln -svf $CI_PROJECT_DIR/* $GOPATH/src/$REPO_NAME
+  - ln -svf $CI_PROJECT_DIR/* $GOPATH/src/github.com/jeffrom/logd
   - cd $GOPATH/src/$REPO_NAME
 
 stages:
