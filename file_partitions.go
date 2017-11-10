@@ -8,9 +8,11 @@ package logd
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -65,7 +67,60 @@ func (p *filePartitions) setCurrentFileHandles(create bool) error {
 	if err := p.setWriteHandle(curr); err != nil {
 		return err
 	}
+
+	parts := p.partitions()
+	maxParts := p.config.MaxPartitions
+	if maxParts > 0 && len(parts) > maxParts {
+		toDelete := parts[:len(parts)-maxParts]
+
+		d, err := ioutil.TempDir("", "logd")
+		if err != nil {
+			return errors.Wrap(err, "error moving old partitions to be removed")
+		}
+
+		prefix := filepath.Join(d, "log")
+		debugf(p.config, "moving %d old partitions to %s", len(parts), d)
+		for _, part := range toDelete {
+			path := p.logFilePath(prefix, part)
+			debugf(p.config, "moving %s to %s", p.logFilePath("", part), path)
+			if err := os.Rename(p.logFilePath("", part), path); err != nil {
+				return errors.Wrap(err, "error moving partition")
+			}
+		}
+
+		// TODO synchronously move the files to another location before doing this
+		go func() {
+			defer os.RemoveAll(d)
+			if derr := p.delete(prefix, toDelete); derr != nil {
+				log.Printf("failed to delete partitions: %+v", derr)
+			}
+		}()
+	}
+
 	return p.setReadHandle(curr)
+}
+
+func (p *filePartitions) delete(prefix string, parts []uint64) error {
+	log.Printf("Deleting %d partitions: %v", len(parts), parts)
+	for _, part := range parts {
+		if err := p.deleteOne(prefix, part); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (p *filePartitions) deleteOne(prefix string, part uint64) error {
+	path := p.logFilePath(prefix, part)
+	log.Printf("Deleting partition #%d at %s", part, path)
+	if err := p.runDeleteHook(part); err != nil {
+		return err
+	}
+	return os.Remove(path)
+}
+
+func (p *filePartitions) runDeleteHook(part uint64) error {
+	return nil
 }
 
 func (p *filePartitions) setHandles(n uint64) error {
@@ -76,7 +131,7 @@ func (p *filePartitions) setHandles(n uint64) error {
 }
 
 func (p *filePartitions) setWriteHandle(n uint64) error {
-	path := fmt.Sprintf("%s.%d", p.config.LogFile, n)
+	path := p.logFilePath("", n)
 
 	if p.w != nil {
 		p.w.Close()
@@ -94,7 +149,7 @@ func (p *filePartitions) setReadHandle(n uint64) error {
 	if n == p.currReadPart && p.r != nil {
 		return nil
 	}
-	path := fmt.Sprintf("%s.%d", p.config.LogFile, n)
+	path := p.logFilePath("", n)
 
 	if p.r != nil {
 		p.r.Close()
@@ -108,6 +163,13 @@ func (p *filePartitions) setReadHandle(n uint64) error {
 	}
 	p.r = r
 	return nil
+}
+
+func (p *filePartitions) logFilePath(root string, part uint64) string {
+	if root == "" {
+		root = p.config.LogFile
+	}
+	return fmt.Sprintf("%s.%d", root, part)
 }
 
 func (p *filePartitions) head() uint64 {
@@ -145,5 +207,6 @@ func (p *filePartitions) partitions() []uint64 {
 		res = append(res, n)
 	}
 
+	sort.Slice(res, func(i, j int) bool { return res[i] < res[j] })
 	return res
 }

@@ -62,8 +62,8 @@ test.golden:
 
 .PHONY: lint
 lint:
-	# gometalinter --aggregate --vendored-linters --vendor --enable-all
 	gometalinter --aggregate --vendored-linters --vendor --enable-all $(PKGS)
+	# ./script/lint.sh
 
 .PHONY: lint.install
 lint.install:
@@ -83,7 +83,7 @@ bench:
 	# $(foreach pkg,$(PKGS),go test -bench=$(BENCH) -cpuprofile=cpu.pprof -memprofile=mem.pprof -mutexprofile=mutex.pprof -outputdir=report/ -benchmem -run="^$$" $(pkg);)
 
 .PHONY: ci
-ci: deps lint.install test.coverprofile test.race test.integration.compile test.integration test.report lint test.report.summary
+ci: clean deps lint.install test.coverprofile test.race test.integration.compile test.integration test.report lint test.report.summary
 
 .PHONY: test.integration.compile
 test.integration.compile:

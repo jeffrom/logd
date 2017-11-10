@@ -4,20 +4,22 @@ import "encoding/json"
 
 // Config holds configuration variables
 type Config struct {
-	Verbose         bool
-	CanShutdown     bool
-	Logger          Logger
-	Hostport        string
-	ServerTimeout   uint
-	ClientTimeout   uint
-	LogFile         string
-	LogFileMode     int
-	MaxChunkSize    int
-	PartitionSize   int
-	IndexCursorSize uint64
-	StartID         uint64
-	ReadLimit       uint64
-	ReadForever     bool
+	Verbose             bool
+	CanShutdown         bool
+	Logger              Logger
+	Hostport            string
+	ServerTimeout       uint
+	ClientTimeout       uint
+	LogFile             string
+	LogFileMode         int
+	MaxChunkSize        int
+	PartitionSize       int
+	MaxPartitions       int
+	PartitionDeleteHook string
+	IndexCursorSize     uint64
+	StartID             uint64
+	ReadLimit           uint64
+	ReadForever         bool
 }
 
 // NewConfig returns a new configuration object
@@ -42,6 +44,7 @@ func init() {
 	DefaultConfig.MaxChunkSize = 1024 * 1024 * 2
 	DefaultConfig.PartitionSize = 1024 * 50
 	// DefaultConfig.PartitionSize = 1024 * 1024 * 2000
+	DefaultConfig.MaxPartitions = 5
 	// DefaultConfig.IndexCursorSize = 1000
 	DefaultConfig.IndexCursorSize = 10
 
