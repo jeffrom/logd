@@ -1,7 +1,7 @@
 
 PKGS ?= $(shell go list ./...)
 
-GENERATED_FILES ?= __log* testdata/*.actual.golden logd.test log-cli.test *.pprof integration_test/out/* report/*
+GENERATED_FILES ?= __log* testdata/*.actual.golden logd.test log-cli.test *.pprof
 
 .PHONY: all
 all: test.cover test build
@@ -10,6 +10,7 @@ all: test.cover test build
 clean:
 	@echo "Cleaning generated development files..."
 	rm -f $(GENERATED_FILES)
+	rm -rf integration_test/out/* report/*
 
 .PHONY: ls.tmp
 ls.tmp:
