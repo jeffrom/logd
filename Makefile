@@ -4,7 +4,7 @@ PKGS ?= $(shell go list ./...)
 GENERATED_FILES ?= __log* testdata/*.actual.golden logd.test log-cli.test *.pprof
 
 .PHONY: all
-all: test.cover test build
+all: build
 
 .PHONY: clean
 clean:
