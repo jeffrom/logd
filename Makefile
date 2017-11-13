@@ -88,7 +88,7 @@ benchcmp:
 
 .PHONY: bench.ci
 bench.ci:
-	./compare_benchmarks.sh
+	./script/compare_benchmarks.sh
 
 .PHONY: ci
 ci: clean deps lint.install test.coverprofile test.race test.integration.compile test.integration test.report lint test.report.summary
