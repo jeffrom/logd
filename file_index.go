@@ -135,20 +135,20 @@ func (idx *fileIndex) loadFromReader() (int64, error) {
 	return n, err
 }
 
-func (idx *fileIndex) dump() {
-	fmt.Printf("id\tpart\toff\n")
-	fmt.Printf("--\t----\t---\n")
-	if len(idx.data) == 0 {
-		return
-	}
+// func (idx *fileIndex) dump() {
+// 	fmt.Printf("id\tpart\toff\n")
+// 	fmt.Printf("--\t----\t---\n")
+// 	if len(idx.data) == 0 {
+// 		return
+// 	}
 
-	sl := idx.data
-	if len(idx.data) > 10 {
-		fmt.Println("...")
-		sl = idx.data[len(idx.data)-10:]
-	}
+// 	sl := idx.data
+// 	if len(idx.data) > 10 {
+// 		fmt.Println("...")
+// 		sl = idx.data[len(idx.data)-10:]
+// 	}
 
-	for _, c := range sl {
-		fmt.Println(c)
-	}
-}
+// 	for _, c := range sl {
+// 		fmt.Println(c)
+// 	}
+// }

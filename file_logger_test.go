@@ -149,6 +149,31 @@ func TestFilePartitionWrites(t *testing.T) {
 	}
 }
 
+func TestFilePartitionDeleteOldOnes(t *testing.T) {
+	config := testConfig(nil)
+	config.IndexCursorSize = 10
+	config.PartitionSize = 500
+	config.MaxPartitions = 2
+	config.LogFile = tmpLog()
+	config, logger, teardown := setupFileLoggerConfig(t, config)
+	defer teardown()
+
+	msg := []byte(repeat("A", 500))
+	for i := 0; i < 10; i++ {
+		logger.Write(msg)
+	}
+	logger.Flush()
+
+	part1, _ := ioutil.ReadFile(config.LogFile + ".9")
+	checkGoldenFile(t, "file_partition_delete_old_ones.9", part1, golden)
+	part2, _ := ioutil.ReadFile(config.LogFile + ".10")
+	checkGoldenFile(t, "file_partition_delete_old_ones.10", part2, golden)
+	_, err := ioutil.ReadFile(config.LogFile + ".11")
+	if err == nil {
+		t.Fatal("Expected no third partition")
+	}
+}
+
 func repeat(s string, n int) string {
 	b := bytes.Buffer{}
 	for i := 0; i < n; i++ {

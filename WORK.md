@@ -3,7 +3,7 @@
 # TODO
 
 - [X] working client functionality, particularly around reads
-- [ ] partitioning, including removing old partitions with hooks
+- [X] partitioning, including removing old partitions with hooks
     - reading doesn't work near partition boundaries
     - can't read last few messages
 - [X] index isn't being written to disk, probably other issues too
@@ -21,6 +21,7 @@
 - [ ] make consistency guarantees configurable. fast by default but also force
   disk flush before returning success if that's desired.
 - [ ] audit all panics: we should only panic when there's a fatal error.
+    - otherwise return all the way up to main
 - [ ] same protocol for file storage as network transfer simplifies the app and
   probably makes it easier to leverage sendfile without calling it directly
 - [ ] compression

@@ -1,7 +1,7 @@
 
 PKGS ?= $(shell go list ./...)
 
-GENERATED_FILES ?= __log* testdata/*.actual.golden logd.test log-cli.test *.pprof
+GENERATED_FILES ?= __log* testdata/*.actual.golden logd.test log-cli.test *.pprof integration_test/out/* report/*
 
 .PHONY: all
 all: test.cover test build
@@ -10,8 +10,6 @@ all: test.cover test build
 clean:
 	@echo "Cleaning generated development files..."
 	rm -f $(GENERATED_FILES)
-	rm -rf integration_test/out/*
-	rm -rf report/*
 
 .PHONY: ls.tmp
 ls.tmp:
@@ -25,6 +23,7 @@ deps:
 	dep version || go get -u github.com/golang/dep/cmd/dep
 	dep ensure
 	go get github.com/wadey/gocovmerge
+	go get golang.org/x/tools/cmd/benchcmp
 	mkdir -p report
 	mkdir -p integration_test/out
 
@@ -79,8 +78,13 @@ lint.update:
 BENCH ?= .
 bench:
 	mkdir -p report
-	go test -run="^$$" -bench=. -benchmem -cpuprofile=cpu.pprof -memprofile=mem.pprof -mutexprofile=mutex.pprof -outputdir=report
+	# go test -run="^$$" -bench=. -benchmem -cpuprofile=cpu.pprof -memprofile=mem.pprof -mutexprofile=mutex.pprof -outputdir=report | tee report/bench.out
 	# $(foreach pkg,$(PKGS),go test -bench=$(BENCH) -cpuprofile=cpu.pprof -memprofile=mem.pprof -mutexprofile=mutex.pprof -outputdir=report/ -benchmem -run="^$$" $(pkg);)
+	./script/benchmark.sh
+
+.PHONY: benchcmp
+benchcmp:
+	benchcmp report/bench.out report/bench.out.1
 
 .PHONY: ci
 ci: clean deps lint.install test.coverprofile test.race test.integration.compile test.integration test.report lint test.report.summary

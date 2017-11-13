@@ -39,22 +39,24 @@ func (p *filePartitions) Write(b []byte) (int, error) {
 func (p *filePartitions) shutdown() error {
 	var firstErr error
 
-	if err := p.w.Close(); err != nil {
-		err = errors.Wrap(err, "failed closing writeable file during shutdown")
-		log.Printf("%+v", err)
-		if firstErr == nil {
-			firstErr = err
-		}
-	}
+	// if err := p.w.Close(); err != nil {
+	// 	err = errors.Wrap(err, "failed closing writeable file during shutdown")
+	// 	log.Printf("%+v", err)
+	// 	if firstErr == nil {
+	// 		firstErr = err
+	// 	}
+	// }
 
-	if err := p.r.Close(); err != nil {
-		err = errors.Wrap(err, "failed closing readable file during shutdown")
-		log.Printf("%+v", err)
-		if firstErr == nil {
-			firstErr = err
-		}
-	}
+	// if err := p.r.Close(); err != nil {
+	// 	err = errors.Wrap(err, "failed closing readable file during shutdown")
+	// 	log.Printf("%+v", err)
+	// 	if firstErr == nil {
+	// 		firstErr = err
+	// 	}
+	// }
 
+	p.w.Close()
+	p.r.Close()
 	return firstErr
 }
 
@@ -71,7 +73,6 @@ func (p *filePartitions) setCurrentFileHandles(create bool) error {
 	maxParts := p.config.MaxPartitions
 	if maxParts > 0 && len(parts) > maxParts {
 
-		// TODO synchronously move the files to another location before doing this
 		go func() {
 			if derr := p.delete(parts[:len(parts)-maxParts]); derr != nil {
 				log.Printf("failed to delete partitions: %+v", derr)
