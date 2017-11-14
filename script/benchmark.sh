@@ -31,7 +31,9 @@ rotate "report/mem.pprof"
 rotate "report/mutex.pprof"
 
 # git rev-parse HEAD > report/bench.out
-git log --oneline > report/bench.out
+set +e
+git log --oneline | head -n 1 > report/bench.out
+set -e
 
 go test -run="^$" -bench=. \
     -benchmem \
