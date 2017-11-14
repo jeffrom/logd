@@ -9,6 +9,8 @@
     - all commands
 - [ ] after the tests are solid, go through all the code and reorg
 - [ ] finish command set, including STATS, REFUSE, ACCEPT
+    - refuse(_at) / accept(_at) should be able to synchronize switching at
+      partition boundaries, as well as ids.
 - [ ] REPLICATE can just call READ internally for now, later it should have a
   different protocol
 - [ ] make consistency guarantees configurable. fast by default but also force
@@ -31,6 +33,8 @@
   previous delayed io.
 - [ ] after tests and refactoring, optimize. shoot for 0 allocations and do as
   little work as possible. Also make sure sendfile is being used.
+    - using preallocated buffer + end position pointer so the buffer doesn't
+      need to be cleared
 - [ ] figure out linting
 - [ ] documentation with many use cases, event log, pub sub, replication,
   changing master
