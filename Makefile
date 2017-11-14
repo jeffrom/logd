@@ -12,6 +12,10 @@ clean:
 	rm -f $(GENERATED_FILES)
 	rm -rf integration_test/out/* report/*
 
+.PHONY: clean.docker
+clean.docker:
+	./script/cleanup_docker.sh
+
 .PHONY: ls.tmp
 ls.tmp:
 	@echo "Listing temporary files..."
@@ -36,6 +40,10 @@ deps.dep:
 .PHONY: build
 build:
 	go install ./...
+
+.PHONY: build.container
+build.container:
+	./script/build_container.sh
 
 .PHONY: test
 test: test.cover test.race

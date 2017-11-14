@@ -16,3 +16,5 @@ log*.test
 report/
 
 /integration_test/out
+
+./build/*
