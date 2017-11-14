@@ -2,15 +2,8 @@
 
 # TODO
 
-- [X] working client functionality, particularly around reads
-- [X] partitioning, including removing old partitions with hooks
-    - reading doesn't work near partition boundaries
-    - can't read last few messages
-- [X] index isn't being written to disk, probably other issues too
 - [ ] test suite that runs the same set of tests with different configurations,
   but also supports expected failures in some cases
-- [X] subscribers are removed when their connection closes
-- [X] test suite should also include system-level tests with coverage
 - [ ] large benchmarking suite
     - server/client startup/shutdown
     - all commands
@@ -31,3 +24,16 @@
 - [ ] documentation with many use cases, event log, pub sub, replication,
   changing master
 - [ ] CONTRIBUTORS.md
+
+
+# COMPLETED
+
+## OCT 2017
+
+- [X] working client functionality, particularly around reads
+- [X] partitioning, including removing old partitions with hooks
+    - reading doesn't work near partition boundaries
+    - can't read last few messages
+- [X] index isn't being written to disk, probably other issues too
+- [X] subscribers are removed when their connection closes
+- [X] test suite should also include system-level tests with coverage
