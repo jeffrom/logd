@@ -24,11 +24,13 @@ rotate() {
 
 rotate
 
+# git rev-parse HEAD > report/bench.out
+git log --oneline > report/bench.out
+
 go test -run="^$" -bench=. \
     -benchmem \
     -cpuprofile=cpu.pprof \
     -memprofile=mem.pprof \
     -mutexprofile=mutex.pprof \
     -outputdir=report \
-    | tee report/bench.out
-
+    | tee -a report/bench.out

@@ -24,4 +24,11 @@ trap finish EXIT
 
 make bench
 
-benchcmp report/bench.out report/bench.out.1 | tee report/benchcmp.out
+{
+    head -n 1 report/bench.out
+    head -n 1 report/bench.out.1
+    echo "---"
+    echo ""
+} > report/benchcmp.out
+
+benchcmp report/bench.out report/bench.out.1 | tee -a report/benchcmp.out
