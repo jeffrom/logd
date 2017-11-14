@@ -18,8 +18,11 @@
 - [ ] same protocol for file storage as network transfer simplifies the app and
   probably makes it easier to leverage sendfile without calling it directly
 - [ ] minimize IO layers as much as possible. io.Copy is ideal, probably.
+    - would syscall.Fdatasync instead of Flush help? seems likely.
 - [ ] evaluate where we can use a mutex instead of channels
 - [ ] compression
+- [ ] need to check the return value of Close()? May contain errors from
+  previous delayed io.
 - [ ] after tests and refactoring, optimize. shoot for 0 allocations and do as
   little work as possible. Also make sure sendfile is being used.
 - [ ] figure out linting
