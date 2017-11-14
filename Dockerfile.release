@@ -6,7 +6,7 @@ VOLUME ["/var/log/logd", "/etc/logd"]
 
 EXPOSE 1774
 
-COPY logd_conf.yml /etc/logd/logd_conf.yml
+COPY logd.conf.yml /etc/logd/logd.conf.yml
 COPY build/logd logd
 
 CMD ./logd --verbose

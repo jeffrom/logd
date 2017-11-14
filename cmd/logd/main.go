@@ -31,7 +31,7 @@ func runApp(args []string) {
 		cli.StringFlag{
 			Name:   "config, c",
 			Usage:  "Load configuration from `FILE`",
-			Value:  "/etc/logd/logd_conf.yml",
+			Value:  "/etc/logd/logd.conf.yml",
 			EnvVar: "LOGD_CONFIG",
 		},
 		altsrc.NewBoolFlag(cli.BoolFlag{

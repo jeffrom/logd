@@ -37,7 +37,7 @@ run_test() {
     rm -rf "${testpath:?}"
     mkdir -p "$testpath"
     cd "$TESTROOT"
-    cp "../logd_conf.yml" "${testpath}/logd_conf.yml"
+    cp "../logd.conf.yml" "${testpath}/logd.conf.yml"
     cd "$testpath"
 }
 
