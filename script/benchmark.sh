@@ -3,26 +3,32 @@ set -euxo pipefail
 
 
 rotate() {
+    fullpath="$1"
+    filebase="$(basename "$1")"
+    filedir="$(dirname "$1")"
     nums=()
     while read -r f; do
-        num="${f##./report/bench.out.}"
+        num="${f##./${fullpath}.}"
         nums+=("$num")
-    done < <(find ./report -name "bench.out.*")
+    done < <(find "./${filedir}" -name "${filebase}.*")
 
     IFS=$'\n' sorted=($(sort -r <<<"${nums[*]}"))
     unset IFS
 
     for n in ${sorted[*]}; do
         next=$((n+1))
-        mv "report/bench.out.$n" "report/bench.out.$next"
+        mv "${fullpath}.$n" "${fullpath}.$next"
     done
 
-    if [[ -e "report/bench.out" ]]; then
-        mv report/bench.out report/bench.out.1
+    if [[ -e "${fullpath}" ]]; then
+        mv "${fullpath}" "${fullpath}.1"
     fi
 }
 
-rotate
+rotate "report/bench.out"
+rotate "report/cpu.pprof"
+rotate "report/mem.pprof"
+rotate "report/mutex.pprof"
 
 # git rev-parse HEAD > report/bench.out
 git log --oneline > report/bench.out
