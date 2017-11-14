@@ -13,8 +13,14 @@
   different protocol
 - [ ] make consistency guarantees configurable. fast by default but also force
   disk flush before returning success if that's desired.
+    - most strict can use creat(O_SYNC), or maybe just flush before responding
+      to each command
+    - least strict just needs to fsync during shutdown
+    - have a flush interval option. also document how it may be better to just
+      change the dirty page cache kernel settings. this can be implemented by
+      just putting a flush command into the queue at an interval.
 - [ ] audit all panics: we should only panic when there's a fatal error.
-    - otherwise return all the way up to main
+    - mostly return all the way up to main
 - [ ] same protocol for file storage as network transfer simplifies the app and
   probably makes it easier to leverage sendfile without calling it directly
 - [ ] minimize IO layers as much as possible. io.Copy is ideal, probably.
