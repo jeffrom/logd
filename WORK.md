@@ -36,6 +36,8 @@
     - using preallocated buffer + end position pointer so the buffer doesn't
       need to be cleared
 - [ ] figure out linting
+- [ ] some tests that spin up containers to replicate, switch masters, etc
+  while under load
 - [ ] documentation with many use cases, event log, pub sub, replication,
   changing master
 - [ ] CONTRIBUTORS.md
