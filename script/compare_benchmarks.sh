@@ -25,10 +25,13 @@ trap finish EXIT
 make bench
 
 {
-    head -n 1 report/bench.out
     head -n 1 report/bench.out.1
+    head -n 1 report/bench.out
     echo "---"
     echo ""
 } > report/benchcmp.out
 
+# NOTE the first argument is the output of the SECOND most recent commit.
+# that means, if on master, the second most recent commit in master. For all
+# other branches, it means HEAD on master.
 benchcmp report/bench.out report/bench.out.1 | tee -a report/benchcmp.out
