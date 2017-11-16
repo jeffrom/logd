@@ -30,6 +30,17 @@ func startQForBench(b *testing.B) *eventQ {
 	return q
 }
 
+func BenchmarkEventQLifecycle(b *testing.B) {
+	config := eventQBenchConfig()
+
+	for i := 0; i < b.N; i++ {
+		q := newEventQ(config)
+		q.start()
+		q.handleShutdown(nil)
+		q.stop()
+	}
+}
+
 func BenchmarkEventQPing(b *testing.B) {
 	b.StopTimer()
 	q := startQForBench(b)
