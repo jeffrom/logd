@@ -28,6 +28,12 @@ receiving commands, the event q is set as an attribute on the server, however
 as more servers are implemented, it makes sense to make the servers attributes
 on the event queue.
 
+## batching
+
+One performance optimization logd uses is batching. logs are gathered up to a
+time interval and published to all subscribers using one send per subscriber.
+The same approach is used by default when writing to the log.
+
 ## commands
 
 - `MSG(*)`: Write a message to the log. Arguments are variadic. Each one will be
