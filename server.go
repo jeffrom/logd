@@ -340,6 +340,7 @@ func (s *SocketServer) handleSubscriber(conn *conn, cmd *Command, resp *Response
 		}
 		conn.close()
 	}()
+
 	for {
 		select {
 		case msg := <-resp.msgC:
