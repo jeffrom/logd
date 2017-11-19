@@ -35,7 +35,7 @@ set +e
 git log --oneline | head -n 1 > report/bench.out
 set -e
 
-go test -run="^$" -bench=. \
+go test -run="^$" -bench="${RUN:-.}" \
     -benchmem \
     -cpuprofile=cpu.pprof \
     -memprofile=mem.pprof \
