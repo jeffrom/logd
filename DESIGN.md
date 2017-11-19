@@ -1,4 +1,4 @@
-= overview =
+# overview
 
 logd - A networked, sequenced logging system designed to be simple and fast,
 and to adhere to the unix philosophy when reasonable. Overall, the design at
@@ -7,16 +7,7 @@ continuous incremental id. There is an index so consumers can keep checkpoints
 and return to them to resume reading. It is possible to tail a log stream and
 respond to messages as they come in.
 
-= maybe later =
-
-This will happen later, maybe.
-
-== clustering ==
-
-It should distribute partitions among different servers. Also, I want to
-experiment with other approaches when it's distributed.
-
-= architecture =
+# architecture
 
 Overall, my goal is for all application logic to happen in the `events`
 namespace, the main piece of which is a queue. Then, there will be a server
@@ -37,44 +28,53 @@ receiving commands, the event q is set as an attribute on the server, however
 as more servers are implemented, it makes sense to make the servers attributes
 on the event queue.
 
-== commands ==
+## commands
 
-- MSG(*): Write a message to the log. Arguments are variadic. Each one will be
+- `MSG(*)`: Write a message to the log. Arguments are variadic. Each one will be
   written to the log in sequence.
 
-- READ(start, limit=0): Read the log from `start`. If `limit` is 0, read
+- `READ(start, limit=0)`: Read the log from `start`. If `limit` is 0, read
   forever.  Otherwise, read until `limit` messages have been read.
 
-- REPLICATE(start): Replicates the log from `start`. Before release, this
+- `REPLICATE(start)`: Replicates the log from `start`. Before release, this
   should change to REPLICATE(start, end=0), and `start` and `end` should be
   partition numbers, not message ids.
 
-- HEAD(): Return the current id of the head of the log.
+- `HEAD()`: Return the current id of the head of the log.
 
-- CLOSE(): Closes the connection.
+- `CLOSE()`: Closes the connection.
 
-- PING(): Returns "PONG". Used for diagnostics.
+- `PING()`: Returns "PONG". Used for diagnostics.
 
-- SHUTDOWN(): Shuts down the server. Only used in test.
+- `SHUTDOWN()`: Shuts down the server. Only used in test.
 
-=== these are planned ===
+### these are planned
 
-- REFUSE(partition=0): Refuse write commands, starting at `partition`. This
+- `REFUSE(partition=0)`: Refuse write commands, starting at `partition`. This
   effectively changes a server into a replica. Used when changing masters.
 
-- ACCEPT(partition=0): Accept write commands, starting at `partition`. This
+- `ACCEPT(partition=0)`: Accept write commands, starting at `partition`. This
   promotes a replica to a master.
 
-- STATS(): Returns a bunch of stats.
+- `STATS()`: Returns a bunch of stats.
 
-== event queue ==
+## event queue
 
 This code ensures that messages are processed in the order received, and
 contains most of the application logic. The queue interacts with the server and
 log by calling methods on them, however there is a caveat. Currently the server
 calls a push method on the queue after parsing a received command.
 
-== log ==
+## log
 
-== server ==
+## server
+
+# maybe later
+
+This will happen later, maybe.
+
+## clustering
+
+It should distribute partitions among different servers. Also, I want to
+experiment with other approaches when it's distributed.
 
