@@ -44,7 +44,8 @@ var errInvalidProtocolLine = errors.New("invalid protocol line")
 var errInvalidBodyLength = errors.New("invalid body length")
 var errCrcChecksumMismatch = errors.New("crc checksum mismatch")
 
-type protocolScanner struct {
+// ProtocolScanner reads the log protocol
+type ProtocolScanner struct {
 	config       *Config
 	br           *bufio.Reader
 	lastChunkPos int64
@@ -54,14 +55,15 @@ type protocolScanner struct {
 	err          error
 }
 
-func newProtocolScanner(config *Config, r io.Reader) *protocolScanner {
-	return &protocolScanner{
+func newProtocolScanner(config *Config, r io.Reader) *ProtocolScanner {
+	return &ProtocolScanner{
 		config: config,
 		br:     bufio.NewReaderSize(r, config.PartitionSize),
 	}
 }
 
-func (ps *protocolScanner) Scan() bool {
+// Scan reads over log data in a loop
+func (ps *ProtocolScanner) Scan() bool {
 	if ps.chunkEnd <= 0 { // need to read chunk envelope
 		if err := ps.scanEnvelope(); err != nil && err != errInvalidFirstByte {
 			ps.err = err
@@ -81,7 +83,7 @@ func (ps *protocolScanner) Scan() bool {
 	return err == nil
 }
 
-func (ps *protocolScanner) readMessage() (int, *Message, error) {
+func (ps *ProtocolScanner) readMessage() (int, *Message, error) {
 	var id uint64
 	var body []byte
 	var bodylen int64
@@ -130,7 +132,7 @@ func (ps *protocolScanner) readMessage() (int, *Message, error) {
 	return read, NewMessage(id, bytes.TrimRight(body, "\r\n")), err
 }
 
-func (ps *protocolScanner) scanEnvelope() error {
+func (ps *ProtocolScanner) scanEnvelope() error {
 	if b, err := ps.br.Peek(1); err != nil {
 		if err == io.EOF {
 			return nil
@@ -159,11 +161,12 @@ func (ps *protocolScanner) scanEnvelope() error {
 	return nil
 }
 
-func (ps *protocolScanner) Message() *Message {
+// Message returns the message of the current iteration
+func (ps *ProtocolScanner) Message() *Message {
 	return ps.msg
 }
 
-func (ps *protocolScanner) Error() error {
+func (ps *ProtocolScanner) Error() error {
 	return ps.err
 }
 

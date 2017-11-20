@@ -345,8 +345,8 @@ func (s *SocketServer) handleSubscriber(conn *conn, cmd *Command, resp *Response
 		select {
 		case msg := <-resp.msgC:
 			// serialized := []byte(fmt.Sprintf("+%d %d %s\r\n", msg.id, len(msg.body), msg.body))
-			bytes := append([]byte("+"), msg...)
-			if _, err := conn.write(bytes); err != nil {
+			// bytes := append(byte("+"), msg...)
+			if _, err := conn.write(msg); err != nil {
 				log.Printf("%s: %+v", conn.RemoteAddr(), err)
 				return
 			}

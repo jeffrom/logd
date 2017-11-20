@@ -98,7 +98,7 @@ func (c *Client) readResponse() (*Response, error) {
 	return resp, nil
 }
 
-func (c *Client) readScanResponse() (*Scanner, error) {
+func (c *Client) readScanResponse() (*ProtocolScanner, error) {
 	resp, err := c.pr.readResponse(c.conn)
 	if c.handleErr(err) != nil {
 		return nil, err
@@ -106,7 +106,7 @@ func (c *Client) readScanResponse() (*Scanner, error) {
 
 	debugf(c.config, "initial scan response: %s", resp.Status)
 
-	return newScanner(c.pr.br, c.conn, c.config), nil
+	return newProtocolScanner(c.config, c.conn), nil
 }
 
 // Close closes the client connection.
@@ -160,7 +160,7 @@ func (c *Client) Do(cmds ...*Command) (*Response, error) {
 
 // DoRead returns a scanner that can be used to loop over messages, similar to
 // bufio.Scanner
-func (c *Client) DoRead(id uint64, limit int) (*Scanner, error) {
+func (c *Client) DoRead(id uint64, limit int) (*ProtocolScanner, error) {
 	debugf(c.config, "DoRead(%d, %d)", id, limit)
 	cmd := NewCommand(CmdRead,
 		[]byte(fmt.Sprintf("%d", id)),

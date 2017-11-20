@@ -154,7 +154,7 @@ func BenchmarkServerTailTwenty(b *testing.B) {
 	writerClient := newTestClient(config, srv)
 	defer writerClient.Close()
 
-	var scanners []*Scanner
+	var scanners []*ProtocolScanner
 	for i := 0; i < 20; i++ {
 		client := newTestClient(config, srv)
 		defer client.Close()
@@ -189,7 +189,7 @@ func BenchmarkServerLoadTest(b *testing.B) {
 		writers = append(writers, writerClient)
 	}
 
-	var scanners []*Scanner
+	var scanners []*ProtocolScanner
 	for i := 0; i < 50; i++ {
 		client := newTestClient(config, srv)
 		defer client.Close()

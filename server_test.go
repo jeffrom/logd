@@ -38,13 +38,13 @@ func closeTestServer(t testing.TB, srv *SocketServer) {
 	}
 }
 
-func checkScan(t *testing.T, scanner *Scanner, msg []byte) {
+func checkScan(t *testing.T, scanner *ProtocolScanner, msg []byte) {
 	readALine := scanner.Scan()
 	if !readALine {
 		t.Logf("%s", debug.Stack())
-		t.Fatalf("Expected to scan one message but failed: %s", scanner.Err())
+		t.Fatalf("Expected to scan one message but failed: %s", scanner.Error())
 	}
-	if err := scanner.Err(); err != nil {
+	if err := scanner.Error(); err != nil {
 		t.Logf("%s", debug.Stack())
 		t.Fatalf("unexpected error scanning: %+v", err)
 	}

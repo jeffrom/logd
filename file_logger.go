@@ -166,7 +166,7 @@ func (l *fileLogger) SeekToID(id uint64) error {
 		return nil
 	}
 
-	var scanner *protocolScanner
+	var scanner *ProtocolScanner
 
 Loop:
 	for {

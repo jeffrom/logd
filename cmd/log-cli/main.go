@@ -160,7 +160,7 @@ func doReadCmdAction(config *logd.Config) func(c *cli.Context) error {
 			fmt.Printf("%d %s\n", msg.ID, msg.Body)
 		}
 
-		if err := scanner.Err(); err != io.EOF && err != nil {
+		if err := scanner.Error(); err != io.EOF && err != nil {
 			if cerr, ok := errors.Cause(err).(net.Error); !ok || !cerr.Timeout() {
 				log.Printf("%+v", err)
 				return cli.NewExitError(err, 3)
@@ -180,7 +180,7 @@ func doReadCmdAction(config *logd.Config) func(c *cli.Context) error {
 					fmt.Printf("%d %s\n", msg.ID, msg.Body)
 				}
 
-				if err := scanner.Err(); err != nil && err != io.EOF {
+				if err := scanner.Error(); err != nil && err != io.EOF {
 					if cerr, ok := errors.Cause(err).(net.Error); !ok || !cerr.Timeout() {
 						log.Printf("%+v", err)
 						return cli.NewExitError(err, 3)
