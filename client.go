@@ -16,7 +16,7 @@ type Client struct {
 	config *Config
 
 	readTimeout time.Duration
-	pr          *protoReader
+	pr          *protocolReader
 
 	pw           *protocolWriter
 	writeTimeout time.Duration
@@ -58,7 +58,7 @@ func DialConfig(addr string, config *Config, conns ...net.Conn) (*Client, error)
 	return &Client{
 		config:       config,
 		conn:         conn,
-		pr:           newProtoReader(conn, config),
+		pr:           newProtocolReader(config),
 		readTimeout:  timeout,
 		pw:           newProtocolWriter(),
 		writeTimeout: timeout,
@@ -89,7 +89,7 @@ func (c *Client) readResponse() (*Response, error) {
 	if err := c.conn.SetReadDeadline(time.Now().Add(c.readTimeout)); err != nil {
 		return nil, err
 	}
-	resp, err := c.pr.readResponse()
+	resp, err := c.pr.readResponse(c.conn)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +99,7 @@ func (c *Client) readResponse() (*Response, error) {
 }
 
 func (c *Client) readScanResponse() (*Scanner, error) {
-	resp, err := c.pr.readResponse()
+	resp, err := c.pr.readResponse(c.conn)
 	if c.handleErr(err) != nil {
 		return nil, err
 	}

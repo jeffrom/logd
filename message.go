@@ -21,42 +21,49 @@ func NewMessage(id uint64, body []byte) *Message {
 }
 
 func (m *Message) logBytes() []byte {
-	return []byte(fmt.Sprintf("%d %d %s\r\n", m.ID, len(m.Body), m.Body))
+	b := newProtocolWriter().writeLogLine(m)
+	return []byte(b)
 }
 
 func (m *Message) String() string {
 	return string(m.logBytes())
 }
 
+// func msgFromBytes(b []byte) (*Message, error) {
+// 	var id uint64
+// 	var length uint64
+// 	var body []byte
+// 	parts := bytes.SplitN(b, []byte(" "), 3)
+
+// 	if len(parts) < 3 {
+// 		return nil, errors.New("invalid message format")
+// 	}
+
+// 	_, err := fmt.Sscanf(string(parts[0]), "%d", &id)
+// 	if err != nil {
+// 		return nil, errors.Wrap(err, "invalid id bytes")
+// 	}
+// 	_, err = fmt.Sscanf(string(parts[1]), "%d", &length)
+// 	if err != nil {
+// 		return nil, errors.Wrap(err, "invalid length bytes")
+// 	}
+// 	body = bytes.TrimRight(parts[2], "\r\n")
+
+// 	if uint64(len(body)) < length {
+// 		return nil, errors.New("invalid body length")
+// 	}
+
+// 	// TODO slicing here is unsafe, we need a crc or something
+// 	return NewMessage(id, body[:length]), nil
+// }
+
 func msgFromBytes(b []byte) (*Message, error) {
-	var id uint64
-	var length uint64
-	var body []byte
-	parts := bytes.SplitN(b, []byte(" "), 3)
-
-	if len(parts) < 3 {
-		return nil, errors.New("invalid message format")
-	}
-
-	_, err := fmt.Sscanf(string(parts[0]), "%d", &id)
-	if err != nil {
-		return nil, errors.Wrap(err, "invalid id bytes")
-	}
-	_, err = fmt.Sscanf(string(parts[1]), "%d", &length)
-	if err != nil {
-		return nil, errors.Wrap(err, "invalid length bytes")
-	}
-	body = bytes.TrimRight(parts[2], "\r\n")
-
-	if uint64(len(body)) < length {
-		return nil, errors.New("invalid body length")
-	}
-
-	// TODO slicing here is unsafe, we need a crc or something
-	return NewMessage(id, body[:length]), nil
+	ps := newProtocolScanner(DefaultConfig, bytes.NewReader(b))
+	_, msg, err := ps.readMessage()
+	return msg, err
 }
 
-func msgFromReader(r *bufio.Reader) (int, *Message, error) {
+func msgFromLogReader(r *bufio.Reader) (int, *Message, error) {
 	var err error
 	var n int
 	var read int

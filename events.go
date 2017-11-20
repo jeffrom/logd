@@ -70,7 +70,7 @@ func (q *eventQ) loop() {
 	for {
 		select {
 		case cmd := <-q.in:
-			debugf(q.config, "event: %s", cmd)
+			debugf(q.config, "event: %s(%q)", cmd, cmd.args)
 
 			switch cmd.name {
 			case CmdMessage:
@@ -138,7 +138,7 @@ func (q *eventQ) handleMsg(cmd *Command) {
 		}
 
 		id++
-		msgb := NewMessage(id, msg).logBytes()
+		msgb := newProtocolWriter().writeLogLine(NewMessage(id, msg))
 		msgs = append(msgs, msgb)
 
 		q.log.SetID(id)
@@ -225,7 +225,8 @@ func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 	}
 
 	numMsg := 0
-	scanner := newFileLogScanner(q.config, log)
+	// scanner := newFileLogScanner(q.config, log)
+	scanner := newProtocolScanner(q.config, log)
 	// TODO chunking, scanner interface
 	for scanner.Scan() {
 		msg := scanner.Message()
@@ -233,7 +234,8 @@ func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 			continue
 		}
 
-		resp.msgC <- msg.logBytes()
+		b := newProtocolWriter().writeLogLine(msg)
+		resp.msgC <- b
 		numMsg++
 
 		if limit > 0 && uint64(numMsg) >= limit {

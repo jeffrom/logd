@@ -72,7 +72,7 @@ func checkMessageReceived(t *testing.T, resp *Response, expectedID uint64, expec
 		msgb = b
 		ok = recvd
 	case <-time.After(time.Millisecond * 100):
-		t.Fatal("timed out waiting for message on channel")
+		t.Fatalf("timed out waiting for message %d on channel", expectedID)
 	}
 
 	if !ok {

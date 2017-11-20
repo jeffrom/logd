@@ -270,7 +270,7 @@ func (s *SocketServer) handleClient(conn *conn) {
 		} else {
 			conn.SetDeadline(time.Time{})
 		}
-		cmd, err := conn.pr.readCommand()
+		cmd, err := conn.pr.readCommand(conn)
 		if cerr := s.handleConnErr(err, conn); cerr != nil {
 			return
 		}

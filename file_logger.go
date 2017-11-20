@@ -166,11 +166,11 @@ func (l *fileLogger) SeekToID(id uint64) error {
 		return nil
 	}
 
-	var scanner *fileLogScanner
+	var scanner *protocolScanner
 
 Loop:
 	for {
-		scanner = newFileLogScanner(l.config, l.parts.r)
+		scanner = newProtocolScanner(l.config, l.parts.r)
 
 		for scanner.Scan() {
 			msg := scanner.Message()
@@ -198,7 +198,7 @@ Loop:
 
 	}
 
-	off := int64(offset) + int64(scanner.read) - int64(scanner.lastRead)
+	off := int64(offset) + int64(scanner.chunkPos) - int64(scanner.lastChunkPos)
 	debugf(l.config, "seeking to offset %d, partition %d", off, l.parts.currReadPart)
 	if _, err := l.parts.r.Seek(off, io.SeekStart); err != nil {
 		return errors.Wrap(err, "failed to seek in partition after scanning")
@@ -217,7 +217,7 @@ func (l *fileLogger) Head() (uint64, error) {
 	}
 
 	var msg *Message
-	scanner := newFileLogScanner(l.config, l)
+	scanner := newProtocolScanner(l.config, l)
 	for scanner.Scan() {
 		if scanned := scanner.Message(); scanned != nil {
 			msg = scanned
@@ -255,12 +255,7 @@ func (l *fileLogger) getNewIndex() error {
 }
 
 func (l *fileLogger) loadState() error {
-	// var c *fileIndexCursor
-	// if len(l.index.data) > 0 {
-	// 	c = l.index.data[len(l.index.data)-1]
-	// }
-
-	scanner := newFileLogScanner(l.config, l)
+	scanner := newProtocolScanner(l.config, l)
 	var lastMsg *Message
 	for scanner.Scan() {
 		msg := scanner.Message()
@@ -272,11 +267,10 @@ func (l *fileLogger) loadState() error {
 		return err
 	}
 
-	l.written = scanner.read
+	// TODO make written a uint64
+	l.written = int(scanner.chunkPos)
 	if lastMsg != nil {
 		l.currID = lastMsg.ID + 1
-
-		// log.Printf("Starting at log id %d, offset %d", l.currID, l.written)
 	}
 
 	return nil
@@ -301,7 +295,7 @@ func CheckIndex(config *Config) error {
 			return err
 		}
 
-		scanner := newFileLogScanner(logger.config, logger.parts.r)
+		scanner := newProtocolScanner(logger.config, logger.parts.r)
 		scanner.Scan()
 		if err := scanner.Error(); err != nil {
 			log.Printf("Failed to scan. id: %d, partition: %d, offset: %d", c.id, c.part, c.offset)

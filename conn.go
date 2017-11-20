@@ -51,7 +51,7 @@ type conn struct {
 
 	config *Config
 
-	pr           *protoReader
+	pr           *protocolReader
 	readTimeout  time.Duration
 	pw           *protoWriter
 	writeTimeout time.Duration
@@ -69,7 +69,7 @@ func newServerConn(c net.Conn, config *Config) *conn {
 	conn := &conn{
 		config:       config,
 		Conn:         c,
-		pr:           newProtoReader(c, config),
+		pr:           newProtocolReader(config),
 		readTimeout:  timeout,
 		pw:           newProtoWriter(c, config),
 		writeTimeout: timeout,
