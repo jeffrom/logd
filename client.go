@@ -18,7 +18,7 @@ type Client struct {
 	readTimeout time.Duration
 	pr          *protoReader
 
-	pw           *protoWriter
+	pw           *protocolWriter
 	writeTimeout time.Duration
 }
 
@@ -60,7 +60,7 @@ func DialConfig(addr string, config *Config, conns ...net.Conn) (*Client, error)
 		conn:         conn,
 		pr:           newProtoReader(conn, config),
 		readTimeout:  timeout,
-		pw:           newProtoWriter(conn, config),
+		pw:           newProtocolWriter(),
 		writeTimeout: timeout,
 	}, nil
 
@@ -70,7 +70,7 @@ func (c *Client) writeCommand(cmd *Command) error {
 	if err := c.conn.SetWriteDeadline(time.Now().Add(c.writeTimeout)); err != nil {
 		return err
 	}
-	if _, err := c.pw.writeCommand(cmd); err != nil {
+	if _, err := c.conn.Write(c.pw.writeCommand(cmd)); err != nil {
 		return err
 	}
 	if err := c.flush(); err != nil {
@@ -81,7 +81,8 @@ func (c *Client) writeCommand(cmd *Command) error {
 }
 
 func (c *Client) flush() error {
-	return c.pw.bw.Flush()
+	return nil
+	// return c.pw.bw.Flush()
 }
 
 func (c *Client) readResponse() (*Response, error) {

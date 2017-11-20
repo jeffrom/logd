@@ -20,7 +20,7 @@ const (
 
 	// RespContinue indicates a read request has been closed but additional
 	// requests can be handled. Not yet in use.
-	RespContinue
+	// RespContinue
 
 	// RespErr indicates a failed response.
 	RespErr
@@ -41,8 +41,8 @@ func (resp RespType) String() string {
 		return "OK"
 	case RespEOF:
 		return "EOF"
-	case RespContinue:
-		return "CONTINUE"
+	// case RespContinue:
+	// 	return "CONTINUE"
 	case RespErr:
 		return "ERR"
 	case RespErrClient:

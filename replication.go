@@ -27,7 +27,7 @@ func (r *logReplicaServer) readFromID(id uint64) (int64, error) {
 	return 0, nil
 }
 
-var table = crc32.MakeTable(crc32.Koopman)
+var crcTable = crc32.MakeTable(crc32.Koopman)
 
 func (r *logReplicaServer) sendChunks(rdr io.Reader, size int64) (int64, error) {
 	var total int64
@@ -44,7 +44,7 @@ func (r *logReplicaServer) sendChunks(rdr io.Reader, size int64) (int64, error) 
 			return total, err
 		}
 
-		checksum := crc32.Checksum(b, table)
+		checksum := crc32.Checksum(b, crcTable)
 
 		// _, err = rdr.Seek(0, io.SeekStart)
 		// if err != nil {
@@ -115,7 +115,7 @@ func (s *logReplicaScanner) Scan() bool {
 	}
 
 	chunk := buf[:len(buf)-2]
-	calculatedChecksum := crc32.Checksum(chunk, table)
+	calculatedChecksum := crc32.Checksum(chunk, crcTable)
 	if checksum != calculatedChecksum {
 		s.err = errors.New("crc32 mismatch")
 		return false
