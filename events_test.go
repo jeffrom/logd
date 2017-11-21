@@ -95,6 +95,20 @@ func checkMessageReceived(t *testing.T, resp *Response, expectedID uint64, expec
 	}
 }
 
+func checkEOF(t *testing.T, resp *Response) {
+	select {
+	case b, recvd := <-resp.msgC:
+		if !recvd {
+			t.Fatal("Expected +EOF but received nothing")
+		}
+		if !bytes.Equal(b, []byte("+EOF\r\n")) {
+			t.Fatalf("Expected +EOF but got %q", b)
+		}
+	case <-time.After(time.Millisecond * 100):
+		t.Fatal("timed out waiting for +EOF on channel")
+	}
+}
+
 func checkErrResp(t *testing.T, resp *Response) {
 	if resp.Status != RespErr {
 		t.Logf("%s", debug.Stack())
@@ -258,6 +272,7 @@ func TestEventQReadFilePartitions(t *testing.T) {
 		resp, err := q.pushCommand(cmd)
 		checkNoErrAndSuccess(t, resp, err)
 		checkMessageReceived(t, resp, uint64(id), truncated)
+		checkEOF(t, resp)
 	}
 }
 

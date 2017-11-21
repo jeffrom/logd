@@ -130,8 +130,11 @@ func (l *fileLogger) Read(b []byte) (int, error) {
 	for {
 		var n int
 		n, err = l.parts.r.Read(b[read:])
-		// fmt.Printf("total buf:\n\"%s\"curr: \"%s\"\nerr: %v\n", b, b[read:], err)
+		// fmt.Printf("total buf(%d):\n\"%s\"curr: \"%s\"\nerr: %v\n", len(b), b, b[read:], err)
 		read += n
+		if err == nil && read >= len(b) {
+			return read, nil
+		}
 		if err == io.EOF {
 			if l.parts.currReadPart < l.parts.head() {
 				if oerr := l.parts.setReadHandle(l.parts.currReadPart + 1); oerr != nil {
