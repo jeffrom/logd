@@ -154,19 +154,32 @@ func (l *fileLogger) Read(b []byte) (int, error) {
 }
 
 func (l *fileLogger) SeekToID(id uint64) error {
+	_, off, err := l.getPartOffset(id)
+	if err != nil {
+		return err
+	}
+	debugf(l.config, "seeking to offset %d, partition %d", off, l.parts.currReadPart)
+	if _, err := l.parts.r.Seek(off, io.SeekStart); err != nil {
+		return errors.Wrap(err, "failed to seek in partition after scanning")
+	}
+
+	return nil
+}
+
+func (l *fileLogger) getPartOffset(id uint64) (uint64, int64, error) {
 	part, offset := l.index.Get(id)
 	debugf(l.config, "index.Get(%d) -> (part %d, offset %d)", id, part, offset)
 
 	if err := l.parts.setReadHandle(part); err != nil {
-		return errors.Wrap(err, "failed setting read handle")
+		return part, 0, errors.Wrap(err, "failed setting read handle")
 	}
 
 	if _, err := l.parts.r.Seek(int64(offset), io.SeekStart); err != nil {
-		return errors.Wrap(err, "failed seeking in partition")
+		return part, 0, errors.Wrap(err, "failed seeking in partition")
 	}
 
 	if id <= 1 {
-		return nil
+		return 0, 0, nil
 	}
 
 	var scanner *ProtocolScanner
@@ -182,18 +195,18 @@ Loop:
 				break Loop
 			}
 			if msg.ID > id-1 {
-				return errors.New("failed to scan to id")
+				return part, 0, errors.New("failed to scan to id")
 			}
 		}
 
 		if err := scanner.Error(); err == io.EOF {
 			if l.parts.currReadPart < l.parts.head() {
 				if oerr := l.parts.setReadHandle(l.parts.currReadPart + 1); oerr != nil {
-					return oerr
+					return part, 0, oerr
 				}
 				continue
 			} else {
-				return err
+				return part, 0, err
 			}
 		} else if err != nil {
 			panic(err)
@@ -202,12 +215,7 @@ Loop:
 	}
 
 	off := int64(offset) + int64(scanner.chunkPos) - int64(scanner.lastChunkPos)
-	debugf(l.config, "seeking to offset %d, partition %d", off, l.parts.currReadPart)
-	if _, err := l.parts.r.Seek(off, io.SeekStart); err != nil {
-		return errors.Wrap(err, "failed to seek in partition after scanning")
-	}
-
-	return nil
+	return part, off, nil
 }
 
 func (l *fileLogger) Head() (uint64, error) {
@@ -239,6 +247,22 @@ func (l *fileLogger) Head() (uint64, error) {
 
 func (l *fileLogger) Copy() Logger {
 	return newFileLogger(l.config)
+}
+
+// Range returns an iterator. each time it is called, it returns a) an *os.File,
+// maybe wrapped with an io.LimitReader, and at a seek position, or b) an
+// io.Reader which reads a chunk of log lines. the final reader will close the
+// files in the iterator and return io.EOF
+func (l *fileLogger) Range(start, end uint64) (func() (io.Reader, error), error) {
+	// part, off, err := l.getPartOffset(start)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	fn := func() (io.Reader, error) {
+		return nil, nil
+	}
+	return fn, nil
 }
 
 func (l *fileLogger) getNewIndex() error {

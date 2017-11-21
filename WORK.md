@@ -27,6 +27,7 @@
   probably makes it easier to leverage sendfile without calling it directly
 - [ ] minimize IO layers as much as possible. io.Copy is ideal, probably.
     - would syscall.Fdatasync instead of Flush help? seems likely.
+- [ ] seeking/reading the log when we don't need to (calling Setup, probably)
 - [ ] evaluate where we can use a mutex instead of channels
 - [ ] compression
 - [ ] need to check the return value of Close()? May contain errors from
