@@ -206,6 +206,10 @@ func (pw *protocolWriter) writeChunkEnvelope(b []byte) []byte {
 }
 
 func (pw *protocolWriter) writeResponse(r *Response) []byte {
+	if r.Status == RespEOF {
+		return []byte("+EOF\r\n")
+	}
+
 	buf := pw.buf
 	buf.Reset()
 	buf.WriteString(r.Status.String())

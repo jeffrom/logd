@@ -249,6 +249,7 @@ func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 	if limit == 0 { // read forever
 		q.subscriptions[cmd.respC] = newSubscription(resp.msgC, cmd.done)
 	} else {
+		resp.msgC <- newProtocolWriter().writeResponse(newResponse(RespEOF))
 		cmd.finish()
 	}
 }

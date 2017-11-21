@@ -1,10 +1,5 @@
 package logd
 
-import (
-	"bytes"
-	"strconv"
-)
-
 // RespType is the response status return type
 type RespType uint8
 
@@ -76,24 +71,7 @@ func NewClientErrResponse(body []byte) *Response {
 
 // Bytes returns a byte representation of the response
 func (r *Response) Bytes() []byte {
-	buf := bytes.Buffer{}
-	buf.WriteString(r.Status.String())
-
-	if r.ID > 0 && r.body != nil {
-		panic("response id and body both set")
-	}
-
-	if r.ID != 0 {
-		buf.WriteByte(' ')
-		buf.WriteString(strconv.FormatUint(r.ID, 10))
-	}
-	if r.body != nil {
-		buf.WriteByte(' ')
-		buf.Write(r.body)
-	}
-
-	buf.WriteString("\r\n")
-	return buf.Bytes()
+	return newProtocolWriter().writeResponse(r)
 }
 
 func (r *Response) String() string {
