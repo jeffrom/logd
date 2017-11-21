@@ -149,7 +149,8 @@ func (ps *ProtocolScanner) scanEnvelope() error {
 	}
 
 	if bytes.Equal(line, []byte("EOF")) {
-		return errReadStopped
+		return io.EOF
+		// return errReadStopped
 	}
 
 	n, err := strconv.ParseInt(string(line), 10, 64)
