@@ -106,6 +106,9 @@ func (c *Client) readScanResponse() (*ProtocolScanner, error) {
 
 	debugf(c.config, "initial scan response: %s", resp.Status)
 
+	if err := c.conn.SetReadDeadline(time.Now().Add(c.readTimeout)); err != nil {
+		return nil, err
+	}
 	return newProtocolScanner(c.config, c.conn), nil
 }
 
@@ -183,6 +186,11 @@ func (c *Client) Write(p []byte) (int, error) {
 		return 0, err
 	}
 	return len(p), nil
+}
+
+// SetDeadline sets the timeout for the next io operation.
+func (c *Client) SetDeadline(t time.Time) error {
+	return c.conn.SetDeadline(t)
 }
 
 type protocolError string

@@ -149,6 +149,7 @@ func doReadCmdAction(config *logd.Config) func(c *cli.Context) error {
 			limit = 0
 		}
 
+		client.SetDeadline(time.Now().Add(time.Duration(config.ClientTimeout) * time.Millisecond))
 		scanner, err := client.DoRead(start, limit)
 		if err != nil {
 			log.Printf("%+v", err)
@@ -175,9 +176,11 @@ func doReadCmdAction(config *logd.Config) func(c *cli.Context) error {
 				case <-time.After(200 * time.Millisecond):
 				}
 
+				client.SetDeadline(time.Now().Add(200 * time.Millisecond))
 				for scanner.Scan() {
 					msg := scanner.Message()
 					fmt.Printf("%d %s\n", msg.ID, msg.Body)
+					client.SetDeadline(time.Now().Add(200 * time.Millisecond))
 				}
 
 				if err := scanner.Error(); err != nil && err != io.EOF {

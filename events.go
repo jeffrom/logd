@@ -235,7 +235,7 @@ func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 		}
 
 		b := newProtocolWriter().writeLogLine(msg)
-		fmt.Printf("logline: %q\n", b)
+		// fmt.Printf("logline: %q\n", b)
 		resp.msgC <- b
 		numMsg++
 

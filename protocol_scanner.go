@@ -92,7 +92,7 @@ func (ps *ProtocolScanner) readMessage() (int, *Message, error) {
 	var read int
 
 	line, err := readLine(ps.br)
-	fmt.Printf("read: %q (%v)\n", line, err)
+	// fmt.Printf("read: %q (%v)\n", line, err)
 	read += len(line)
 	if err != nil {
 		ps.err = err

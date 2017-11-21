@@ -351,6 +351,7 @@ func TestEventQRead(t *testing.T) {
 	tailResp, err := q.pushCommand(cmd)
 	checkNoErrAndSuccess(t, tailResp, err)
 	checkMessageReceived(t, tailResp, 1, expectedMsg)
+	checkEOF(t, tailResp)
 
 	cmd = NewCommand(CmdRead, []byte("1"), []byte("0"))
 	tailResp, err = q.pushCommand(cmd)
@@ -365,6 +366,7 @@ func TestEventQRead(t *testing.T) {
 	closeCmd := newCloseCommand(cmd.respC)
 	closeResp, err := q.pushCommand(closeCmd)
 	checkNoErrAndSuccess(t, closeResp, err)
+
 }
 
 func TestEventQReadFromEmpty(t *testing.T) {
