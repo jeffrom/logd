@@ -213,7 +213,7 @@ func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 	resp.chunkC = make(chan logReadableFile)
 	cmd.respond(resp)
 
-	end := startID + limit
+	end := startID + (limit + 1)
 	if limit == 0 {
 		head, err := q.log.Head()
 		if err != nil {
@@ -238,27 +238,27 @@ func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 	}
 	// fmt.Println(startID, limit, end)
 
-	numMsg := 0
-	scanner := newProtocolScanner(q.config, q.log)
-	// TODO chunking, scanner interface
-	for scanner.Scan() {
-		msg := scanner.Message()
-		if msg.ID < startID {
-			continue
-		}
+	// numMsg := 0
+	// scanner := newProtocolScanner(q.config, q.log)
+	// // TODO chunking, scanner interface
+	// for scanner.Scan() {
+	// 	msg := scanner.Message()
+	// 	if msg.ID < startID {
+	// 		continue
+	// 	}
 
-		b := newProtocolWriter().writeLogLine(msg)
-		// fmt.Printf("logline: %q\n", b)
-		resp.msgC <- b
-		numMsg++
+	// 	b := newProtocolWriter().writeLogLine(msg)
+	// 	// fmt.Printf("logline: %q\n", b)
+	// 	resp.msgC <- b
+	// 	numMsg++
 
-		if limit > 0 && uint64(numMsg) >= limit {
-			break
-		}
-	}
-	if err := scanner.Error(); err != nil && err != io.EOF {
-		panic(err)
-	}
+	// 	if limit > 0 && uint64(numMsg) >= limit {
+	// 		break
+	// 	}
+	// }
+	// if err := scanner.Error(); err != nil && err != io.EOF {
+	// 	panic(err)
+	// }
 
 	if limit == 0 { // read forever
 		q.subscriptions[cmd.respC] = newSubscription(resp.msgC, cmd.done)

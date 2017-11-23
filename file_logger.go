@@ -325,13 +325,11 @@ func (l *fileLogger) Range(start, end uint64) (logRangeIterator, error) {
 
 	lcopy := newFileLogger(l.config)
 	endpart, endoff, pcerr := lcopy.getPartOffset(end)
-	fmt.Println("first err", pcerr)
 	if pcerr != nil {
 		return nil, pcerr
 	}
 
 	currpart, curroff, perr := l.getPartOffset(start)
-	fmt.Println("second err", perr)
 	if perr != nil {
 		return nil, perr
 	}

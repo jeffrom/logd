@@ -356,8 +356,8 @@ func (s *SocketServer) handleSubscriber(conn *conn, cmd *Command, resp *Response
 			}
 
 			conn.mu.Lock()
-			debugf(s.config, "sending partition as chunk to %s", conn.RemoteAddr())
-			if _, err := conn.Conn.(*net.TCPConn).ReadFrom(lf); err != nil {
+			debugf(s.config, "sending partition as %d byte chunk to %s", buflen, conn.RemoteAddr())
+			if _, err := conn.Conn.(*net.TCPConn).ReadFrom(io.LimitReader(lf, buflen)); err != nil {
 				log.Printf("%s: %+v", conn.RemoteAddr(), err)
 				conn.mu.Unlock()
 				return
