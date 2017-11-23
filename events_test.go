@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"path"
 	"runtime/debug"
@@ -71,7 +72,20 @@ func checkMessageReceived(t *testing.T, resp *Response, expectedID uint64, expec
 	case b, recvd := <-resp.msgC:
 		msgb = b
 		ok = recvd
+	case lf, recvd := <-resp.chunkC:
+		size, limit := lf.SizeLimit()
+		buflen := size
+		if limit > 0 {
+			buflen = limit
+		}
+		msgb = make([]byte, buflen)
+		if _, err := io.ReadFull(lf, msgb); err != nil {
+			t.Logf("%s", debug.Stack())
+			t.Fatalf("failed to read chunk into buffer")
+		}
+		ok = recvd
 	case <-time.After(time.Millisecond * 100):
+		t.Logf("%s", debug.Stack())
 		t.Fatalf("timed out waiting for message %d on channel", expectedID)
 	}
 
@@ -264,12 +278,12 @@ func TestEventQReadFilePartitions(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		truncated := msg[:len(msg)-(10%(i+1))]
 		id := i + 1
+		t.Logf("checking id %d", id)
+
 		idStr := fmt.Sprintf("%d", id)
-
-		// log.Printf("Reading id %d", id)
-
 		cmd := NewCommand(CmdRead, []byte(idStr), []byte("1"))
 		resp, err := q.pushCommand(cmd)
+
 		checkNoErrAndSuccess(t, resp, err)
 		checkMessageReceived(t, resp, uint64(id), truncated)
 		checkEOF(t, resp)

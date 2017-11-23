@@ -96,14 +96,14 @@ func (q *eventQ) loop() {
 				q.handleSleep(cmd)
 			case CmdShutdown:
 				if err := q.handleShutdown(cmd); err != nil {
-					cmd.respC <- newResponse(RespErr)
+					cmd.respond(newResponse(RespErr))
 				} else {
-					cmd.respC <- newResponse(RespOK)
+					cmd.respond(newResponse(RespOK))
 					// close(q.close)
 					// close(q.in)
 				}
 			default:
-				cmd.respC <- newResponse(RespErr)
+				cmd.respond(newResponse(RespErr))
 			}
 		case <-q.close:
 			return
@@ -234,7 +234,7 @@ func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 			}
 			panic(err)
 		}
-		resp.chunkC <- lf
+		resp.sendChunk(lf)
 	}
 	// fmt.Println(startID, limit, end)
 
@@ -263,7 +263,7 @@ func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 	if limit == 0 { // read forever
 		q.subscriptions[cmd.respC] = newSubscription(resp.msgC, cmd.done)
 	} else {
-		resp.msgC <- newProtocolWriter().writeResponse(newResponse(RespEOF))
+		resp.sendBytes(newProtocolWriter().writeResponse(newResponse(RespEOF)))
 		cmd.finish()
 	}
 }

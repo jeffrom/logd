@@ -1,5 +1,7 @@
 package logd
 
+import "fmt"
+
 // RespType is the response status return type
 type RespType uint8
 
@@ -77,4 +79,14 @@ func (r *Response) Bytes() []byte {
 
 func (r *Response) String() string {
 	return string(r.Bytes())
+}
+
+func (r *Response) sendChunk(lf logReadableFile) {
+	fmt.Printf("<-chunk\n")
+	r.chunkC <- lf
+}
+
+func (r *Response) sendBytes(b []byte) {
+	fmt.Printf("<-bytes %q (response)", b)
+	r.msgC <- b
 }
