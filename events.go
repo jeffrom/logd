@@ -213,12 +213,6 @@ func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 	cmd.respond(resp)
 
 	log := q.log.Copy()
-	if manager, ok := log.(logManager); ok {
-		if err := manager.Setup(); err != nil {
-			panic(err)
-		}
-		defer manager.Shutdown()
-	}
 
 	if err := log.SeekToID(startID); err != nil {
 		panic(err)

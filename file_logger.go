@@ -167,6 +167,11 @@ func (l *fileLogger) SeekToID(id uint64) error {
 }
 
 func (l *fileLogger) getPartOffset(id uint64) (uint64, int64, error) {
+	if l.index == nil {
+		if err := l.getNewIndex(); err != nil {
+			return 0, 0, err
+		}
+	}
 	part, offset := l.index.Get(id)
 	debugf(l.config, "index.Get(%d) -> (part %d, offset %d)", id, part, offset)
 
@@ -254,13 +259,13 @@ func (l *fileLogger) Copy() Logger {
 // io.Reader which reads a chunk of log lines. the final reader will close the
 // files in the iterator and return io.EOF
 func (l *fileLogger) Range(start, end uint64) (*partitionIterator, error) {
-	l = newFileLogger(l.config)
-	currpart, curroff, perr := l.getPartOffset(start)
+	lcopy := newFileLogger(l.config)
+	currpart, curroff, perr := lcopy.getPartOffset(start)
 	if perr != nil {
 		return nil, perr
 	}
 
-	otherl := newFileLogger(l.config)
+	otherl := newFileLogger(lcopy.config)
 	endpart, endoff, err := otherl.getPartOffset(end)
 	if err != nil {
 		return nil, err
@@ -299,6 +304,11 @@ func (l *fileLogger) Range(start, end uint64) (*partitionIterator, error) {
 		closers = append(closers, f.Close)
 	}
 
+	// set the original logger to the current HEAD
+	if err := l.SeekToID(end); err != nil {
+		return nil, err
+	}
+
 	return l.rangeIterator(readers, closers), nil
 }
 
@@ -311,7 +321,7 @@ func partitionIteratorFunc(next func() (io.Reader, error)) *partitionIterator {
 }
 
 func (l *fileLogger) rangeIterator(readers []io.Reader, closers []func() error) *partitionIterator {
-	fn := func() (io.Reader, error) {
+	return partitionIteratorFunc(func() (io.Reader, error) {
 		var r io.Reader
 		if len(readers) == 0 {
 			closeAll(closers)
@@ -330,9 +340,7 @@ func (l *fileLogger) rangeIterator(readers []io.Reader, closers []func() error) 
 
 		r, readers = readers[0], readers[1:]
 		return r, nil
-	}
-
-	return partitionIteratorFunc(fn)
+	})
 }
 
 func closeAll(closers []func() error) error {
