@@ -46,6 +46,7 @@ type logReadableFile interface {
 	io.Closer
 	SetLimit(limit int64)
 	SizeLimit() (int64, int64)
+	AsFile() *os.File
 }
 
 type logWriteableFile interface {
@@ -92,4 +93,8 @@ func (lf *logFile) SizeLimit() (size int64, limit int64) {
 	stat, err := lf.Stat()
 	panicOnError(err)
 	return stat.Size(), 0
+}
+
+func (lf *logFile) AsFile() *os.File {
+	return lf.File
 }
