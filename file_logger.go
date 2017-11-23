@@ -129,7 +129,6 @@ func (l *fileLogger) Read(b []byte) (int, error) {
 	var read int
 	for {
 		var n int
-		fmt.Printf("Read() %+v\n", l.parts.r)
 		n, err = l.parts.r.Read(b[read:])
 		// fmt.Printf("total buf(%d):\n\"%s\"curr: \"%s\"\nerr: %v\n", len(b), b, b[read:], err)
 		read += n
@@ -174,7 +173,6 @@ func (l *fileLogger) getPartOffset(id uint64) (uint64, int64, error) {
 		}
 	}
 	part, offset := l.index.Get(id)
-	debugf(l.config, "index.Get(%d) -> (part %d, offset %d)", id, part, offset)
 
 	if err := l.parts.setReadHandle(part); err != nil {
 		return part, 0, errors.Wrap(err, "failed setting read handle")
@@ -259,7 +257,7 @@ func (l *fileLogger) Copy() Logger {
 // maybe wrapped with an io.LimitReader, and at a seek position, or b) an
 // io.Reader which reads a chunk of log lines. the final reader will close the
 // files in the iterator and return io.EOF
-func (l *fileLogger) Range(start, end uint64) (logRangeIterator, error) {
+func (l *fileLogger) shittyRange(start, end uint64) (*fileLogger, error) {
 	lcopy := newFileLogger(l.config)
 	currpart, curroff, perr := lcopy.getPartOffset(start)
 	if perr != nil {
@@ -318,45 +316,89 @@ func (l *fileLogger) Range(start, end uint64) (logRangeIterator, error) {
 		return nil, err
 	}
 
-	return l.rangeIterator(sizes, readers, closers), nil
+	return nil, nil
+	// return l.rangeIterator(sizes, readers, closers), nil
+}
+
+func (l *fileLogger) Range(start, end uint64) (logRangeIterator, error) {
+	debugf(l.config, "Range(%d, %d)", start, end)
+
+	lcopy := newFileLogger(l.config)
+	endpart, endoff, pcerr := lcopy.getPartOffset(end)
+	fmt.Println("first err", pcerr)
+	if pcerr != nil {
+		return nil, pcerr
+	}
+
+	currpart, curroff, perr := l.getPartOffset(start)
+	fmt.Println("second err", perr)
+	if perr != nil {
+		return nil, perr
+	}
+
+	if _, serr := l.parts.r.Seek(curroff, io.SeekStart); serr != nil {
+		return nil, errors.Wrap(serr, "failed to seek log in range query")
+	}
+
+	var lf logReadableFile
+	fn := func() (logReadableFile, error) {
+		if lf != nil {
+			currpart++
+			if currpart >= l.parts.head() {
+				return nil, io.EOF
+			}
+			if err := l.parts.setReadHandle(currpart); err != nil {
+				return nil, err
+			}
+		}
+		lf = l.parts.r
+
+		if currpart == endpart {
+			lf.SetLimit(endoff)
+		}
+
+		// use the current partition, which is seeked to `start`
+		return lf, nil
+	}
+	return partitionIteratorFunc(fn), nil
 }
 
 type partitionIterator struct {
-	next func() (int64, io.Reader, error)
+	next func() (logReadableFile, error)
 }
 
-func partitionIteratorFunc(next func() (int64, io.Reader, error)) *partitionIterator {
+func partitionIteratorFunc(next func() (logReadableFile, error)) *partitionIterator {
 	return &partitionIterator{next: next}
 }
 
-func (pi *partitionIterator) Next() (int64, io.Reader, error) {
+func (pi *partitionIterator) Next() (logReadableFile, error) {
 	return pi.next()
 }
 
-func (l *fileLogger) rangeIterator(sizes []int64, readers []io.Reader, closers []func() error) *partitionIterator {
-	return partitionIteratorFunc(func() (int64, io.Reader, error) {
-		var r io.Reader
-		var size int64
-		if len(readers) == 0 {
-			closeAll(closers)
-			return 0, nil, io.EOF
-		}
+// func (l *fileLogger) rangeIterator(sizes []int64, readers []io.Reader, closers []func() error) *partitionIterator {
+// 	return partitionIteratorFunc(func() (int64, io.Reader, error) {
+// 		var r io.Reader
+// 		var size int64
+// 		if len(readers) == 0 {
+// 			closeAll(closers)
+// 			return 0, nil, io.EOF
+// 		}
 
-		// close the previous reader
-		if len(closers) > len(readers) {
-			var closer func() error
-			closer, closers = closers[0], closers[1:]
-			if err := closer(); err != nil {
-				closeAll(closers)
-				return 0, nil, err
-			}
-		}
+// 		// close the previous reader
+// 		if len(closers) > len(readers) {
+// 			var closer func() error
+// 			closer, closers = closers[0], closers[1:]
+// 			if err := closer(); err != nil {
+// 				closeAll(closers)
+// 				return 0, nil, err
+// 			}
+// 		}
 
-		r, readers = readers[0], readers[1:]
-		size, sizes = sizes[0], sizes[1:]
-		return size, r, nil
-	})
-}
+// 		r, readers = readers[0], readers[1:]
+// 		size, sizes = sizes[0], sizes[1:]
+// 		return size, r, nil
+// 	})
+// }
 
 func closeAll(closers []func() error) error {
 	var firstErr error

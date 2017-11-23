@@ -39,24 +39,22 @@ func (p *filePartitions) Write(b []byte) (int, error) {
 func (p *filePartitions) shutdown() error {
 	var firstErr error
 
-	// if err := p.w.Close(); err != nil {
-	// 	err = errors.Wrap(err, "failed closing writeable file during shutdown")
-	// 	log.Printf("%+v", err)
-	// 	if firstErr == nil {
-	// 		firstErr = err
-	// 	}
-	// }
+	if err := p.w.Close(); err != nil {
+		err = errors.Wrap(err, "failed closing writeable file during shutdown")
+		log.Printf("%+v", err)
+		if firstErr == nil {
+			firstErr = err
+		}
+	}
 
-	// if err := p.r.Close(); err != nil {
-	// 	err = errors.Wrap(err, "failed closing readable file during shutdown")
-	// 	log.Printf("%+v", err)
-	// 	if firstErr == nil {
-	// 		firstErr = err
-	// 	}
-	// }
+	if err := p.r.Close(); err != nil {
+		err = errors.Wrap(err, "failed closing readable file during shutdown")
+		log.Printf("%+v", err)
+		if firstErr == nil {
+			firstErr = err
+		}
+	}
 
-	p.w.Close()
-	p.r.Close()
 	return firstErr
 }
 
@@ -127,7 +125,7 @@ func (p *filePartitions) setWriteHandle(n uint64) error {
 }
 
 func (p *filePartitions) setReadHandle(n uint64) error {
-	debugf(p.config, "setReadHandle(%d)", n)
+	debugf(p.config, "setReadHandle(%d->%d)", p.currReadPart, n)
 	if n == p.currReadPart && p.r != nil {
 		return nil
 	}
@@ -145,7 +143,7 @@ func (p *filePartitions) setReadHandle(n uint64) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to open log for reading")
 	}
-	p.r = r
+	p.r = newLogFile(r)
 	return nil
 }
 

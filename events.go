@@ -210,7 +210,7 @@ func (q *eventQ) handleRead(cmd *Command) {
 func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 	resp := newResponse(RespOK)
 	resp.msgC = make(chan []byte)
-	resp.chunkC = make(chan io.Reader)
+	resp.chunkC = make(chan logReadableFile)
 	cmd.respond(resp)
 
 	end := startID + limit
@@ -227,14 +227,14 @@ func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 	}
 
 	for {
-		_, r, err := iterator.Next()
+		lf, err := iterator.Next()
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
 			panic(err)
 		}
-		resp.chunkC <- r
+		resp.chunkC <- lf
 	}
 	// fmt.Println(startID, limit, end)
 

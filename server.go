@@ -343,8 +343,26 @@ func (s *SocketServer) handleSubscriber(conn *conn, cmd *Command, resp *Response
 
 	for {
 		select {
-		case <-resp.chunkC:
+		case lf := <-resp.chunkC:
+			size, limit := lf.SizeLimit()
+			buflen := size
+			if limit > 0 {
+				buflen = limit
+			}
 
+			if _, err := conn.write([]byte(fmt.Sprintf("+%d\r\n", buflen))); err != nil {
+				log.Printf("%s: %+v", conn.RemoteAddr(), err)
+				return
+			}
+
+			conn.mu.Lock()
+			debugf(s.config, "sending partition as chunk to %s", conn.RemoteAddr())
+			if _, err := conn.Conn.(*net.TCPConn).ReadFrom(lf); err != nil {
+				log.Printf("%s: %+v", conn.RemoteAddr(), err)
+				conn.mu.Unlock()
+				return
+			}
+			conn.mu.Unlock()
 		case msg := <-resp.msgC:
 			if _, err := conn.write(msg); err != nil {
 				log.Printf("%s: %+v", conn.RemoteAddr(), err)

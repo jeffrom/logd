@@ -2,6 +2,7 @@ package logd
 
 import (
 	"io"
+	"os"
 )
 
 // Logger handles reading from and writing to the log
@@ -43,6 +44,8 @@ type logReplicator interface {
 type logReadableFile interface {
 	io.ReadSeeker
 	io.Closer
+	SetLimit(limit int64)
+	SizeLimit() (int64, int64)
 }
 
 type logWriteableFile interface {
@@ -66,5 +69,27 @@ type logRanger interface {
 }
 
 type logRangeIterator interface {
-	Next() (int64, io.Reader, error)
+	Next() (logReadableFile, error)
+}
+
+type logFile struct {
+	*os.File
+	limit int64
+}
+
+func newLogFile(f *os.File) *logFile {
+	return &logFile{File: f}
+}
+
+func (lf *logFile) SetLimit(limit int64) {
+	lf.limit = limit
+}
+
+func (lf *logFile) SizeLimit() (size int64, limit int64) {
+	if lf.limit > 0 {
+		return 0, lf.limit
+	}
+	stat, err := lf.Stat()
+	panicOnError(err)
+	return stat.Size(), 0
 }

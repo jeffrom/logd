@@ -115,6 +115,7 @@ func (idx *fileIndex) Get(id uint64) (uint64, uint64) {
 		curr = c
 	}
 
+	debugf(idx.config, "index.Get(%d) -> (part %d, offset %d)", id, curr.part, curr.offset)
 	return curr.part, curr.offset
 }
 

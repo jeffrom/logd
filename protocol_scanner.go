@@ -100,11 +100,12 @@ func (ps *ProtocolScanner) readMessage() (int, *Message, error) {
 	}
 	read += 2 // \r\n
 
+	if bytes.Equal(line, []byte("+EOF")) {
+		return read, nil, io.EOF
+	}
+
 	parts := bytes.SplitN(line, []byte(" "), 4)
 	if len(parts) != 4 {
-		// if len(parts) == 1 && bytes.Equal(parts[0], []byte("+EOF")) {
-		// 	return nil, io.EOF
-		// }
 		return read, nil, errInvalidProtocolLine
 	}
 
