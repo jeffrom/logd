@@ -24,6 +24,7 @@ type logReader interface {
 	SeekToID(id uint64) error
 	Head() (uint64, error)
 	Copy() Logger
+	Range(start, end uint64) (logRangeIterator, error)
 }
 
 type logScannable interface {
@@ -65,5 +66,5 @@ type logRanger interface {
 }
 
 type logRangeIterator interface {
-	Next() (io.Reader, error)
+	Next() (int64, io.Reader, error)
 }

@@ -1,5 +1,7 @@
 package logd
 
+import "io"
+
 // RespType is the response status return type
 type RespType uint8
 
@@ -52,6 +54,7 @@ type Response struct {
 	ID     uint64
 	body   []byte
 	msgC   chan []byte
+	chunkC chan io.Reader
 }
 
 func newResponse(status RespType) *Response {

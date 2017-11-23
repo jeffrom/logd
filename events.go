@@ -210,17 +210,36 @@ func (q *eventQ) handleRead(cmd *Command) {
 func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 	resp := newResponse(RespOK)
 	resp.msgC = make(chan []byte)
+	resp.chunkC = make(chan io.Reader)
 	cmd.respond(resp)
 
-	log := q.log.Copy()
-
-	if err := log.SeekToID(startID); err != nil {
+	end := startID + limit
+	if limit == 0 {
+		head, err := q.log.Head()
+		if err != nil {
+			panic(err)
+		}
+		end = head
+	}
+	iterator, err := q.log.Range(startID, end)
+	if err != nil {
 		panic(err)
 	}
 
+	for {
+		_, r, err := iterator.Next()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			panic(err)
+		}
+		resp.chunkC <- r
+	}
+	// fmt.Println(startID, limit, end)
+
 	numMsg := 0
-	// scanner := newFileLogScanner(q.config, log)
-	scanner := newProtocolScanner(q.config, log)
+	scanner := newProtocolScanner(q.config, q.log)
 	// TODO chunking, scanner interface
 	for scanner.Scan() {
 		msg := scanner.Message()

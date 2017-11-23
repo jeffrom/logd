@@ -129,6 +129,7 @@ func (l *fileLogger) Read(b []byte) (int, error) {
 	var read int
 	for {
 		var n int
+		fmt.Printf("Read() %+v\n", l.parts.r)
 		n, err = l.parts.r.Read(b[read:])
 		// fmt.Printf("total buf(%d):\n\"%s\"curr: \"%s\"\nerr: %v\n", len(b), b, b[read:], err)
 		read += n
@@ -258,7 +259,7 @@ func (l *fileLogger) Copy() Logger {
 // maybe wrapped with an io.LimitReader, and at a seek position, or b) an
 // io.Reader which reads a chunk of log lines. the final reader will close the
 // files in the iterator and return io.EOF
-func (l *fileLogger) Range(start, end uint64) (*partitionIterator, error) {
+func (l *fileLogger) Range(start, end uint64) (logRangeIterator, error) {
 	lcopy := newFileLogger(l.config)
 	currpart, curroff, perr := lcopy.getPartOffset(start)
 	if perr != nil {
@@ -271,9 +272,10 @@ func (l *fileLogger) Range(start, end uint64) (*partitionIterator, error) {
 		return nil, err
 	}
 
-	lr := l.parts.r
+	lr := lcopy.parts.r
 	startr := lr.(io.Reader)
 	closer := lr.Close
+	size := currSize(lr)
 	if _, serr := lr.Seek(curroff, io.SeekStart); serr != nil {
 		return nil, errors.Wrap(serr, "failed to seek log in range query")
 	}
@@ -282,6 +284,7 @@ func (l *fileLogger) Range(start, end uint64) (*partitionIterator, error) {
 		startr = io.LimitReader(lr, endoff-curroff)
 	}
 
+	var sizes = []int64{size}
 	var closers = []func() error{closer}
 	var readers = []io.Reader{startr}
 
@@ -296,10 +299,16 @@ func (l *fileLogger) Range(start, end uint64) (*partitionIterator, error) {
 			return nil, errors.Wrap(err, "failed to open log for range query")
 		}
 
+		stat, err := f.Stat()
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to stat partition file")
+		}
+
 		if currpart == endpart {
 			r = io.LimitReader(r, endoff)
 		}
 
+		sizes = append(sizes, stat.Size())
 		readers = append(readers, r)
 		closers = append(closers, f.Close)
 	}
@@ -309,23 +318,28 @@ func (l *fileLogger) Range(start, end uint64) (*partitionIterator, error) {
 		return nil, err
 	}
 
-	return l.rangeIterator(readers, closers), nil
+	return l.rangeIterator(sizes, readers, closers), nil
 }
 
 type partitionIterator struct {
-	next func() (io.Reader, error)
+	next func() (int64, io.Reader, error)
 }
 
-func partitionIteratorFunc(next func() (io.Reader, error)) *partitionIterator {
+func partitionIteratorFunc(next func() (int64, io.Reader, error)) *partitionIterator {
 	return &partitionIterator{next: next}
 }
 
-func (l *fileLogger) rangeIterator(readers []io.Reader, closers []func() error) *partitionIterator {
-	return partitionIteratorFunc(func() (io.Reader, error) {
+func (pi *partitionIterator) Next() (int64, io.Reader, error) {
+	return pi.next()
+}
+
+func (l *fileLogger) rangeIterator(sizes []int64, readers []io.Reader, closers []func() error) *partitionIterator {
+	return partitionIteratorFunc(func() (int64, io.Reader, error) {
 		var r io.Reader
+		var size int64
 		if len(readers) == 0 {
 			closeAll(closers)
-			return nil, io.EOF
+			return 0, nil, io.EOF
 		}
 
 		// close the previous reader
@@ -334,12 +348,13 @@ func (l *fileLogger) rangeIterator(readers []io.Reader, closers []func() error) 
 			closer, closers = closers[0], closers[1:]
 			if err := closer(); err != nil {
 				closeAll(closers)
-				return nil, err
+				return 0, nil, err
 			}
 		}
 
 		r, readers = readers[0], readers[1:]
-		return r, nil
+		size, sizes = sizes[0], sizes[1:]
+		return size, r, nil
 	})
 }
 
@@ -424,4 +439,10 @@ func CheckIndex(config *Config) error {
 		}
 	}
 	return nil
+}
+
+func currSize(r io.Reader) int64 {
+	info, err := r.(*os.File).Stat()
+	panicOnError(err)
+	return info.Size()
 }

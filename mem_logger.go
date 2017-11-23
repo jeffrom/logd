@@ -87,3 +87,7 @@ func (l *memLogger) Copy() Logger {
 	ml.messages = l.messages
 	return ml
 }
+
+func (l *memLogger) Range(start, end uint64) (logRangeIterator, error) {
+	return nil, nil
+}
