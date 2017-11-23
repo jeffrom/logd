@@ -253,16 +253,96 @@ func (l *fileLogger) Copy() Logger {
 // maybe wrapped with an io.LimitReader, and at a seek position, or b) an
 // io.Reader which reads a chunk of log lines. the final reader will close the
 // files in the iterator and return io.EOF
-func (l *fileLogger) Range(start, end uint64) (func() (io.Reader, error), error) {
-	// part, off, err := l.getPartOffset(start)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	fn := func() (io.Reader, error) {
-		return nil, nil
+func (l *fileLogger) Range(start, end uint64) (*partitionIterator, error) {
+	l = newFileLogger(l.config)
+	currpart, curroff, perr := l.getPartOffset(start)
+	if perr != nil {
+		return nil, perr
 	}
-	return fn, nil
+
+	otherl := newFileLogger(l.config)
+	endpart, endoff, err := otherl.getPartOffset(end)
+	if err != nil {
+		return nil, err
+	}
+
+	lr := l.parts.r
+	startr := lr.(io.Reader)
+	closer := lr.Close
+	if _, serr := lr.Seek(curroff, io.SeekStart); serr != nil {
+		return nil, errors.Wrap(serr, "failed to seek log in range query")
+	}
+
+	if currpart == endpart {
+		startr = io.LimitReader(lr, endoff-curroff)
+	}
+
+	var closers = []func() error{closer}
+	var readers = []io.Reader{startr}
+
+	// TODO use filePartitions. it already handles the closing logic. and we
+	// wont need to open all these file handles up front either.
+	var r io.Reader
+	for currpart < endpart {
+		currpart++
+		f, ferr := os.Open(l.parts.logFilePath(currpart))
+		r = f
+		if ferr != nil {
+			return nil, errors.Wrap(err, "failed to open log for range query")
+		}
+
+		if currpart == endpart {
+			r = io.LimitReader(r, endoff)
+		}
+
+		readers = append(readers, r)
+		closers = append(closers, f.Close)
+	}
+
+	return l.rangeIterator(readers, closers), nil
+}
+
+type partitionIterator struct {
+	next func() (io.Reader, error)
+}
+
+func partitionIteratorFunc(next func() (io.Reader, error)) *partitionIterator {
+	return &partitionIterator{next: next}
+}
+
+func (l *fileLogger) rangeIterator(readers []io.Reader, closers []func() error) *partitionIterator {
+	fn := func() (io.Reader, error) {
+		var r io.Reader
+		if len(readers) == 0 {
+			closeAll(closers)
+			return nil, io.EOF
+		}
+
+		// close the previous reader
+		if len(closers) > len(readers) {
+			var closer func() error
+			closer, closers = closers[0], closers[1:]
+			if err := closer(); err != nil {
+				closeAll(closers)
+				return nil, err
+			}
+		}
+
+		r, readers = readers[0], readers[1:]
+		return r, nil
+	}
+
+	return partitionIteratorFunc(fn)
+}
+
+func closeAll(closers []func() error) error {
+	var firstErr error
+	for _, closer := range closers {
+		if err := closer(); err != nil {
+			firstErr = err
+		}
+	}
+	return firstErr
 }
 
 func (l *fileLogger) getNewIndex() error {

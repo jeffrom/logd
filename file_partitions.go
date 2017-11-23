@@ -134,7 +134,9 @@ func (p *filePartitions) setReadHandle(n uint64) error {
 	path := p.logFilePath(n)
 
 	if p.r != nil {
-		p.r.Close()
+		if err := p.r.Close(); err != nil {
+			log.Printf("failed to close partition #%d: %+v", p.currReadPart, err)
+		}
 	}
 
 	p.currReadPart = n

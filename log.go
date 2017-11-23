@@ -59,3 +59,11 @@ type logScanner interface {
 	Message() *Message
 	Error() error
 }
+
+type logRanger interface {
+	Range(start, end uint64) (logRangeIterator, error)
+}
+
+type logRangeIterator interface {
+	Next() (io.Reader, error)
+}
