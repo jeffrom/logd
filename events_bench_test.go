@@ -85,7 +85,7 @@ func BenchmarkEventQReadOne(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		resp, _ := q.pushCommand(NewCommand(CmdRead, []byte("1"), []byte("1")))
-		<-resp.msgC
+		<-resp.readerC
 	}
 }
 
@@ -99,7 +99,7 @@ func BenchmarkEventQReadFromHeadOne(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		q.pushCommand(NewCommand(CmdMessage, msg))
-		<-resp.msgC
+		<-resp.readerC
 	}
 }
 
@@ -119,7 +119,7 @@ func BenchmarkEventQReadFromHeadTen(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		q.pushCommand(NewCommand(CmdMessage, msg))
 		for _, resp := range subs {
-			<-resp.msgC
+			<-resp.readerC
 		}
 	}
 }

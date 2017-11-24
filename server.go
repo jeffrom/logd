@@ -351,11 +351,6 @@ func (s *SocketServer) handleSubscriber(conn *conn, cmd *Command, resp *Response
 				return
 			}
 			conn.mu.Unlock()
-		case msg := <-resp.msgC:
-			if _, err := conn.write(msg); err != nil {
-				log.Printf("%s: %+v", conn.RemoteAddr(), err)
-				return
-			}
 		case <-cmd.done:
 			conn.write([]byte("+EOF\r\n"))
 			return

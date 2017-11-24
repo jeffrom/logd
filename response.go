@@ -57,7 +57,6 @@ type Response struct {
 	Status  RespType
 	ID      uint64
 	body    []byte
-	msgC    chan []byte
 	readerC chan io.Reader
 }
 

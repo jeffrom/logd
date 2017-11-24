@@ -75,9 +75,6 @@ func checkMessageReceived(t *testing.T, resp *Response, expectedID uint64, expec
 		}
 		msgb = b
 		ok = recvd
-	case b, recvd := <-resp.msgC:
-		msgb = b
-		ok = recvd
 	case <-time.After(time.Millisecond * 100):
 		t.Logf("%s", debug.Stack())
 		t.Fatalf("timed out waiting for message %d on channel", expectedID)
@@ -105,7 +102,12 @@ func checkMessageReceived(t *testing.T, resp *Response, expectedID uint64, expec
 
 func checkEOF(t *testing.T, resp *Response) {
 	select {
-	case b, recvd := <-resp.msgC:
+	case r, recvd := <-resp.readerC:
+		b, err := ioutil.ReadAll(r)
+		if err != nil {
+			t.Fatalf("error reading response: %+v", err)
+		}
+
 		if !recvd {
 			t.Fatal("Expected +EOF but received nothing")
 		}

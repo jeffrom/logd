@@ -210,7 +210,6 @@ func (q *eventQ) handleRead(cmd *Command) {
 func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 	resp := newResponse(RespOK)
 	resp.readerC = make(chan io.Reader)
-	resp.msgC = make(chan []byte)
 	cmd.respond(resp)
 
 	end := startID + limit
