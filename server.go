@@ -343,6 +343,14 @@ func (s *SocketServer) handleSubscriber(conn *conn, cmd *Command, resp *Response
 
 	for {
 		select {
+		case r := <-resp.readerC:
+			conn.mu.Lock()
+			if _, err := conn.Conn.(*net.TCPConn).ReadFrom(r); err != nil {
+				log.Printf("%s: %+v", conn.RemoteAddr(), err)
+				conn.mu.Unlock()
+				return
+			}
+			conn.mu.Unlock()
 		case lf := <-resp.chunkC:
 			size, limit := lf.SizeLimit()
 			buflen := size

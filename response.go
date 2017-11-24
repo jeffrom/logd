@@ -1,6 +1,10 @@
 package logd
 
-import "fmt"
+import (
+	"bytes"
+	"fmt"
+	"io"
+)
 
 // RespType is the response status return type
 type RespType uint8
@@ -50,11 +54,12 @@ func (resp RespType) String() string {
 
 // Response is returned to the caller
 type Response struct {
-	Status RespType
-	ID     uint64
-	body   []byte
-	msgC   chan []byte
-	chunkC chan logReadableFile
+	Status  RespType
+	ID      uint64
+	body    []byte
+	msgC    chan []byte
+	chunkC  chan logReadableFile
+	readerC chan io.Reader
 }
 
 func newResponse(status RespType) *Response {
@@ -82,11 +87,20 @@ func (r *Response) String() string {
 }
 
 func (r *Response) sendChunk(lf logReadableFile) {
-	fmt.Printf("<-chunk\n")
-	r.chunkC <- lf
+	fmt.Printf("<-readerC\n")
+	size, limit := lf.SizeLimit()
+	buflen := size
+	if limit > 0 {
+		buflen = limit
+	}
+
+	reader := bytes.NewReader([]byte(fmt.Sprintf("+%d\r\n", buflen)))
+	r.readerC <- reader
+	r.readerC <- io.LimitReader(lf.AsFile(), buflen)
 }
 
 func (r *Response) sendBytes(b []byte) {
-	fmt.Printf("<-bytes %q (response)", b)
-	r.msgC <- b
+	fmt.Printf("<-readerC %q (response)\n", b)
+	reader := bytes.NewReader(b)
+	r.readerC <- reader
 }

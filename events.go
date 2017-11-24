@@ -209,11 +209,12 @@ func (q *eventQ) handleRead(cmd *Command) {
 
 func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 	resp := newResponse(RespOK)
+	resp.readerC = make(chan io.Reader)
 	resp.msgC = make(chan []byte)
 	resp.chunkC = make(chan logReadableFile)
 	cmd.respond(resp)
 
-	end := startID + (limit + 1)
+	end := startID + limit
 	if limit == 0 {
 		head, err := q.log.Head()
 		if err != nil {
