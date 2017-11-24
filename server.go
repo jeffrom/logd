@@ -352,7 +352,7 @@ func (s *SocketServer) handleSubscriber(conn *conn, cmd *Command, resp *Response
 			}
 			conn.mu.Unlock()
 		case <-cmd.done:
-			conn.write([]byte("+EOF\r\n"))
+			// conn.write([]byte("+EOF\r\n"))
 			return
 		}
 	}
