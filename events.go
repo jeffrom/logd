@@ -211,7 +211,6 @@ func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 	resp := newResponse(RespOK)
 	resp.readerC = make(chan io.Reader)
 	resp.msgC = make(chan []byte)
-	resp.chunkC = make(chan logReadableFile)
 	cmd.respond(resp)
 
 	end := startID + limit
@@ -222,6 +221,7 @@ func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 		}
 		end = head
 	}
+
 	iterator, err := q.log.Range(startID, end)
 	if err != nil {
 		panic(err)
@@ -239,7 +239,7 @@ func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 	}
 
 	if limit == 0 { // read forever
-		q.subscriptions[cmd.respC] = newSubscription(resp.msgC, cmd.done)
+		q.subscriptions[cmd.respC] = newSubscription(resp.readerC, cmd.done)
 	} else {
 		resp.sendBytes(newProtocolWriter().writeResponse(newResponse(RespEOF)))
 		cmd.finish()

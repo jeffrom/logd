@@ -58,7 +58,6 @@ type Response struct {
 	ID      uint64
 	body    []byte
 	msgC    chan []byte
-	chunkC  chan logReadableFile
 	readerC chan io.Reader
 }
 
@@ -87,12 +86,13 @@ func (r *Response) String() string {
 }
 
 func (r *Response) sendChunk(lf logReadableFile) {
-	fmt.Printf("<-readerC\n")
 	size, limit := lf.SizeLimit()
 	buflen := size
 	if limit > 0 {
 		buflen = limit
 	}
+
+	fmt.Printf("<-readerC %d byte chunk\n", buflen)
 
 	reader := bytes.NewReader([]byte(fmt.Sprintf("+%d\r\n", buflen)))
 	r.readerC <- reader

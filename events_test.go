@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"path"
 	"runtime/debug"
@@ -69,20 +68,15 @@ func checkMessageReceived(t *testing.T, resp *Response, expectedID uint64, expec
 	var msgb []byte
 	var ok bool
 	select {
-	case b, recvd := <-resp.msgC:
+	case r, recvd := <-resp.readerC:
+		b, err := ioutil.ReadAll(r)
+		if err != nil {
+			t.Fatalf("error reading response: %+v", err)
+		}
 		msgb = b
 		ok = recvd
-	case lf, recvd := <-resp.chunkC:
-		size, limit := lf.SizeLimit()
-		buflen := size
-		if limit > 0 {
-			buflen = limit
-		}
-		msgb = make([]byte, buflen)
-		if _, err := io.ReadFull(lf, msgb); err != nil {
-			t.Logf("%s", debug.Stack())
-			t.Fatalf("failed to read chunk into buffer")
-		}
+	case b, recvd := <-resp.msgC:
+		msgb = b
 		ok = recvd
 	case <-time.After(time.Millisecond * 100):
 		t.Logf("%s", debug.Stack())

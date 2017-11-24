@@ -195,10 +195,10 @@ Loop:
 		for scanner.Scan() {
 			msg := scanner.Message()
 			// fmt.Println(scanner.Error(), msg.String())
-			if msg.ID == id-1 {
+			if msg.ID == id {
 				break Loop
 			}
-			if msg.ID > id-1 {
+			if msg.ID > id {
 				return part, 0, errors.New("failed to scan to id")
 			}
 		}

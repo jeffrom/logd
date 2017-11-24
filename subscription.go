@@ -1,23 +1,27 @@
 package logd
 
-import "fmt"
+import (
+	"bytes"
+	"fmt"
+	"io"
+)
 
 // Subscription is used to tail logs
 type Subscription struct {
-	msgC chan []byte
-	done chan struct{}
+	readerC chan io.Reader
+	done    chan struct{}
 }
 
-func newSubscription(msgC chan []byte, done chan struct{}) *Subscription {
+func newSubscription(readerC chan io.Reader, done chan struct{}) *Subscription {
 	return &Subscription{
-		msgC: msgC,
-		done: done,
+		readerC: readerC,
+		done:    done,
 	}
 }
 
 func (subs *Subscription) send(msg []byte) {
 	fmt.Printf("<-bytes %q (subscription)\n", msg)
-	subs.msgC <- msg
+	subs.readerC <- bytes.NewReader(msg)
 }
 
 func (subs *Subscription) finish() {
