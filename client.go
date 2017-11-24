@@ -116,7 +116,7 @@ func (c *Client) readScanResponse() (*ProtocolScanner, error) {
 func (c *Client) Close() error {
 	debugf(c.config, "closing %s->%s", c.conn.LocalAddr(), c.conn.RemoteAddr())
 
-	err := c.writeCommand(NewCommand(CmdClose))
+	err := c.writeCommand(NewCommand(c.config, CmdClose))
 	if c.handleErr(err) != nil {
 		log.Printf("close error: %s", err)
 		c.conn.Close()
@@ -165,7 +165,7 @@ func (c *Client) Do(cmds ...*Command) (*Response, error) {
 // bufio.Scanner
 func (c *Client) DoRead(id uint64, limit int) (*ProtocolScanner, error) {
 	debugf(c.config, "DoRead(%d, %d)", id, limit)
-	cmd := NewCommand(CmdRead,
+	cmd := NewCommand(c.config, CmdRead,
 		[]byte(fmt.Sprintf("%d", id)),
 		[]byte(fmt.Sprintf("%d", limit)),
 	)
@@ -182,7 +182,7 @@ func (c *Client) DoRead(id uint64, limit int) (*ProtocolScanner, error) {
 }
 
 func (c *Client) Write(p []byte) (int, error) {
-	if err := c.writeCommand(NewCommand(CmdMessage, p)); c.handleErr(err) != nil {
+	if err := c.writeCommand(NewCommand(c.config, CmdMessage, p)); c.handleErr(err) != nil {
 		return 0, err
 	}
 	return len(p), nil

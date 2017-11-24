@@ -66,7 +66,7 @@ func cmdAction(config *logd.Config, cmd logd.CmdType) func(c *cli.Context) error
 		defer client.Close()
 
 		if len(c.Args()) > 0 {
-			resp, err := client.Do(logd.NewCommand(cmd, toBytes(c.Args())...))
+			resp, err := client.Do(logd.NewCommand(config, cmd, toBytes(c.Args())...))
 			if err != nil {
 				return cli.NewExitError(err, 1)
 			}
@@ -75,7 +75,7 @@ func cmdAction(config *logd.Config, cmd logd.CmdType) func(c *cli.Context) error
 				return err
 			}
 		} else if cmd != logd.CmdMessage {
-			resp, err := client.Do(logd.NewCommand(cmd))
+			resp, err := client.Do(logd.NewCommand(config, cmd))
 			if err != nil {
 				if err == io.EOF && cmd == logd.CmdShutdown {
 					return nil
@@ -98,7 +98,7 @@ func cmdAction(config *logd.Config, cmd logd.CmdType) func(c *cli.Context) error
 		scanner.Split(bufio.ScanLines)
 		for scanner.Scan() {
 			b := scanner.Bytes()
-			resp, err := client.Do(logd.NewCommand(cmd, b))
+			resp, err := client.Do(logd.NewCommand(config, cmd, b))
 			if err == io.EOF {
 				return nil
 			}
@@ -131,7 +131,7 @@ func doReadCmdAction(config *logd.Config) func(c *cli.Context) error {
 		signal.Notify(sigc, os.Interrupt, syscall.SIGTERM)
 
 		if start == 0 && !config.ReadForever {
-			resp, headErr := client.Do(logd.NewCommand(logd.CmdHead))
+			resp, headErr := client.Do(logd.NewCommand(config, logd.CmdHead))
 			if err != nil {
 				log.Printf("%+v", err)
 				return cli.NewExitError(headErr, 2)

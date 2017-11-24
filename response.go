@@ -54,25 +54,26 @@ func (resp RespType) String() string {
 
 // Response is returned to the caller
 type Response struct {
+	config  *Config
 	Status  RespType
 	ID      uint64
 	body    []byte
 	readerC chan io.Reader
 }
 
-func newResponse(status RespType) *Response {
-	r := &Response{Status: status}
+func newResponse(config *Config, status RespType) *Response {
+	r := &Response{config: config, Status: status}
 	return r
 }
 
 // NewErrResponse returns a new server error response
-func NewErrResponse(body []byte) *Response {
-	return &Response{Status: RespErr, body: body}
+func NewErrResponse(config *Config, body []byte) *Response {
+	return &Response{config: config, Status: RespErr, body: body}
 }
 
 // NewClientErrResponse returns a new validation error reponse
-func NewClientErrResponse(body []byte) *Response {
-	return &Response{Status: RespErrClient, body: body}
+func NewClientErrResponse(config *Config, body []byte) *Response {
+	return &Response{config: config, Status: RespErrClient, body: body}
 }
 
 // Bytes returns a byte representation of the response
@@ -91,15 +92,14 @@ func (r *Response) sendChunk(lf logReadableFile) {
 		buflen = limit
 	}
 
-	fmt.Printf("<-readerC %d byte chunk\n", buflen)
-
+	debugf(r.config, "<-readerC %d byte chunk\n", buflen)
 	reader := bytes.NewReader([]byte(fmt.Sprintf("+%d\r\n", buflen)))
 	r.readerC <- reader
 	r.readerC <- io.LimitReader(lf.AsFile(), buflen)
 }
 
 func (r *Response) sendBytes(b []byte) {
-	fmt.Printf("<-readerC %q (response)\n", b)
+	debugf(r.config, "<-readerC %q (response)\n", b)
 	reader := bytes.NewReader(b)
 	r.readerC <- reader
 }

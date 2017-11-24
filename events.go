@@ -96,14 +96,14 @@ func (q *eventQ) loop() {
 				q.handleSleep(cmd)
 			case CmdShutdown:
 				if err := q.handleShutdown(cmd); err != nil {
-					cmd.respond(newResponse(RespErr))
+					cmd.respond(newResponse(q.config, RespErr))
 				} else {
-					cmd.respond(newResponse(RespOK))
+					cmd.respond(newResponse(q.config, RespOK))
 					// close(q.close)
 					// close(q.in)
 				}
 			default:
-				cmd.respond(newResponse(RespErr))
+				cmd.respond(newResponse(q.config, RespErr))
 			}
 		case <-q.close:
 			return
@@ -126,14 +126,14 @@ func (q *eventQ) handleMsg(cmd *Command) {
 	id := q.currID - 1
 
 	if len(cmd.args) == 0 {
-		cmd.respond(NewClientErrResponse(errRespNoArguments))
+		cmd.respond(NewClientErrResponse(q.config, errRespNoArguments))
 		return
 	}
 
 	// TODO if any messages are invalid, throw out the whole bunch
 	for _, msg := range cmd.args {
 		if len(msg) == 0 {
-			cmd.respond(NewClientErrResponse(errRespEmptyMessage))
+			cmd.respond(NewClientErrResponse(q.config, errRespEmptyMessage))
 			return
 		}
 
@@ -145,13 +145,13 @@ func (q *eventQ) handleMsg(cmd *Command) {
 		_, err := q.log.Write(msgb)
 		if err != nil {
 			log.Printf("Error: %+v", err)
-			cmd.respond(newResponse(RespErr))
+			cmd.respond(newResponse(q.config, RespErr))
 			return
 		}
 	}
 	q.currID = id + 1
 
-	resp := newResponse(RespOK)
+	resp := newResponse(q.config, RespOK)
 	resp.ID = id
 	cmd.respond(resp)
 
@@ -175,7 +175,7 @@ func (q *eventQ) handleReplicate(cmd *Command) {
 	startID, err := q.parseReplicate(cmd)
 	if err != nil {
 		debugf(q.config, "invalid: %v", err)
-		cmd.respond(newResponse(RespErr))
+		cmd.respond(newResponse(q.config, RespErr))
 		return
 	}
 
@@ -192,7 +192,7 @@ func (q *eventQ) parseReplicate(cmd *Command) (uint64, error) {
 // handleRawMsg receives a chunk of data from a master and writes it to the log
 func (q *eventQ) handleRawMsg(cmd *Command) {
 
-	resp := newResponse(RespOK)
+	resp := newResponse(q.config, RespOK)
 	cmd.respond(resp)
 }
 
@@ -200,7 +200,7 @@ func (q *eventQ) handleRead(cmd *Command) {
 	startID, limit, err := q.parseRead(cmd)
 	if err != nil {
 		debugf(q.config, "invalid: %v", err)
-		cmd.respond(NewClientErrResponse(errRespInvalid))
+		cmd.respond(NewClientErrResponse(q.config, errRespInvalid))
 		return
 	}
 
@@ -208,9 +208,11 @@ func (q *eventQ) handleRead(cmd *Command) {
 }
 
 func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
-	resp := newResponse(RespOK)
+
+	resp := newResponse(q.config, RespOK)
 	resp.readerC = make(chan io.Reader, 20)
 	cmd.respond(resp)
+	cmd.waitForReady()
 
 	end := startID + limit
 	if limit == 0 {
@@ -236,7 +238,7 @@ func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 	if limit == 0 { // read forever
 		q.subscriptions[cmd.respC] = newSubscription(resp.readerC, cmd.done)
 	} else {
-		resp.sendBytes(newProtocolWriter().writeResponse(newResponse(RespEOF)))
+		resp.sendBytes(newProtocolWriter().writeResponse(newResponse(q.config, RespEOF)))
 		cmd.finish()
 	}
 }
@@ -263,14 +265,14 @@ func (q *eventQ) parseRead(cmd *Command) (uint64, uint64, error) {
 
 func (q *eventQ) handleHead(cmd *Command) {
 	if len(cmd.args) != 0 {
-		cmd.respond(NewClientErrResponse(errRespInvalid))
+		cmd.respond(NewClientErrResponse(q.config, errRespInvalid))
 		return
 	}
 
 	if id, err := q.log.Head(); err != nil {
-		cmd.respond(newResponse(RespErr))
+		cmd.respond(newResponse(q.config, RespErr))
 	} else {
-		resp := newResponse(RespOK)
+		resp := newResponse(q.config, RespOK)
 		resp.ID = id
 		cmd.respond(resp)
 	}
@@ -278,38 +280,38 @@ func (q *eventQ) handleHead(cmd *Command) {
 
 func (q *eventQ) handlePing(cmd *Command) {
 	if len(cmd.args) != 0 {
-		cmd.respond(NewClientErrResponse(errRespInvalid))
+		cmd.respond(NewClientErrResponse(q.config, errRespInvalid))
 		return
 	}
 
-	cmd.respond(newResponse(RespOK))
+	cmd.respond(newResponse(q.config, RespOK))
 }
 
 func (q *eventQ) handleClose(cmd *Command) {
 	if len(cmd.args) != 0 {
-		cmd.respond(NewClientErrResponse(errRespInvalid))
+		cmd.respond(NewClientErrResponse(q.config, errRespInvalid))
 		return
 	}
 
 	if sub, ok := q.subscriptions[cmd.respC]; ok {
 		sub.finish()
 	}
-
 	delete(q.subscriptions, cmd.respC)
-	cmd.respond(newResponse(RespOK))
+
+	cmd.respond(newResponse(q.config, RespOK))
 	// cmd.finish()
 }
 
 func (q *eventQ) handleSleep(cmd *Command) {
 	if len(cmd.args) != 1 {
-		cmd.respond(NewClientErrResponse(errRespInvalid))
+		cmd.respond(NewClientErrResponse(q.config, errRespInvalid))
 		return
 	}
 
 	var msecs int
 	_, err := fmt.Sscanf(string(cmd.args[0]), "%d", &msecs)
 	if err != nil {
-		cmd.respond(NewClientErrResponse(errRespInvalid))
+		cmd.respond(NewClientErrResponse(q.config, errRespInvalid))
 		return
 	}
 
@@ -318,7 +320,7 @@ func (q *eventQ) handleSleep(cmd *Command) {
 	case <-cmd.wake:
 	}
 
-	cmd.respond(newResponse(RespOK))
+	cmd.respond(newResponse(q.config, RespOK))
 }
 
 func (q *eventQ) handleShutdown(cmd *Command) error {

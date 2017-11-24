@@ -310,6 +310,7 @@ func (s *SocketServer) handleClient(conn *conn) {
 		if _, err := conn.write(respBytes); handleConnErr(s.config, err, conn) != nil {
 			return
 		}
+		cmd.signalReady()
 
 		s.finishRequest(conn, cmd, resp)
 	}
@@ -342,6 +343,7 @@ func (s *SocketServer) handleSubscriber(conn *conn, cmd *Command, resp *Response
 				return
 			}
 		case <-cmd.done:
+			conn.flush()
 			return
 		}
 	}

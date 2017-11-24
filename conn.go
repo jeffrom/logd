@@ -105,8 +105,13 @@ func (c *conn) write(bufs ...[]byte) (int, error) {
 		}
 	}
 
-	err := c.pw.bw.Flush()
+	err := c.flush()
 	return n, err
+}
+
+func (c *conn) flush() error {
+	debugf(c.config, "%s: flush()", c.RemoteAddr())
+	return c.pw.bw.Flush()
 }
 
 func (c *conn) readPending() (int64, error) {
@@ -114,23 +119,27 @@ func (c *conn) readPending() (int64, error) {
 	// c.setState(connStateReading)
 	// defer c.setState(prevState)
 	var read int64
+	numRead := 0
 Loop:
 	for {
 		select {
 		case r := <-c.readerC:
-			n, err := c.readFrom(r)
+			n, rerr := c.readFrom(r)
+			numRead++
 			read += n
-			if err != nil {
-				return read, err
+			if rerr != nil {
+				return read, rerr
 			}
 		default:
 			break Loop
 		}
 	}
+	debugf(c.config, "%s: read %d pending readers", c.RemoteAddr(), numRead)
 	return read, nil
 }
 
 func (c *conn) readFrom(r io.Reader) (int64, error) {
+	debugf(c.config, "%s: conn.readFrom()", c.RemoteAddr())
 	n, err := c.Conn.(*net.TCPConn).ReadFrom(r)
 	return n, err
 }
@@ -153,6 +162,7 @@ func (c *conn) isActive() bool {
 }
 
 func (c *conn) close() error {
+	c.readPending()
 	c.setState(connStateClosed)
 	err := c.Conn.Close()
 	// we only care about the channel if we're gracefully shutting down

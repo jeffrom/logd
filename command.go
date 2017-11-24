@@ -69,29 +69,35 @@ func (cmd *CmdType) String() string {
 
 // Command is an input received by a caller
 type Command struct {
-	name  CmdType
-	args  [][]byte
-	respC chan *Response
+	config *Config
+	name   CmdType
+	args   [][]byte
+	respC  chan *Response
+
+	ready chan struct{}
 	done  chan struct{}
 	wake  chan struct{}
 }
 
 // NewCommand returns a new instance of a command type
-func NewCommand(name CmdType, args ...[]byte) *Command {
+func NewCommand(config *Config, name CmdType, args ...[]byte) *Command {
 	c := &Command{
-		name:  name,
-		args:  args,
-		respC: make(chan *Response),
-		done:  make(chan struct{}),
-		wake:  make(chan struct{}),
+		config: config,
+		name:   name,
+		args:   args,
+		respC:  make(chan *Response),
+		ready:  make(chan struct{}),
+		done:   make(chan struct{}),
+		wake:   make(chan struct{}),
 	}
 	return c
 }
 
-func newCloseCommand(respC chan *Response) *Command {
+func newCloseCommand(config *Config, respC chan *Response) *Command {
 	return &Command{
-		name:  CmdClose,
-		respC: respC,
+		config: config,
+		name:   CmdClose,
+		respC:  respC,
 	}
 }
 
@@ -127,6 +133,15 @@ func (cmd *Command) finish() {
 		default:
 		}
 	}
+}
+
+func (cmd *Command) signalReady() {
+	cmd.ready <- struct{}{}
+}
+
+func (cmd *Command) waitForReady() {
+	debugf(cmd.config, "waiting for command to be ready")
+	<-cmd.ready
 }
 
 func (cmd *Command) cancelSleep() {

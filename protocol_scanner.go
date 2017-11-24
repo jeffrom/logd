@@ -296,7 +296,7 @@ func (pr *protocolReader) readCommand(r io.Reader) (*Command, error) {
 		args = append(args, arg)
 	}
 
-	return NewCommand(name, args...), nil
+	return NewCommand(pr.config, name, args...), nil
 }
 
 func (pr *protocolReader) readResponse(r io.Reader) (*Response, error) {
@@ -309,24 +309,24 @@ func (pr *protocolReader) readResponse(r io.Reader) (*Response, error) {
 	parts := bytes.SplitN(line, []byte(" "), 2)
 	var resp *Response
 	if bytes.Equal(parts[0], []byte("OK")) {
-		resp = newResponse(RespOK)
+		resp = newResponse(pr.config, RespOK)
 		if len(parts) > 1 {
 			if _, err := fmt.Sscanf(string(parts[1]), "%d", &resp.ID); err != nil {
 				return nil, errors.Wrap(err, "failed to parse response id")
 			}
 		}
 	} else if bytes.Equal(parts[0], []byte("+EOF")) {
-		resp = newResponse(RespEOF)
+		resp = newResponse(pr.config, RespEOF)
 		// } else if parts[0][0] == '+' {
-		// 	resp = newResponse(RespContinue)
+		// 	resp = newResponse(pr.config, RespContinue)
 	} else if bytes.Equal(parts[0], []byte("ERR")) {
 		var arg []byte
 		if len(parts) > 1 {
 			arg = parts[1]
 		}
-		resp = NewErrResponse(arg)
+		resp = NewErrResponse(pr.config, arg)
 	} else if bytes.Equal(parts[0], []byte("ERR_CLIENT")) {
-		resp = NewClientErrResponse(parts[1])
+		resp = NewClientErrResponse(pr.config, parts[1])
 	} else {
 		debugf(pr.config, "invalid response: %q", line)
 		return nil, errors.New("Invalid response")
