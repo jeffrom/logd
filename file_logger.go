@@ -326,13 +326,13 @@ func (l *fileLogger) Range(start, end uint64) (logRangeIterator, error) {
 
 	lcopy := newFileLogger(l.config)
 	endpart, endoff, pcerr := lcopy.getPartOffset(end)
-	fmt.Println("end partition:", endpart, "offset:", endoff, "err:", pcerr)
+	// fmt.Println("end partition:", endpart, "offset:", endoff, "err:", pcerr)
 	if pcerr != nil {
 		return nil, errors.Wrap(pcerr, "failed to get range upper bound")
 	}
 
 	currpart, curroff, perr := l.getPartOffset(start)
-	fmt.Println("start partition:", currpart, "offset:", curroff, "err:", perr)
+	// fmt.Println("start partition:", currpart, "offset:", curroff, "err:", perr)
 	if perr != nil {
 		return nil, errors.Wrap(perr, "failed to get range lower bound")
 	}

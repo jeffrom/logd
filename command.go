@@ -119,7 +119,7 @@ func (cmd *Command) Bytes() []byte {
 }
 
 func (cmd *Command) respond(resp *Response) {
-	fmt.Printf("<-response: %+v\n", resp)
+	debugf(cmd.config, "<-response: %q", resp)
 	cmd.respC <- resp
 
 	close(cmd.respC)

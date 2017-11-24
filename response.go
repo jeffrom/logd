@@ -92,14 +92,14 @@ func (r *Response) sendChunk(lf logReadableFile) {
 		buflen = limit
 	}
 
-	debugf(r.config, "<-readerC %d byte chunk\n", buflen)
+	debugf(r.config, "<-readerC %d byte chunk", buflen)
 	reader := bytes.NewReader([]byte(fmt.Sprintf("+%d\r\n", buflen)))
 	r.readerC <- reader
 	r.readerC <- io.LimitReader(lf.AsFile(), buflen)
 }
 
 func (r *Response) sendBytes(b []byte) {
-	debugf(r.config, "<-readerC %q (response)\n", b)
+	debugf(r.config, "<-readerC %q (response)", b)
 	reader := bytes.NewReader(b)
 	r.readerC <- reader
 }
