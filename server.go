@@ -282,6 +282,12 @@ func (s *SocketServer) handleClient(conn *conn) {
 			return
 		}
 
+		// for when another connection shut down the server while this one was
+		// waiting for a response
+		if s.isShuttingDown() {
+			break
+		}
+
 		if cmd.name == CmdShutdown && resp.Status == RespOK {
 			s.removeConn(conn)
 			s.stop()
@@ -295,7 +301,7 @@ func (s *SocketServer) handleClient(conn *conn) {
 
 		respBytes := resp.Bytes()
 		if cmd.name == CmdClose {
-			debugf(s.config, "close %s", conn.RemoteAddr())
+			debugf(s.config, "closing %s", conn.RemoteAddr())
 			conn.write(respBytes)
 			break
 		}
@@ -325,14 +331,7 @@ func (s *SocketServer) finishRequest(conn *conn, cmd *Command, resp *Response) {
 }
 
 func (s *SocketServer) handleSubscriber(conn *conn, cmd *Command, resp *Response) {
-	defer func() {
-		ccmd := newCloseCommand(cmd.respC)
-		_, err := s.q.pushCommand(ccmd)
-		if err != nil {
-			debugf(s.config, "error closing: %+v", err)
-		}
-		conn.close()
-	}()
+	defer conn.close()
 
 	for {
 		select {
