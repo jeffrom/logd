@@ -54,7 +54,7 @@ func DialConfig(addr string, config *Config, conns ...net.Conn) (*Client, error)
 		}
 	}
 
-	timeout := time.Duration(time.Duration(config.ClientTimeout) * time.Millisecond)
+	timeout := time.Duration(config.ClientTimeout) * time.Millisecond
 	return &Client{
 		config:       config,
 		conn:         conn,

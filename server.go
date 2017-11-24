@@ -51,7 +51,7 @@ func NewServer(addr string, config *Config) *SocketServer {
 		panic(err)
 	}
 
-	timeout := time.Duration(time.Duration(config.ServerTimeout) * time.Millisecond)
+	timeout := time.Duration(config.ServerTimeout) * time.Millisecond
 	return &SocketServer{
 		config:       config,
 		addr:         addr,
@@ -294,8 +294,8 @@ func (s *SocketServer) handleClient(conn *conn) {
 			return
 		}
 
-		err = conn.SetWriteDeadline(time.Now().Add(s.writeTimeout))
-		if cerr := handleConnErr(s.config, err, conn); cerr != nil {
+		if err := conn.setWriteDeadline(); err != nil {
+			log.Printf("error setting %s write deadline: %+v", conn.RemoteAddr(), err)
 			return
 		}
 

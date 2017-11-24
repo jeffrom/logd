@@ -81,7 +81,7 @@ func NewCommand(name CmdType, args ...[]byte) *Command {
 	c := &Command{
 		name:  name,
 		args:  args,
-		respC: make(chan *Response, 0),
+		respC: make(chan *Response),
 		done:  make(chan struct{}),
 		wake:  make(chan struct{}),
 	}

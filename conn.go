@@ -65,7 +65,7 @@ type conn struct {
 }
 
 func newServerConn(c net.Conn, config *Config) *conn {
-	timeout := time.Duration(time.Duration(config.ServerTimeout) * time.Millisecond)
+	timeout := time.Duration(config.ServerTimeout) * time.Millisecond
 	conn := &conn{
 		config:       config,
 		Conn:         c,
@@ -144,6 +144,10 @@ func (c *conn) setWaitForCmdDeadline() error {
 	}
 
 	return nil
+}
+
+func (c *conn) setWriteDeadline() error {
+	return c.Conn.SetWriteDeadline(time.Now().Add(c.writeTimeout))
 }
 
 func prettybuf(bufs ...[]byte) []byte {
