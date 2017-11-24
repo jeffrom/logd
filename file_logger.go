@@ -169,7 +169,7 @@ func (l *fileLogger) SeekToID(id uint64) error {
 func (l *fileLogger) getPartOffset(id uint64) (uint64, int64, error) {
 	if l.index == nil {
 		if err := l.getNewIndex(); err != nil {
-			return 0, 0, err
+			return 0, 0, errors.Wrap(err, "failed to create index")
 		}
 	}
 	part, offset := l.index.Get(id)
@@ -206,11 +206,12 @@ Loop:
 		if err := scanner.Error(); err == io.EOF {
 			if l.parts.currReadPart < l.parts.head() {
 				if oerr := l.parts.setReadHandle(l.parts.currReadPart + 1); oerr != nil {
-					return part, 0, oerr
+					return part, 0, errors.Wrap(oerr, "failed to set read handle")
 				}
 				continue
 			} else {
-				return part, 0, err
+				break
+				// return part, 0, errors.Wrap(err, "failed scanning")
 			}
 		} else if err != nil {
 			panic(err)
@@ -327,13 +328,13 @@ func (l *fileLogger) Range(start, end uint64) (logRangeIterator, error) {
 	endpart, endoff, pcerr := lcopy.getPartOffset(end)
 	fmt.Println("end partition:", endpart, "offset:", endoff, "err:", pcerr)
 	if pcerr != nil {
-		return nil, pcerr
+		return nil, errors.Wrap(pcerr, "failed to get range upper bound")
 	}
 
 	currpart, curroff, perr := l.getPartOffset(start)
 	fmt.Println("start partition:", currpart, "offset:", curroff, "err:", perr)
 	if perr != nil {
-		return nil, perr
+		return nil, errors.Wrap(perr, "failed to get range lower bound")
 	}
 
 	if _, serr := l.parts.r.Seek(curroff, io.SeekStart); serr != nil {
