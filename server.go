@@ -278,6 +278,7 @@ func (s *SocketServer) handleClient(conn *conn) {
 
 		// push to event queue and wait for a result
 		resp, err := s.q.pushCommand(cmd)
+		conn.readerC = resp.readerC
 		if cerr := handleConnErr(s.config, err, conn); cerr != nil {
 			return
 		}
@@ -302,7 +303,7 @@ func (s *SocketServer) handleClient(conn *conn) {
 		respBytes := resp.Bytes()
 		if cmd.name == CmdClose {
 			debugf(s.config, "closing %s", conn.RemoteAddr())
-			conn.write(respBytes)
+			resp.sendBytes(respBytes)
 			break
 		}
 
@@ -336,13 +337,10 @@ func (s *SocketServer) handleSubscriber(conn *conn, cmd *Command, resp *Response
 	for {
 		select {
 		case r := <-resp.readerC:
-			conn.mu.Lock()
-			if _, err := conn.Conn.(*net.TCPConn).ReadFrom(r); err != nil {
+			if _, err := conn.readFrom(r); err != nil {
 				log.Printf("%s: %+v", conn.RemoteAddr(), err)
-				conn.mu.Unlock()
 				return
 			}
-			conn.mu.Unlock()
 		case <-cmd.done:
 			return
 		}

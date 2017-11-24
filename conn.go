@@ -2,6 +2,7 @@ package logd
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"sync"
 	"time"
@@ -58,6 +59,10 @@ type conn struct {
 
 	state connState
 
+	// shared with Response. used to flush any pending data before a
+	// synchronous write.
+	readerC chan io.Reader
+
 	done chan struct{}
 	mu   sync.Mutex
 
@@ -79,9 +84,14 @@ func newServerConn(c net.Conn, config *Config) *conn {
 	return conn
 }
 
+// sync write. needs to write any pending data on the channel first.
 func (c *conn) write(bufs ...[]byte) (int, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	if _, err := c.readPending(); err != nil {
+		return 0, err
+	}
 
 	debugf(c.config, "->%s: %q", c.RemoteAddr(), prettybuf(bufs...))
 
@@ -96,6 +106,32 @@ func (c *conn) write(bufs ...[]byte) (int, error) {
 	}
 
 	err := c.pw.bw.Flush()
+	return n, err
+}
+
+func (c *conn) readPending() (int64, error) {
+	// prevState := c.getState()
+	// c.setState(connStateReading)
+	// defer c.setState(prevState)
+	var read int64
+Loop:
+	for {
+		select {
+		case r := <-c.readerC:
+			n, err := c.readFrom(r)
+			read += n
+			if err != nil {
+				return read, err
+			}
+		default:
+			break Loop
+		}
+	}
+	return read, nil
+}
+
+func (c *conn) readFrom(r io.Reader) (int64, error) {
+	n, err := c.Conn.(*net.TCPConn).ReadFrom(r)
 	return n, err
 }
 
