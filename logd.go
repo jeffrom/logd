@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"runtime"
+	"runtime/trace"
 	"strings"
 	"time"
 )
@@ -49,4 +50,11 @@ func debugf(config *Config, s string, args ...interface{}) {
 
 func logf(s string, args ...interface{}) {
 	stdlog(2, s, args...)
+}
+
+func doTrace() func() {
+	f, err := os.Create("trace.out")
+	panicOnError(err)
+	trace.Start(f)
+	return trace.Stop
 }

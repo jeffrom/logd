@@ -24,7 +24,6 @@ type SocketServer struct {
 	ln   net.Listener
 	mu   sync.Mutex
 
-	readyC chan struct{}
 	conns  map[*conn]bool
 	connMu sync.Mutex
 	connIn chan *conn
@@ -32,6 +31,7 @@ type SocketServer struct {
 	readTimeout  time.Duration
 	writeTimeout time.Duration
 
+	readyC       chan struct{}
 	stopC        chan struct{}
 	shutdownC    chan struct{}
 	shuttingDown bool
@@ -188,11 +188,7 @@ func (s *SocketServer) shutdown() error {
 				}
 			}
 
-			c.Conn.Close()
-
-			s.connMu.Lock()
-			delete(s.conns, c)
-			s.connMu.Unlock()
+			s.removeConn(c)
 		}(c)
 	}
 	s.connMu.Unlock()
@@ -227,14 +223,18 @@ func (s *SocketServer) addConn(conn *conn) {
 }
 
 func (s *SocketServer) removeConn(conn *conn) {
+	conn.Close()
 	s.connMu.Lock()
 	delete(s.conns, conn)
 	s.connMu.Unlock()
 }
 
-func (s *SocketServer) handleConnErr(err error, conn *conn) error {
+func handleConnErr(config *Config, err error, conn *conn) error {
+	if err == nil {
+		return nil
+	}
 	if err == io.EOF {
-		debugf(s.config, "%s closed the connection", conn.RemoteAddr())
+		debugf(config, "%s closed the connection", conn.RemoteAddr())
 	} else if err, ok := err.(net.Error); ok && err.Timeout() {
 		stdlog(2, "%s timed out", conn.RemoteAddr())
 	} else if err != nil {
@@ -260,18 +260,14 @@ func (s *SocketServer) handleClient(conn *conn) {
 			break
 		}
 
-		if conn.getState() != connStateReading {
-			err := conn.SetReadDeadline(time.Now().Add(s.readTimeout))
-			if cerr := s.handleConnErr(err, conn); cerr != nil {
-				return
-			}
-
-			conn.setState(connStateActive)
-		} else {
-			conn.SetDeadline(time.Time{})
+		if err := conn.setWaitForCmdDeadline(); err != nil {
+			log.Printf("%s error: %+v", conn.RemoteAddr(), err)
+			return
 		}
+
+		// wait for a command
 		cmd, err := conn.pr.readCommand(conn)
-		if cerr := s.handleConnErr(err, conn); cerr != nil {
+		if cerr := handleConnErr(s.config, err, conn); cerr != nil {
 			return
 		}
 		debugf(s.config, "%s<-%s: %s", conn.LocalAddr(), conn.RemoteAddr(), cmd)
@@ -280,22 +276,20 @@ func (s *SocketServer) handleClient(conn *conn) {
 			break
 		}
 
+		// push to event queue and wait for a result
 		resp, err := s.q.pushCommand(cmd)
-		if cerr := s.handleConnErr(err, conn); cerr != nil {
+		if cerr := handleConnErr(s.config, err, conn); cerr != nil {
 			return
 		}
 
 		if cmd.name == CmdShutdown && resp.Status == RespOK {
-			conn.Close()
-			s.connMu.Lock()
-			delete(s.conns, conn)
-			s.connMu.Unlock()
+			s.removeConn(conn)
 			s.stop()
 			return
 		}
 
 		err = conn.SetWriteDeadline(time.Now().Add(s.writeTimeout))
-		if cerr := s.handleConnErr(err, conn); cerr != nil {
+		if cerr := handleConnErr(s.config, err, conn); cerr != nil {
 			return
 		}
 
@@ -304,30 +298,29 @@ func (s *SocketServer) handleClient(conn *conn) {
 			debugf(s.config, "close %s", conn.RemoteAddr())
 			conn.write(respBytes)
 			break
-		} else {
-			_, err = conn.write(respBytes)
-			if cerr := s.handleConnErr(err, conn); cerr != nil {
-				return
-			}
-		}
-		// debugf(s.config, "%s->%s: %q", conn.LocalAddr(), conn.RemoteAddr(), respBytes)
-
-		if cmd.name == CmdRead {
-			debugf(s.config, "sending log messages to %s", conn.RemoteAddr())
-			conn.setState(connStateReading)
-			// continue the loop to accept additional commands
-
-			if err := conn.SetWriteDeadline(time.Time{}); err != nil {
-				panic(err)
-			}
-			go s.handleSubscriber(conn, cmd, resp)
-		} else {
-			conn.setState(connStateInactive)
 		}
 
-		if s.isShuttingDown() {
-			break
+		if _, err := conn.write(respBytes); handleConnErr(s.config, err, conn) != nil {
+			return
 		}
+
+		s.finishRequest(conn, cmd, resp)
+	}
+}
+
+func (s *SocketServer) finishRequest(conn *conn, cmd *Command, resp *Response) {
+	if cmd.name == CmdRead {
+		debugf(s.config, "reading log messages to %s", conn.RemoteAddr())
+		conn.setState(connStateReading)
+		// continue the loop to accept additional commands
+
+		if err := conn.SetWriteDeadline(time.Time{}); err != nil {
+			log.Printf("error setting write deadline to %s: %+v", conn.RemoteAddr(), err)
+			return
+		}
+		go s.handleSubscriber(conn, cmd, resp)
+	} else {
+		conn.setState(connStateInactive)
 	}
 }
 
@@ -352,7 +345,6 @@ func (s *SocketServer) handleSubscriber(conn *conn, cmd *Command, resp *Response
 			}
 			conn.mu.Unlock()
 		case <-cmd.done:
-			// conn.write([]byte("+EOF\r\n"))
 			return
 		}
 	}

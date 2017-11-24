@@ -215,16 +215,12 @@ func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 	end := startID + limit
 	if limit == 0 {
 		head, err := q.log.Head()
-		if err != nil {
-			panic(err)
-		}
+		panicOnError(err)
 		end = head
 	}
 
 	iterator, err := q.log.Range(startID, end)
-	if err != nil {
-		panic(err)
-	}
+	panicOnError(err)
 
 	for {
 		lf, err := iterator.Next()

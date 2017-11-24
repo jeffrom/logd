@@ -127,6 +127,25 @@ func (c *conn) close() error {
 	return err
 }
 
+func (c *conn) setWaitForCmdDeadline() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.state == connStateReading {
+		c.SetDeadline(time.Time{})
+	} else {
+		timeout := time.Duration(c.config.ServerTimeout) * time.Millisecond
+		err := c.SetReadDeadline(time.Now().Add(timeout))
+		if cerr := handleConnErr(c.config, err, c); cerr != nil {
+			return cerr
+		}
+
+		c.state = connStateActive
+	}
+
+	return nil
+}
+
 func prettybuf(bufs ...[]byte) []byte {
 	var flat []byte
 	limit := 100
