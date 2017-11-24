@@ -345,6 +345,7 @@ func (l *fileLogger) Range(start, end uint64) (logRangeIterator, error) {
 	fn := func() (logReadableFile, error) {
 		if lf != nil {
 			currpart++
+			curroff = 0
 			if currpart >= l.parts.head() {
 				return nil, io.EOF
 			}
@@ -355,7 +356,7 @@ func (l *fileLogger) Range(start, end uint64) (logRangeIterator, error) {
 		lf = l.parts.r
 
 		if currpart == endpart {
-			lf.SetLimit(endoff)
+			lf.SetLimit(endoff - curroff)
 		}
 
 		// use the current partition, which is seeked to `start`
