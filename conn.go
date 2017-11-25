@@ -1,6 +1,7 @@
 package logd
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"net"
@@ -54,8 +55,8 @@ type conn struct {
 
 	pr           *protocolReader
 	readTimeout  time.Duration
-	pw           *protoWriter
 	writeTimeout time.Duration
+	bw           *bufio.Writer
 
 	state connState
 
@@ -76,7 +77,7 @@ func newServerConn(c net.Conn, config *Config) *conn {
 		Conn:         c,
 		pr:           newProtocolReader(config),
 		readTimeout:  timeout,
-		pw:           newProtoWriter(c, config),
+		bw:           bufio.NewWriter(c),
 		writeTimeout: timeout,
 		done:         make(chan struct{}),
 	}
@@ -97,7 +98,7 @@ func (c *conn) write(bufs ...[]byte) (int, error) {
 
 	var n int
 	for _, buf := range bufs {
-		wrote, err := c.pw.bw.Write(buf)
+		wrote, err := c.bw.Write(buf)
 		n += wrote
 		c.written += wrote
 		if err != nil {
@@ -111,7 +112,7 @@ func (c *conn) write(bufs ...[]byte) (int, error) {
 
 func (c *conn) flush() error {
 	debugf(c.config, "%s: flush()", c.RemoteAddr())
-	return c.pw.bw.Flush()
+	return c.bw.Flush()
 }
 
 func (c *conn) readPending() (int64, error) {
