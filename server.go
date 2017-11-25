@@ -314,7 +314,9 @@ func (s *SocketServer) handleClient(conn *conn) {
 			log.Printf("error writing to %s: %+v", conn.RemoteAddr(), err)
 			return
 		}
-		cmd.signalReady()
+		if cmd.name == CmdRead || cmd.name == CmdReplicate {
+			cmd.signalReady()
+		}
 
 		s.finishRequest(conn, cmd, resp)
 	}

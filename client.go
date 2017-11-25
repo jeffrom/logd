@@ -3,6 +3,7 @@ package logd
 // NOTE CLIENT
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"log"
@@ -18,6 +19,7 @@ type Client struct {
 	readTimeout time.Duration
 	pr          *protocolReader
 
+	bw           *bufio.Writer
 	pw           *protocolWriter
 	writeTimeout time.Duration
 }
@@ -60,6 +62,7 @@ func DialConfig(addr string, config *Config, conns ...net.Conn) (*Client, error)
 		conn:         conn,
 		pr:           newProtocolReader(config),
 		readTimeout:  timeout,
+		bw:           bufio.NewWriter(conn),
 		pw:           newProtocolWriter(),
 		writeTimeout: timeout,
 	}, nil
@@ -70,7 +73,7 @@ func (c *Client) writeCommand(cmd *Command) error {
 	if err := c.conn.SetWriteDeadline(time.Now().Add(c.writeTimeout)); err != nil {
 		return err
 	}
-	if _, err := c.conn.Write(c.pw.writeCommand(cmd)); err != nil {
+	if _, err := c.bw.Write(c.pw.writeCommand(cmd)); err != nil {
 		return err
 	}
 	if err := c.flush(); err != nil {
@@ -81,8 +84,8 @@ func (c *Client) writeCommand(cmd *Command) error {
 }
 
 func (c *Client) flush() error {
-	return nil
-	// return c.pw.bw.Flush()
+	// return nil
+	return c.bw.Flush()
 }
 
 func (c *Client) readResponse() (*Response, error) {
@@ -118,14 +121,14 @@ func (c *Client) Close() error {
 
 	err := c.writeCommand(NewCommand(c.config, CmdClose))
 	if c.handleErr(err) != nil {
-		log.Printf("close error: %s", err)
+		log.Printf("%s: close error: %+v", c.conn.RemoteAddr(), err)
 		c.conn.Close()
 		return err
 	}
 
 	_, err = c.readResponse()
 	if c.handleErr(err) != nil {
-		log.Printf("close error: %s", err)
+		log.Printf("%s: close error: %+v", c.conn.RemoteAddr(), err)
 		c.conn.Close()
 		return err
 	}

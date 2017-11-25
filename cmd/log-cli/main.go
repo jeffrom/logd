@@ -138,7 +138,7 @@ func doReadCmdAction(config *logd.Config) func(c *cli.Context) error {
 			}
 
 			if resp.ID < uint64(limit) {
-				limit -= (int(resp.ID))
+				limit -= int(resp.ID)
 				start = 1
 			} else {
 				start = resp.ID - uint64(limit) + 1
