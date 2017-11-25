@@ -154,7 +154,7 @@ func (l *fileLogger) Read(b []byte) (int, error) {
 }
 
 func (l *fileLogger) SeekToID(id uint64) error {
-	_, off, err := l.getPartOffset(id)
+	_, off, err := l.getPartOffset(id, false)
 	if err != nil {
 		return err
 	}
@@ -166,7 +166,7 @@ func (l *fileLogger) SeekToID(id uint64) error {
 	return nil
 }
 
-func (l *fileLogger) getPartOffset(id uint64) (uint64, int64, error) {
+func (l *fileLogger) getPartOffset(id uint64, inclusive bool) (uint64, int64, error) {
 	if l.index == nil {
 		if err := l.getNewIndex(); err != nil {
 			return 0, 0, errors.Wrap(err, "failed to create index")
@@ -194,7 +194,7 @@ Loop:
 
 		for scanner.Scan() {
 			msg := scanner.Message()
-			// fmt.Println(scanner.Error(), msg.String())
+			// fmt.Println("scanning for id", id, scanner.Error(), msg.String())
 			if msg.ID == id {
 				break Loop
 			}
@@ -219,7 +219,11 @@ Loop:
 
 	}
 
-	off := int64(offset) + int64(scanner.chunkPos) - int64(scanner.lastChunkPos)
+	off := int64(offset) + int64(scanner.chunkPos)
+	if !inclusive {
+		off -= int64(scanner.lastChunkPos)
+	}
+	debugf(l.config, "looked up id %d: partition: %d, offset: %d", id, part, off)
 	return part, off, nil
 }
 
@@ -260,13 +264,13 @@ func (l *fileLogger) Copy() Logger {
 // files in the iterator and return io.EOF
 func (l *fileLogger) shittyRange(start, end uint64) (*fileLogger, error) {
 	lcopy := newFileLogger(l.config)
-	currpart, curroff, perr := lcopy.getPartOffset(start)
+	currpart, curroff, perr := lcopy.getPartOffset(start, false)
 	if perr != nil {
 		return nil, perr
 	}
 
 	otherl := newFileLogger(lcopy.config)
-	endpart, endoff, err := otherl.getPartOffset(end)
+	endpart, endoff, err := otherl.getPartOffset(end, true)
 	if err != nil {
 		return nil, err
 	}
@@ -325,13 +329,13 @@ func (l *fileLogger) Range(start, end uint64) (logRangeIterator, error) {
 	debugf(l.config, "Range(%d, %d)", start, end)
 
 	lcopy := newFileLogger(l.config)
-	endpart, endoff, pcerr := lcopy.getPartOffset(end)
+	endpart, endoff, pcerr := lcopy.getPartOffset(end, true)
 	// fmt.Println("end partition:", endpart, "offset:", endoff, "err:", pcerr)
 	if pcerr != nil {
 		return nil, errors.Wrap(pcerr, "failed to get range upper bound")
 	}
 
-	currpart, curroff, perr := l.getPartOffset(start)
+	currpart, curroff, perr := l.getPartOffset(start, false)
 	// fmt.Println("start partition:", currpart, "offset:", curroff, "err:", perr)
 	if perr != nil {
 		return nil, errors.Wrap(perr, "failed to get range lower bound")

@@ -143,6 +143,8 @@ func doReadCmdAction(config *logd.Config) func(c *cli.Context) error {
 			} else {
 				start = resp.ID - uint64(limit) + 1
 			}
+		} else if start > 0 {
+			limit--
 		}
 
 		if config.ReadForever {
