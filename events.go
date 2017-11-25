@@ -208,7 +208,6 @@ func (q *eventQ) handleRead(cmd *Command) {
 }
 
 func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
-
 	resp := newResponse(q.config, RespOK)
 	resp.readerC = make(chan io.Reader, 20)
 	cmd.respond(resp)
@@ -238,7 +237,7 @@ func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 	if limit == 0 { // read forever
 		q.subscriptions[cmd.respC] = newSubscription(resp.readerC, cmd.done)
 	} else {
-		resp.sendBytes(newProtocolWriter().writeResponse(newResponse(q.config, RespEOF)))
+		resp.sendEOF()
 		cmd.finish()
 	}
 }

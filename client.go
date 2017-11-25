@@ -173,11 +173,14 @@ func (c *Client) DoRead(id uint64, limit int) (*ProtocolScanner, error) {
 		return nil, err
 	}
 
-	if limit == 0 {
-		if err := c.conn.SetReadDeadline(time.Time{}); err != nil {
-			return nil, err
-		}
+	deadline := time.Time{}
+	if limit > 0 {
+		deadline = time.Now().Add(c.readTimeout)
 	}
+	if err := c.conn.SetReadDeadline(deadline); err != nil {
+		return nil, err
+	}
+
 	return c.readScanResponse()
 }
 

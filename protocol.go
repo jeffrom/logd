@@ -44,7 +44,28 @@ var errInvalidProtocolLine = errors.New("invalid protocol line")
 var errInvalidBodyLength = errors.New("invalid body length")
 var errCrcChecksumMismatch = errors.New("crc checksum mismatch")
 
-// ProtocolScanner reads the log protocol
+type protocolFlusher interface {
+	shouldFlush() bool
+}
+
+type flushReader struct {
+	r io.Reader
+}
+
+func (fr *flushReader) Read(p []byte) (int, error) {
+	return fr.r.Read(p)
+}
+
+func (fr *flushReader) shouldFlush() bool {
+	return true
+}
+
+func newFlushReader(r io.Reader) *flushReader {
+	return &flushReader{r: r}
+}
+
+// ProtocolScanner reads the log protocol. The same protocol is used for both
+// the file log and network chunk protocol.
 type ProtocolScanner struct {
 	config       *Config
 	br           *bufio.Reader
@@ -74,7 +95,9 @@ func (ps *ProtocolScanner) Scan() bool {
 	n, msg, err := ps.readMessage()
 	ps.lastChunkPos = int64(n)
 	ps.chunkPos += int64(n)
-	if ps.chunkPos >= ps.chunkEnd {
+	if ps.chunkEnd > 0 && ps.chunkPos >= ps.chunkEnd {
+		debugf(ps.config, "completed reading %d byte chunk", ps.chunkPos)
+		ps.chunkPos = 0
 		ps.chunkEnd = 0
 	}
 	ps.err = err
@@ -159,6 +182,7 @@ func (ps *ProtocolScanner) scanEnvelope() error {
 	}
 	ps.chunkEnd = n
 
+	debugf(ps.config, "scanned chunk envelope for %d bytes", n)
 	return nil
 }
 

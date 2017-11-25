@@ -339,8 +339,15 @@ func (s *SocketServer) handleSubscriber(conn *conn, cmd *Command, resp *Response
 		select {
 		case r := <-resp.readerC:
 			if _, err := conn.readFrom(r); err != nil {
-				log.Printf("%s: %+v", conn.RemoteAddr(), err)
+				log.Printf("%s error: %+v", conn.RemoteAddr(), err)
 				return
+			}
+
+			if flusher, ok := r.(protocolFlusher); ok && flusher.shouldFlush() {
+				if err := conn.flush(); err != nil {
+					log.Printf("%s error: %+v", conn.RemoteAddr(), err)
+					return
+				}
 			}
 		case <-cmd.done:
 			conn.flush()

@@ -127,11 +127,9 @@ func (cmd *Command) respond(resp *Response) {
 }
 
 func (cmd *Command) finish() {
-	if cmd.done != nil {
-		select {
-		case cmd.done <- struct{}{}:
-		default:
-		}
+	select {
+	case cmd.done <- struct{}{}:
+	default:
 	}
 }
 

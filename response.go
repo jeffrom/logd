@@ -99,7 +99,14 @@ func (r *Response) sendChunk(lf logReadableFile) {
 }
 
 func (r *Response) sendBytes(b []byte) {
-	debugf(r.config, "<-readerC %q (response)", b)
+	debugf(r.config, "<-readerC %q", b)
 	reader := bytes.NewReader(b)
+	r.readerC <- reader
+}
+
+func (r *Response) sendEOF() {
+	b := newProtocolWriter().writeResponse(newResponse(r.config, RespEOF))
+	debugf(r.config, "<-readerC %q (with flush)", b)
+	reader := newFlushReader(bytes.NewReader(b))
 	r.readerC <- reader
 }
