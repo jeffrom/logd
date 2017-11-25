@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"sync"
 	"time"
@@ -128,6 +129,12 @@ Loop:
 			n, rerr := c.readFrom(r)
 			numRead++
 			read += n
+
+			if closer, ok := r.(io.Closer); ok {
+				if err := closer.Close(); err != nil {
+					log.Printf("error closing %s: %+v", c.RemoteAddr(), err)
+				}
+			}
 			if rerr != nil {
 				return read, rerr
 			}

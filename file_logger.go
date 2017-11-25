@@ -278,20 +278,26 @@ func (l *fileLogger) Range(start, end uint64) (logRangeIterator, error) {
 	if _, serr := l.parts.r.Seek(curroff, io.SeekStart); serr != nil {
 		return nil, errors.Wrap(serr, "failed to seek log in range query")
 	}
+	r := l.parts.r
 
 	var lf logReadableFile
 	fn := func() (logReadableFile, error) {
 		if lf != nil {
 			currpart++
-			curroff = 0
-			if currpart > l.parts.head() {
+			if currpart >= endpart || currpart > l.parts.head() {
 				return nil, io.EOF
 			}
-			if err := l.parts.setReadHandle(currpart); err != nil {
-				return nil, err
+			curroff = 0
+
+			nextpath := l.parts.logFilePath(currpart)
+			f, err := os.Open(nextpath)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to open next file in range")
 			}
+
+			r = newLogFile(f)
 		}
-		lf = l.parts.r
+		lf = r
 
 		if currpart == endpart {
 			lf.SetLimit(endoff - curroff)

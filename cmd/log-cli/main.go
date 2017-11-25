@@ -144,14 +144,14 @@ func doReadCmdAction(config *logd.Config) func(c *cli.Context) error {
 				start = resp.ID - uint64(limit) + 1
 			}
 		} else if start > 0 {
-			limit--
+			// limit--
 		}
 
 		if config.ReadForever {
 			limit = 0
 		}
 
-		// client.SetDeadline(time.Now().Add(time.Duration(config.ClientTimeout) * time.Millisecond))
+		// fmt.Printf("Reading %d messages from id %d\n", limit, start)
 		scanner, err := client.DoRead(start, limit)
 		if err != nil {
 			log.Printf("%+v", err)

@@ -349,9 +349,16 @@ func (s *SocketServer) handleSubscriber(conn *conn, cmd *Command, resp *Response
 				return
 			}
 
-			if flusher, ok := r.(protocolFlusher); ok && flusher.shouldFlush() {
-				if err := conn.flush(); err != nil {
-					log.Printf("%s error: %+v", conn.RemoteAddr(), err)
+			// if flusher, ok := r.(protocolFlusher); ok && flusher.shouldFlush() {
+			// 	if err := conn.flush(); err != nil {
+			// 		log.Printf("%s error: %+v", conn.RemoteAddr(), err)
+			// 		return
+			// 	}
+			// }
+
+			if closer, ok := r.(io.Closer); ok {
+				if err := closer.Close(); err != nil {
+					log.Printf("error closing %s: %+v", conn.RemoteAddr(), err)
 					return
 				}
 			}
