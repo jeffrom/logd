@@ -76,7 +76,7 @@ func BenchmarkServerPing(b *testing.B) {
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		client.Do(NewCommand(CmdPing))
+		client.Do(NewCommand(config, CmdPing))
 	}
 }
 
@@ -93,7 +93,7 @@ func BenchmarkServerMsg(b *testing.B) {
 	b.StartTimer()
 
 	for i := 0; i < b.N; i++ {
-		client.Do(NewCommand(CmdMessage, msg))
+		client.Do(NewCommand(config, CmdMessage, msg))
 	}
 }
 
@@ -104,7 +104,7 @@ func BenchmarkServerRead(b *testing.B) {
 	defer closeTestServer(b, srv)
 
 	client := newTestClient(config, srv)
-	client.Do(NewCommand(CmdMessage, someMessage))
+	client.Do(NewCommand(config, CmdMessage, someMessage))
 	client.Close()
 
 	for i := 0; i < b.N; i++ {
@@ -139,7 +139,7 @@ func BenchmarkServerTail(b *testing.B) {
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		writerClient.Do(NewCommand(CmdMessage, someMessage))
+		writerClient.Do(NewCommand(config, CmdMessage, someMessage))
 		for scanner.Scan() {
 		}
 	}
@@ -165,7 +165,7 @@ func BenchmarkServerTailTwenty(b *testing.B) {
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		writerClient.Do(NewCommand(CmdMessage, someMessage))
+		writerClient.Do(NewCommand(config, CmdMessage, someMessage))
 		for _, scanner := range scanners {
 			for scanner.Scan() {
 			}
@@ -215,7 +215,7 @@ func BenchmarkServerLoadTest(b *testing.B) {
 		for _, writerClient := range writers {
 			wg.Add(1)
 			go func(writerClient *Client) {
-				writerClient.Do(NewCommand(CmdMessage, someMessage))
+				writerClient.Do(NewCommand(config, CmdMessage, someMessage))
 				wg.Done()
 			}(writerClient)
 		}

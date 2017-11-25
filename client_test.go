@@ -45,16 +45,18 @@ func newMockClient(config *Config, srv *SocketServer) (*Client, *mockConn) {
 func TestConnProtocolWriter(t *testing.T) {
 	r := &bytes.Buffer{}
 	w := &bytes.Buffer{}
+	config := defaultTestConfig()
+
 	conn := dialTestConn(r, w)
-	conn.writeCommand(NewCommand(CmdPing))
-	conn.writeCommand(NewCommand(CmdMessage, []byte("Cool arg")))
-	conn.writeCommand(NewCommand(CmdMessage, []byte("one arg"), []byte("two arg")))
-	conn.writeCommand(NewCommand(CmdMessage, []byte("aaaaaaaaaaaaaaaaaaaaaaaaaaa"), []byte("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")))
-	conn.writeCommand(NewCommand(CmdRead, []byte("0"), []byte("0")))
-	conn.writeCommand(NewCommand(CmdHead, []byte("100")))
-	conn.writeCommand(NewCommand(CmdClose))
-	conn.writeCommand(NewCommand(CmdShutdown))
-	conn.writeCommand(NewCommand(CmdMessage, []byte("aaaaaaaaaaaaaaaaaaaaaaaaaaa"), []byte("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"), []byte("cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc")))
+	conn.writeCommand(NewCommand(config, CmdPing))
+	conn.writeCommand(NewCommand(config, CmdMessage, []byte("Cool arg")))
+	conn.writeCommand(NewCommand(config, CmdMessage, []byte("one arg"), []byte("two arg")))
+	conn.writeCommand(NewCommand(config, CmdMessage, []byte("aaaaaaaaaaaaaaaaaaaaaaaaaaa"), []byte("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")))
+	conn.writeCommand(NewCommand(config, CmdRead, []byte("0"), []byte("0")))
+	conn.writeCommand(NewCommand(config, CmdHead, []byte("100")))
+	conn.writeCommand(NewCommand(config, CmdClose))
+	conn.writeCommand(NewCommand(config, CmdShutdown))
+	conn.writeCommand(NewCommand(config, CmdMessage, []byte("aaaaaaaaaaaaaaaaaaaaaaaaaaa"), []byte("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"), []byte("cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc")))
 
 	err := conn.flush()
 	checkError(t, err)
@@ -77,7 +79,7 @@ func TestClientWriteFails(t *testing.T) {
 		Err:    errors.New("unknown host"),
 	})
 
-	_, err := client.Do(NewCommand(CmdPing))
+	_, err := client.Do(NewCommand(config, CmdPing))
 	if err == nil {
 		t.Fatalf("Expected error but got none")
 	}

@@ -60,14 +60,14 @@ func checkScan(t *testing.T, scanner *ProtocolScanner, msg []byte) {
 }
 
 func checkRespOK(t *testing.T, resp *Response) {
-	if !reflect.DeepEqual(resp, newResponse(RespOK)) {
+	if !reflect.DeepEqual(resp, newResponse(defaultTestConfig(), RespOK)) {
 		t.Logf("%s", debug.Stack())
 		t.Fatalf("response was not OK: %q", resp.Bytes())
 	}
 }
 
 func checkRespOKID(t *testing.T, resp *Response, id uint64) {
-	expected := newResponse(RespOK)
+	expected := newResponse(defaultTestConfig(), RespOK)
 	expected.ID = id
 	if !reflect.DeepEqual(resp, expected) {
 		t.Logf("%s", debug.Stack())
@@ -81,42 +81,47 @@ func TestStartStopServer(t *testing.T) {
 }
 
 func TestPingServer(t *testing.T) {
-	srv := newTestServer(defaultTestConfig())
+	config := defaultTestConfig()
+	srv := newTestServer(config)
 	defer closeTestServer(t, srv)
 
-	client := newTestClient(defaultTestConfig(), srv)
+	client := newTestClient(config, srv)
 	defer client.Close()
 
-	resp, err := client.Do(NewCommand(CmdPing))
+	resp, err := client.Do(NewCommand(config, CmdPing))
 	checkError(t, err)
 
-	if !reflect.DeepEqual(resp, newResponse(RespOK)) {
+	if !reflect.DeepEqual(resp, newResponse(config, RespOK)) {
 		t.Fatalf("response was not OK: %+v", resp)
 	}
 }
 
 func TestMsgServer(t *testing.T) {
-	srv := newTestServer(testConfig(newMemLogger()))
+	config := testConfig(newMemLogger())
+	srv := newTestServer(config)
 	defer closeTestServer(t, srv)
 
-	client := newTestClient(defaultTestConfig(), srv)
+	clientConfig := defaultTestConfig()
+	client := newTestClient(clientConfig, srv)
 	defer client.Close()
 
-	resp, err := client.Do(NewCommand(CmdMessage, []byte("cool message")))
+	resp, err := client.Do(NewCommand(clientConfig, CmdMessage, []byte("cool message")))
 	checkError(t, err)
 
 	checkRespOKID(t, resp, 1)
 }
 
 func TestReadServer(t *testing.T) {
-	srv := newTestServer(testConfig(newMemLogger()))
+	config := testConfig(newMemLogger())
+	srv := newTestServer(config)
 	defer closeTestServer(t, srv)
 
-	client := newTestClient(defaultTestConfig(), srv)
+	clientConfig := defaultTestConfig()
+	client := newTestClient(clientConfig, srv)
 	defer client.Close()
 
 	msg := []byte("cool message")
-	resp, err := client.Do(NewCommand(CmdMessage, msg))
+	resp, err := client.Do(NewCommand(clientConfig, CmdMessage, msg))
 	checkError(t, err)
 	checkRespOKID(t, resp, 1)
 
@@ -130,14 +135,16 @@ func TestTailServer(t *testing.T) {
 	success := make(chan struct{})
 	sent := make(chan struct{})
 	msg := []byte("cool message")
+	config := testConfig(newMemLogger())
 
-	srv := newTestServer(testConfig(newMemLogger()))
+	srv := newTestServer(config)
 	defer closeTestServer(t, srv)
 
-	client := newTestClient(defaultTestConfig(), srv)
+	clientConfig := defaultTestConfig()
+	client := newTestClient(clientConfig, srv)
 	defer client.Close()
 
-	writerClient := newTestClient(defaultTestConfig(), srv)
+	writerClient := newTestClient(clientConfig, srv)
 	defer writerClient.Close()
 
 	scanner, err := client.DoRead(1, 0)
@@ -149,14 +156,14 @@ func TestTailServer(t *testing.T) {
 		success <- struct{}{}
 	}()
 
-	resp, err := writerClient.Do(NewCommand(CmdMessage, msg))
+	resp, err := writerClient.Do(NewCommand(clientConfig, CmdMessage, msg))
 	checkError(t, err)
 	checkRespOKID(t, resp, 1)
 
 	sent <- struct{}{}
 	waitForChannel(t, success)
 
-	secondTailClient := newTestClient(defaultTestConfig(), srv)
+	secondTailClient := newTestClient(clientConfig, srv)
 	defer secondTailClient.Close()
 
 	secondScanner, rerr := client.DoRead(1, 0)
@@ -170,7 +177,7 @@ func TestTailServer(t *testing.T) {
 	}()
 
 	msg = []byte("another cool message")
-	resp, err = writerClient.Do(NewCommand(CmdMessage, msg))
+	resp, err = writerClient.Do(NewCommand(clientConfig, CmdMessage, msg))
 	checkError(t, err)
 	checkRespOKID(t, resp, 2)
 
@@ -187,13 +194,15 @@ func TestTailServer(t *testing.T) {
 }
 
 func TestServerSleep(t *testing.T) {
-	srv := newTestServer(testConfig(newMemLogger()))
+	config := testConfig(newMemLogger())
+	srv := newTestServer(config)
 	defer closeTestServer(t, srv)
 
-	client := newTestClient(defaultTestConfig(), srv)
+	clientConfig := defaultTestConfig()
+	client := newTestClient(clientConfig, srv)
 	defer client.Close()
 
-	resp, err := client.Do(NewCommand(CmdSleep, []byte("10")))
+	resp, err := client.Do(NewCommand(clientConfig, CmdSleep, []byte("10")))
 	checkError(t, err)
 	checkRespOK(t, resp)
 }
@@ -211,10 +220,12 @@ func TestServerSleep(t *testing.T) {
 // }
 
 func TestServerInvalidRequests(t *testing.T) {
-	srv := newTestServer(testConfig(newMemLogger()))
+	config := testConfig(newMemLogger())
+	srv := newTestServer(config)
 	defer closeTestServer(t, srv)
 
-	client := newTestClient(defaultTestConfig(), srv)
+	clientConfig := defaultTestConfig()
+	client := newTestClient(clientConfig, srv)
 	defer client.Close()
 
 	var tests = []struct {
@@ -223,37 +234,37 @@ func TestServerInvalidRequests(t *testing.T) {
 		reason   string
 	}{
 		{
-			NewCommand(CmdMessage, []byte("")),
-			NewClientErrResponse([]byte("empty message not allowed")),
+			NewCommand(clientConfig, CmdMessage, []byte("")),
+			NewClientErrResponse(clientConfig, []byte("empty message not allowed")),
 			"Server should not accept empty messages",
 		},
 		{
-			NewCommand(CmdMessage),
-			NewClientErrResponse([]byte("must supply an argument")),
+			NewCommand(clientConfig, CmdMessage),
+			NewClientErrResponse(clientConfig, []byte("must supply an argument")),
 			"Server should not accept missing message argument",
 		},
 
 		{
-			NewCommand(CmdRead),
-			NewClientErrResponse([]byte("invalid request")),
+			NewCommand(clientConfig, CmdRead),
+			NewClientErrResponse(clientConfig, []byte("invalid request")),
 			"Server should not accept missing read argument",
 		},
 
 		{
-			NewCommand(CmdHead, []byte("0")),
-			NewClientErrResponse([]byte("invalid request")),
+			NewCommand(clientConfig, CmdHead, []byte("0")),
+			NewClientErrResponse(clientConfig, []byte("invalid request")),
 			"Server should not accept extra head argument",
 		},
 
 		{
-			NewCommand(CmdPing, []byte("0")),
-			NewClientErrResponse([]byte("invalid request")),
+			NewCommand(clientConfig, CmdPing, []byte("0")),
+			NewClientErrResponse(clientConfig, []byte("invalid request")),
 			"Server should not accept extra ping argument",
 		},
 
 		{
-			NewCommand(CmdClose, []byte("0")),
-			NewClientErrResponse([]byte("invalid request")),
+			NewCommand(clientConfig, CmdClose, []byte("0")),
+			NewClientErrResponse(clientConfig, []byte("invalid request")),
 			"Server should not accept extra close argument",
 		},
 	}

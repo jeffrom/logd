@@ -149,18 +149,20 @@ func TestEventQStartStop(t *testing.T) {
 }
 
 func TestEventQAdd(t *testing.T) {
+	config := defaultTestConfig()
 	q := startQ(t, newMemLogger())
 	defer stopQ(t, q)
 
-	resp, err := q.pushCommand(NewCommand(CmdPing))
+	resp, err := q.pushCommand(NewCommand(config, CmdPing))
 	checkNoErrAndSuccess(t, resp, err)
 }
 
 func TestEventQWrite(t *testing.T) {
+	config := defaultTestConfig()
 	q := startQ(t, newMemLogger())
 	defer stopQ(t, q)
 
-	resp, err := q.pushCommand(NewCommand(CmdMessage, []byte("Hello, log!")))
+	resp, err := q.pushCommand(NewCommand(config, CmdMessage, []byte("Hello, log!")))
 	checkNoErrAndSuccess(t, resp, err)
 	if resp.ID != 1 {
 		t.Fatalf("Expected response with id 1 but got %d", resp.ID)
@@ -168,12 +170,13 @@ func TestEventQWrite(t *testing.T) {
 }
 
 func TestEventQWriteErr(t *testing.T) {
+	config := defaultTestConfig()
 	memLogger := newMemLogger()
 	memLogger.returnErr = true
 	q := startQ(t, memLogger)
 	defer stopQ(t, q)
 
-	resp, _ := q.pushCommand(NewCommand(CmdMessage, []byte("Hello, log!")))
+	resp, _ := q.pushCommand(NewCommand(config, CmdMessage, []byte("Hello, log!")))
 	checkErrResp(t, resp)
 }
 
@@ -191,7 +194,7 @@ func TestEventQWriteFilePartitions(t *testing.T) {
 	msg := []byte(repeat("A", 50))
 	for i := 0; i < 10; i++ {
 		truncated := msg[:len(msg)-(10%(i+1))]
-		resp, err := q.pushCommand(NewCommand(CmdMessage, truncated))
+		resp, err := q.pushCommand(NewCommand(config, CmdMessage, truncated))
 		checkNoErrAndSuccess(t, resp, err)
 	}
 
@@ -222,7 +225,7 @@ func TestEventQWriteAfterRestart(t *testing.T) {
 	// defer stopQ(t, q)
 
 	for _, line := range someLines[:2] {
-		resp, err := q.pushCommand(NewCommand(CmdMessage, line))
+		resp, err := q.pushCommand(NewCommand(config, CmdMessage, line))
 		checkNoErrAndSuccess(t, resp, err)
 	}
 
@@ -235,7 +238,7 @@ func TestEventQWriteAfterRestart(t *testing.T) {
 	defer stopQ(t, q)
 
 	for _, line := range someLines {
-		resp, err := q.pushCommand(NewCommand(CmdMessage, line))
+		resp, err := q.pushCommand(NewCommand(config, CmdMessage, line))
 		checkNoErrAndSuccess(t, resp, err)
 	}
 
@@ -277,7 +280,7 @@ func TestEventQReadFilePartitions(t *testing.T) {
 		t.Logf("checking id %d", id)
 
 		idStr := fmt.Sprintf("%d", id)
-		cmd := NewCommand(CmdRead, []byte(idStr), []byte("1"))
+		cmd := NewCommand(config, CmdRead, []byte(idStr), []byte("1"))
 		resp, err := q.pushCommand(cmd)
 
 		checkNoErrAndSuccess(t, resp, err)
@@ -287,22 +290,23 @@ func TestEventQReadFilePartitions(t *testing.T) {
 }
 
 func TestEventQHead(t *testing.T) {
+	config := defaultTestConfig()
 	q := startQ(t, newMemLogger())
 	defer stopQ(t, q)
 
-	resp, err := q.pushCommand(NewCommand(CmdHead))
+	resp, err := q.pushCommand(NewCommand(config, CmdHead))
 	checkNoErrAndSuccess(t, resp, err)
 	if resp.ID != 0 {
 		t.Fatalf("Expected response with id 0 but got %d", resp.ID)
 	}
 
-	resp, err = q.pushCommand(NewCommand(CmdMessage, []byte("Hello, log!")))
+	resp, err = q.pushCommand(NewCommand(config, CmdMessage, []byte("Hello, log!")))
 	checkNoErrAndSuccess(t, resp, err)
 	if resp.ID != 1 {
 		t.Fatalf("Expected response with id 1 but got %d", resp.ID)
 	}
 
-	resp, err = q.pushCommand(NewCommand(CmdHead))
+	resp, err = q.pushCommand(NewCommand(config, CmdHead))
 	checkNoErrAndSuccess(t, resp, err)
 	if resp.ID != 1 {
 		t.Fatalf("Expected response with id 1 but got %d", resp.ID)
@@ -311,118 +315,124 @@ func TestEventQHead(t *testing.T) {
 
 func TestEventQHeadErr(t *testing.T) {
 	memLogger := newMemLogger()
+	config := testConfig(memLogger)
 	q := startQ(t, memLogger)
 	defer stopQ(t, q)
 
 	memLogger.headReturnErr = errors.New("cool error")
-	resp, _ := q.pushCommand(NewCommand(CmdHead))
+	resp, _ := q.pushCommand(NewCommand(config, CmdHead))
 	checkErrResp(t, resp)
 
-	anotherQ := newEventQ(testConfig(memLogger))
+	anotherQ := newEventQ(config)
 	if err := anotherQ.start(); err == nil {
 		t.Fatalf("expected error starting queue but got none")
 	}
 }
 
 func TestEventQReplicate(t *testing.T) {
+	config := defaultTestConfig()
 	q := startQ(t, newMemLogger())
 	defer stopQ(t, q)
 
 	expectedMsg := []byte("Hello, log!")
 
-	resp, err := q.pushCommand(NewCommand(CmdMessage, expectedMsg))
+	resp, err := q.pushCommand(NewCommand(config, CmdMessage, expectedMsg))
 	checkNoErrAndSuccess(t, resp, err)
 
-	cmd := NewCommand(CmdReplicate, []byte("1"))
+	cmd := NewCommand(config, CmdReplicate, []byte("1"))
 	tailResp, err := q.pushCommand(cmd)
 	checkNoErrAndSuccess(t, tailResp, err)
 	checkMessageReceived(t, tailResp, 1, expectedMsg)
 
-	resp, err = q.pushCommand(NewCommand(CmdMessage, expectedMsg))
+	resp, err = q.pushCommand(NewCommand(config, CmdMessage, expectedMsg))
 	checkNoErrAndSuccess(t, resp, err)
 
 	checkMessageReceived(t, tailResp, 2, expectedMsg)
 
-	closeCmd := newCloseCommand(cmd.respC)
+	closeCmd := newCloseCommand(config, cmd.respC)
 	closeResp, err := q.pushCommand(closeCmd)
 	checkNoErrAndSuccess(t, closeResp, err)
 }
 
 func TestEventQRead(t *testing.T) {
+	config := defaultTestConfig()
 	q := startQ(t, newMemLogger())
 	defer stopQ(t, q)
 
 	expectedMsg := []byte("Hello, log!")
 
-	resp, err := q.pushCommand(NewCommand(CmdMessage, expectedMsg))
+	resp, err := q.pushCommand(NewCommand(config, CmdMessage, expectedMsg))
 	checkNoErrAndSuccess(t, resp, err)
 
-	cmd := NewCommand(CmdRead, []byte("1"), []byte("1"))
+	cmd := NewCommand(config, CmdRead, []byte("1"), []byte("1"))
 	tailResp, err := q.pushCommand(cmd)
 	checkNoErrAndSuccess(t, tailResp, err)
 	checkMessageReceived(t, tailResp, 1, expectedMsg)
 	checkEOF(t, tailResp)
 
-	cmd = NewCommand(CmdRead, []byte("1"), []byte("0"))
+	cmd = NewCommand(config, CmdRead, []byte("1"), []byte("0"))
 	tailResp, err = q.pushCommand(cmd)
 	checkNoErrAndSuccess(t, tailResp, err)
 	checkMessageReceived(t, tailResp, 1, expectedMsg)
 
-	resp, err = q.pushCommand(NewCommand(CmdMessage, expectedMsg))
+	resp, err = q.pushCommand(NewCommand(config, CmdMessage, expectedMsg))
 	checkNoErrAndSuccess(t, resp, err)
 
 	checkMessageReceived(t, tailResp, 2, expectedMsg)
 
-	closeCmd := newCloseCommand(cmd.respC)
+	closeCmd := newCloseCommand(config, cmd.respC)
 	closeResp, err := q.pushCommand(closeCmd)
 	checkNoErrAndSuccess(t, closeResp, err)
 
 }
 
 func TestEventQReadFromEmpty(t *testing.T) {
+	config := defaultTestConfig()
 	q := startQ(t, newMemLogger())
 	defer stopQ(t, q)
 
 	expectedMsg := []byte("Hello, log!")
 
-	tailResp, err := q.pushCommand(NewCommand(CmdRead, []byte("1"), []byte("0")))
+	tailResp, err := q.pushCommand(NewCommand(config, CmdRead, []byte("1"), []byte("0")))
 	checkNoErrAndSuccess(t, tailResp, err)
 
-	resp, err := q.pushCommand(NewCommand(CmdMessage, expectedMsg))
+	resp, err := q.pushCommand(NewCommand(config, CmdMessage, expectedMsg))
 	checkNoErrAndSuccess(t, resp, err)
 
 	checkMessageReceived(t, tailResp, 1, expectedMsg)
 }
 
 func TestEventQReadErr(t *testing.T) {
+	config := defaultTestConfig()
 	memLogger := newMemLogger()
 	memLogger.returnErr = true
 	q := startQ(t, memLogger)
 	defer stopQ(t, q)
 
-	resp, _ := q.pushCommand(NewCommand(CmdRead))
+	resp, _ := q.pushCommand(NewCommand(config, CmdRead))
 	checkClientErrResp(t, resp)
 }
 
 func TestEventQReadClose(t *testing.T) {
+	config := defaultTestConfig()
 	q := startQ(t, newMemLogger())
 	defer stopQ(t, q)
 
 	expectedMsg := []byte("Hello, log!")
 
-	resp, err := q.pushCommand(NewCommand(CmdMessage, expectedMsg))
+	resp, err := q.pushCommand(NewCommand(config, CmdMessage, expectedMsg))
 	checkNoErrAndSuccess(t, resp, err)
 
-	readCmd := NewCommand(CmdRead, []byte("1"), []byte("0"))
+	readCmd := NewCommand(config, CmdRead, []byte("1"), []byte("0"))
 	tailResp, err := q.pushCommand(readCmd)
 	checkNoErrAndSuccess(t, tailResp, err)
 	checkMessageReceived(t, tailResp, 1, expectedMsg)
 
-	closeCmd := newCloseCommand(readCmd.respC)
+	closeCmd := newCloseCommand(config, readCmd.respC)
 	closeResp, err := q.pushCommand(closeCmd)
 	checkNoErrAndSuccess(t, closeResp, err)
 
-	resp, err = q.pushCommand(NewCommand(CmdMessage, expectedMsg))
+	resp, err = q.pushCommand(NewCommand(config, CmdMessage, expectedMsg))
 	checkNoErrAndSuccess(t, resp, err)
 
 	if len(q.subscriptions) > 0 {
@@ -431,39 +441,42 @@ func TestEventQReadClose(t *testing.T) {
 }
 
 func TestEventQReadInvalidParams(t *testing.T) {
+	config := defaultTestConfig()
 	q := startQ(t, newMemLogger())
 	defer stopQ(t, q)
 
-	resp, _ := q.pushCommand(NewCommand(CmdRead, []byte("asdf"), []byte("1")))
+	resp, _ := q.pushCommand(NewCommand(config, CmdRead, []byte("asdf"), []byte("1")))
 	checkClientErrResp(t, resp)
 
-	resp, _ = q.pushCommand(NewCommand(CmdRead, []byte("1"), []byte("asdf")))
+	resp, _ = q.pushCommand(NewCommand(config, CmdRead, []byte("1"), []byte("asdf")))
 	checkClientErrResp(t, resp)
 
-	resp, _ = q.pushCommand(NewCommand(CmdRead, []byte("1")))
+	resp, _ = q.pushCommand(NewCommand(config, CmdRead, []byte("1")))
 	checkClientErrResp(t, resp)
 }
 
 func TestEventQUnknownCommand(t *testing.T) {
+	config := defaultTestConfig()
 	q := startQ(t, newMemLogger())
 	defer stopQ(t, q)
 
-	resp, _ := q.pushCommand(NewCommand(100))
+	resp, _ := q.pushCommand(NewCommand(config, 100))
 	checkErrResp(t, resp)
 }
 
 func TestEventQSleep(t *testing.T) {
+	config := defaultTestConfig()
 	q := startQ(t, newMemLogger())
 	defer stopQ(t, q)
 
-	resp, err := q.pushCommand(NewCommand(CmdSleep, []byte("0")))
+	resp, err := q.pushCommand(NewCommand(config, CmdSleep, []byte("0")))
 	checkNoErrAndSuccess(t, resp, err)
 
-	resp, err = q.pushCommand(NewCommand(CmdSleep, []byte("1")))
+	resp, err = q.pushCommand(NewCommand(config, CmdSleep, []byte("1")))
 	checkNoErrAndSuccess(t, resp, err)
 
 	done := make(chan struct{})
-	sleepCmd := NewCommand(CmdSleep, []byte("100"))
+	sleepCmd := NewCommand(config, CmdSleep, []byte("100"))
 
 	go func() {
 		resp, err = q.pushCommand(sleepCmd)
