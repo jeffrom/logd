@@ -2,7 +2,6 @@ package logd
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 )
 
@@ -20,7 +19,7 @@ func newSubscription(readerC chan io.Reader, done chan struct{}) *Subscription {
 }
 
 func (subs *Subscription) send(msg []byte) {
-	fmt.Printf("<-bytes %q (subscription)\n", msg)
+	// fmt.Printf("<-bytes %q (subscription)\n", prettybuf(msg))
 	subs.readerC <- bytes.NewReader(msg)
 }
 

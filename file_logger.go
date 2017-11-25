@@ -208,6 +208,7 @@ Loop:
 				if oerr := l.parts.setReadHandle(l.parts.currReadPart + 1); oerr != nil {
 					return part, 0, errors.Wrap(oerr, "failed to set read handle")
 				}
+				part++
 				continue
 			} else {
 				break
@@ -258,73 +259,6 @@ func (l *fileLogger) Copy() Logger {
 	return newFileLogger(l.config)
 }
 
-// Range returns an iterator. each time it is called, it returns a) an *os.File,
-// maybe wrapped with an io.LimitReader, and at a seek position, or b) an
-// io.Reader which reads a chunk of log lines. the final reader will close the
-// files in the iterator and return io.EOF
-func (l *fileLogger) shittyRange(start, end uint64) (*fileLogger, error) {
-	lcopy := newFileLogger(l.config)
-	currpart, curroff, perr := lcopy.getPartOffset(start, false)
-	if perr != nil {
-		return nil, perr
-	}
-
-	otherl := newFileLogger(lcopy.config)
-	endpart, endoff, err := otherl.getPartOffset(end, true)
-	if err != nil {
-		return nil, err
-	}
-
-	lr := lcopy.parts.r
-	startr := lr.(io.Reader)
-	closer := lr.Close
-	size := currSize(lr)
-	if _, serr := lr.Seek(curroff, io.SeekStart); serr != nil {
-		return nil, errors.Wrap(serr, "failed to seek log in range query")
-	}
-
-	if currpart == endpart {
-		startr = io.LimitReader(lr, endoff-curroff)
-	}
-
-	var sizes = []int64{size}
-	var closers = []func() error{closer}
-	var readers = []io.Reader{startr}
-
-	// TODO use filePartitions. it already handles the closing logic. and we
-	// wont need to open all these file handles up front either.
-	var r io.Reader
-	for currpart < endpart {
-		currpart++
-		f, ferr := os.Open(l.parts.logFilePath(currpart))
-		r = f
-		if ferr != nil {
-			return nil, errors.Wrap(err, "failed to open log for range query")
-		}
-
-		stat, err := f.Stat()
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to stat partition file")
-		}
-
-		if currpart == endpart {
-			r = io.LimitReader(r, endoff)
-		}
-
-		sizes = append(sizes, stat.Size())
-		readers = append(readers, r)
-		closers = append(closers, f.Close)
-	}
-
-	// set the original logger to the current HEAD
-	if err := l.SeekToID(end); err != nil {
-		return nil, err
-	}
-
-	return nil, nil
-	// return l.rangeIterator(sizes, readers, closers), nil
-}
-
 func (l *fileLogger) Range(start, end uint64) (logRangeIterator, error) {
 	debugf(l.config, "Range(%d, %d)", start, end)
 
@@ -350,7 +284,7 @@ func (l *fileLogger) Range(start, end uint64) (logRangeIterator, error) {
 		if lf != nil {
 			currpart++
 			curroff = 0
-			if currpart >= l.parts.head() {
+			if currpart > l.parts.head() {
 				return nil, io.EOF
 			}
 			if err := l.parts.setReadHandle(currpart); err != nil {
