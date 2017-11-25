@@ -77,14 +77,12 @@ type ProtocolScanner struct {
 }
 
 func newProtocolScanner(config *Config, r io.Reader) *ProtocolScanner {
+	// TODO maybe pass through bufio.Reader instead of creating a new one if r
+	// is a bufio.Reader?
 	return &ProtocolScanner{
 		config: config,
 		br:     bufio.NewReaderSize(r, config.PartitionSize),
 	}
-}
-
-func newProtocolScannerWithReader(config *Config, br *bufio.Reader) *ProtocolScanner {
-	return &ProtocolScanner{config: config, br: br}
 }
 
 // Scan reads over log data in a loop
@@ -162,7 +160,6 @@ func (ps *ProtocolScanner) readMessage() (int, *Message, error) {
 }
 
 func (ps *ProtocolScanner) scanEnvelope() error {
-	debugf(ps.config, "peeking")
 	if b, err := ps.br.Peek(1); err != nil {
 		if err == io.EOF {
 			return err
@@ -172,7 +169,6 @@ func (ps *ProtocolScanner) scanEnvelope() error {
 		return errInvalidFirstByte
 	}
 	ps.br.ReadByte()
-	debugf(ps.config, "peeked")
 	// debugf(ps.config, "scanning envelope")
 
 	line, err := readLine(ps.br)

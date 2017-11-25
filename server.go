@@ -303,11 +303,15 @@ func (s *SocketServer) handleClient(conn *conn) {
 		respBytes := resp.Bytes()
 		if cmd.name == CmdClose {
 			debugf(s.config, "closing %s", conn.RemoteAddr())
-			resp.sendBytes(respBytes)
+			if _, err := conn.write(respBytes); handleConnErr(s.config, err, conn) != nil {
+				log.Printf("error closing connection to %s: %+v", conn.RemoteAddr(), err)
+				return
+			}
 			break
 		}
 
 		if _, err := conn.write(respBytes); handleConnErr(s.config, err, conn) != nil {
+			log.Printf("error writing to %s: %+v", conn.RemoteAddr(), err)
 			return
 		}
 		cmd.signalReady()
