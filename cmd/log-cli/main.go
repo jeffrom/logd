@@ -149,7 +149,7 @@ func doReadCmdAction(config *logd.Config) func(c *cli.Context) error {
 			limit = 0
 		}
 
-		client.SetDeadline(time.Now().Add(time.Duration(config.ClientTimeout) * time.Millisecond))
+		// client.SetDeadline(time.Now().Add(time.Duration(config.ClientTimeout) * time.Millisecond))
 		scanner, err := client.DoRead(start, limit)
 		if err != nil {
 			log.Printf("%+v", err)

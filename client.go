@@ -109,7 +109,7 @@ func (c *Client) readScanResponse() (*ProtocolScanner, error) {
 	if err := c.conn.SetReadDeadline(time.Now().Add(c.readTimeout)); err != nil {
 		return nil, err
 	}
-	return newProtocolScanner(c.config, c.conn), nil
+	return newProtocolScannerWithReader(c.config, c.pr.br), nil
 }
 
 // Close closes the client connection.

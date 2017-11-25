@@ -83,6 +83,10 @@ func newProtocolScanner(config *Config, r io.Reader) *ProtocolScanner {
 	}
 }
 
+func newProtocolScannerWithReader(config *Config, br *bufio.Reader) *ProtocolScanner {
+	return &ProtocolScanner{config: config, br: br}
+}
+
 // Scan reads over log data in a loop
 func (ps *ProtocolScanner) Scan() bool {
 	if ps.chunkEnd <= 0 { // need to read chunk envelope
@@ -114,6 +118,7 @@ func (ps *ProtocolScanner) readMessage() (int, *Message, error) {
 	var err error
 	var read int
 
+	// fmt.Println("reading line")
 	line, err := readLine(ps.br)
 	// fmt.Printf("read: %q (%v)\n", line, err)
 	read += len(line)
@@ -157,15 +162,18 @@ func (ps *ProtocolScanner) readMessage() (int, *Message, error) {
 }
 
 func (ps *ProtocolScanner) scanEnvelope() error {
+	debugf(ps.config, "peeking")
 	if b, err := ps.br.Peek(1); err != nil {
 		if err == io.EOF {
-			return nil
+			return err
 		}
 		return errors.Wrap(err, "failed reading first byte")
 	} else if b[0] != '+' {
 		return errInvalidFirstByte
 	}
 	ps.br.ReadByte()
+	debugf(ps.config, "peeked")
+	// debugf(ps.config, "scanning envelope")
 
 	line, err := readLine(ps.br)
 	if err != nil {
