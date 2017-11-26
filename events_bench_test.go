@@ -1,6 +1,7 @@
 package logd
 
 import (
+	"io"
 	"runtime/debug"
 	"testing"
 )
@@ -88,8 +89,10 @@ func BenchmarkEventQReadOne(b *testing.B) {
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		resp, _ := q.pushCommand(NewCommand(config, CmdRead, []byte("1"), []byte("1")))
-		<-resp.readerC
+		cmd := NewCommand(config, CmdRead, []byte("1"), []byte("1"))
+		resp, _ := q.pushCommand(cmd)
+		cmd.signalReady()
+		drainReaderChan(resp.readerC)
 	}
 }
 
@@ -99,12 +102,14 @@ func BenchmarkEventQReadFromHeadOne(b *testing.B) {
 	q := startQForBench(b)
 	defer stopQ(b, q)
 	msg := []byte("hey i'm a message")
-	resp, _ := q.pushCommand(NewCommand(config, CmdRead, []byte("1"), []byte("0")))
+	cmd := NewCommand(config, CmdRead, []byte("1"), []byte("0"))
+	resp, _ := q.pushCommand(cmd)
+	cmd.signalReady()
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		q.pushCommand(NewCommand(config, CmdMessage, msg))
-		<-resp.readerC
+		drainReaderChan(resp.readerC)
 	}
 }
 
@@ -117,7 +122,9 @@ func BenchmarkEventQReadFromHeadTen(b *testing.B) {
 
 	var subs []*Response
 	for i := 0; i < 10; i++ {
-		resp, _ := q.pushCommand(NewCommand(config, CmdRead, []byte("1"), []byte("0")))
+		cmd := NewCommand(config, CmdRead, []byte("1"), []byte("0"))
+		resp, _ := q.pushCommand(cmd)
+		cmd.signalReady()
 		subs = append(subs, resp)
 	}
 
@@ -125,7 +132,23 @@ func BenchmarkEventQReadFromHeadTen(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		q.pushCommand(NewCommand(config, CmdMessage, msg))
 		for _, resp := range subs {
-			<-resp.readerC
+			drainReaderChan(resp.readerC)
+		}
+	}
+}
+
+func drainReaderChan(readerC chan io.Reader) {
+	n := 0
+Loop:
+	for {
+		select {
+		case <-readerC:
+			n++
+		default:
+			if n == 0 {
+				continue
+			}
+			break Loop
 		}
 	}
 }
