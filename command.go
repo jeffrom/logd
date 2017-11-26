@@ -134,12 +134,19 @@ func (cmd *Command) finish() {
 }
 
 func (cmd *Command) signalReady() {
+	debugf(cmd.config, "signalling command %s readiness", cmd)
 	cmd.ready <- struct{}{}
 }
 
 func (cmd *Command) waitForReady() {
-	debugf(cmd.config, "waiting for command to be ready")
-	<-cmd.ready
+	debugf(cmd.config, "waiting for command %s to be ready", cmd)
+	select {
+	case <-cmd.ready:
+		// case <-time.After(100 * time.Millisecond):
+		// 	log.Printf("timed out waiting for read command to be ready")
+		// 	return
+	}
+
 }
 
 func (cmd *Command) cancelSleep() {
