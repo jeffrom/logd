@@ -91,11 +91,13 @@ func (r *Response) sendChunk(lf logReadableFile) {
 	if limit > 0 {
 		buflen = limit
 	}
+	// buflen does not take seek position into account
 
-	debugf(r.config, "<-readerC %d byte chunk", buflen)
+	f := lf.AsFile()
+	debugf(r.config, "<-%s: %d bytes", f.Name(), buflen)
 	reader := bytes.NewReader([]byte(fmt.Sprintf("+%d\r\n", buflen)))
 	r.readerC <- reader
-	r.readerC <- io.LimitReader(lf.AsFile(), buflen)
+	r.readerC <- io.LimitReader(f, buflen)
 }
 
 func (r *Response) sendBytes(b []byte) {

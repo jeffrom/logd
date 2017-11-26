@@ -358,7 +358,7 @@ func (s *SocketServer) handleSubscriber(conn *conn, cmd *Command, resp *Response
 
 			if closer, ok := r.(io.Closer); ok {
 				if err := closer.Close(); err != nil {
-					log.Printf("error closing %s: %+v", conn.RemoteAddr(), err)
+					log.Printf("error closing reader to %s: %+v", conn.RemoteAddr(), err)
 					return
 				}
 			}
