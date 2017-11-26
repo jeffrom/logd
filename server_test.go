@@ -60,8 +60,7 @@ func checkScan(t *testing.T, scanner *ProtocolScanner, msg []byte) {
 }
 
 func checkRespOK(t *testing.T, resp *Response) {
-	if !reflect.DeepEqual(resp, newResponse(defaultTestConfig(), RespOK)) {
-		t.Logf("%s", debug.Stack())
+	if resp.Status != RespOK {
 		t.Fatalf("response was not OK: %q", resp.Bytes())
 	}
 }
@@ -88,7 +87,7 @@ func TestPingServer(t *testing.T) {
 	resp, err := client.Do(NewCommand(config, CmdPing))
 	checkError(t, err)
 
-	if !reflect.DeepEqual(resp, newResponse(config, RespOK)) {
+	if resp.Status != RespOK {
 		t.Fatalf("response was not OK: %+v", resp)
 	}
 }
