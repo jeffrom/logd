@@ -15,7 +15,7 @@
   different protocol
 - [ ] make consistency guarantees configurable. fast by default but also force
   disk flush before returning success if that's desired.
-    - most strict can use creat(O_SYNC), or maybe just flush before responding
+    - most strict can use `creat(O_SYNC)`, or maybe just flush before responding
       to each command
     - least strict just needs to fsync during shutdown
     - have a flush interval option. also document how it may be better to just
@@ -41,6 +41,7 @@
   while under load
 - [ ] documentation with many use cases, event log, pub sub, replication,
   changing master
+- [ ] keep track of running delete hooks, make part of graceful shutdown
 - [ ] CONTRIBUTORS.md
 
 
