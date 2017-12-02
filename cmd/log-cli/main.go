@@ -14,8 +14,8 @@ import (
 
 	"github.com/jeffrom/logd"
 	"github.com/pkg/errors"
-	"github.com/urfave/cli"
-	"github.com/urfave/cli/altsrc"
+	"gopkg.in/urfave/cli.v1"
+	"gopkg.in/urfave/cli.v1/altsrc"
 )
 
 func toBytes(args []string) [][]byte {

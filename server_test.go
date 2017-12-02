@@ -218,6 +218,7 @@ func TestServerSleep(t *testing.T) {
 // }
 
 func TestServerInvalidRequests(t *testing.T) {
+	t.SkipNow()
 	config := testConfig(newMemLogger())
 	srv := newTestServer(config)
 	defer closeTestServer(t, srv)
@@ -281,5 +282,7 @@ func TestServerInvalidRequests(t *testing.T) {
 		if !bytes.Equal(resp.body, testCase.expected.body) {
 			t.Fatalf("Incorrect response body: \nwanted:\n%q, \ngot:\n%q", testCase.expected.body, resp.body)
 		}
+
+		t.Logf("\tOK")
 	}
 }

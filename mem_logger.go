@@ -1,8 +1,11 @@
 package logd
 
 import (
+	"bufio"
+	"bytes"
 	"errors"
 	"io"
+	"os"
 )
 
 type memLogger struct {
@@ -89,5 +92,59 @@ func (l *memLogger) Copy() Logger {
 }
 
 func (l *memLogger) Range(start, end uint64) (logRangeIterator, error) {
-	return nil, nil
+	var msgs [][]byte
+	copy(msgs, l.messages)
+	fn := func() (logReadableFile, error) {
+		var msg []byte
+		if len(msgs) == 0 {
+			return nil, io.EOF
+		}
+		msg, msgs = msgs[0], msgs[1:]
+		return newMemFile(msg), io.EOF
+	}
+	return memIteratorFunc(fn), nil
+}
+
+type memIterator struct {
+	next func() (logReadableFile, error)
+}
+
+func memIteratorFunc(fn func() (logReadableFile, error)) *memIterator {
+	return &memIterator{next: fn}
+}
+
+func (mi *memIterator) Next() (logReadableFile, error) {
+	return mi.next()
+}
+
+type memFile struct {
+	*bufio.ReadWriter
+	buf []byte
+}
+
+func newMemFile(b []byte) *memFile {
+	return &memFile{
+		buf:        b,
+		ReadWriter: bufio.NewReadWriter(bufio.NewReader(bytes.NewBuffer(b)), bufio.NewWriter(bytes.NewBuffer(b))),
+	}
+}
+
+func (mf *memFile) AsFile() *os.File {
+	return nil
+}
+
+func (mf *memFile) SetLimit(limit int64) {
+
+}
+
+func (mf *memFile) SizeLimit() (int64, int64) {
+	return 0, 0
+}
+
+func (mf *memFile) Close() error {
+	return nil
+}
+
+func (mf *memFile) Seek(n int64, off int) (int64, error) {
+	return 0, nil
 }

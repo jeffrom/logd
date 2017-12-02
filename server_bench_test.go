@@ -3,48 +3,49 @@ package logd
 import (
 	"io/ioutil"
 	"log"
-	"runtime/debug"
 	"sync"
 	"testing"
 )
 
 var someMessage = []byte("cool, reasonably-sized message. something about the length of an access log, or a json object displaying some information about a request. Not too big, not too small. Probably about 200 bytes, maybe more. I mean, these things are pretty arbitrary, really. In many instances, 200 bytes would be far too small. In others, too large.")
 
-func serverBenchConfig() *Config {
-	return serverBenchConfigWithOpts(true)
+func serverBenchConfig(t testing.TB) (*Config, func()) {
+	return serverBenchConfigWithOpts(t, true)
 }
 
-func serverBenchConfigWithOpts(discard bool) *Config {
+func serverBenchConfigWithOpts(t testing.TB, discard bool) (*Config, func()) {
 	config := NewConfig()
 	config.ServerTimeout = 500
 	config.ClientTimeout = 500
 	config.MaxChunkSize = 1024 * 10
-	config.PartitionSize = 1024 * 1024 * 500
-	config.IndexCursorSize = 1000
+	// config.PartitionSize = 1024 * 1024 * 500
+	// config.IndexCursorSize = 1000
+	config.PartitionSize = 1024 * 500
+	config.IndexCursorSize = 100
+	config.LogFileMode = 0644
 
-	logger := newMemLogger()
-	logger.discard = discard
-	// logger.returnErr = loggerShouldErr
+	_, logger, teardown := setupFileLoggerConfig(t, config)
+	config.LogFile = tmpLog()
 
 	config.Verbose = false
 	config.Logger = logger
 
 	log.SetOutput(ioutil.Discard)
-	return config
+	return config, teardown
 }
 
-func startServerForBench(b *testing.B) *SocketServer {
-	return startServerForBenchWithConfig(b, serverBenchConfig())
-}
+// func startServerForBench(b *testing.B) *SocketServer {
+// 	return startServerForBenchWithConfig(b, serverBenchConfig())
+// }
 
-func startServerForBenchWithConfig(b *testing.B, config *Config) *SocketServer {
-	srv := NewServer("127.0.0.1:0", config)
-	if err := srv.ListenAndServe(); err != nil {
-		b.Logf("%s", debug.Stack())
-		b.Fatalf("error running server: %v", err)
-	}
-	return srv
-}
+// func startServerForBenchWithConfig(b *testing.B, config *Config) *SocketServer {
+// 	srv := NewServer("127.0.0.1:0", config)
+// 	if err := srv.ListenAndServe(); err != nil {
+// 		b.Logf("%s", debug.Stack())
+// 		b.Fatalf("error running server: %v", err)
+// 	}
+// 	return srv
+// }
 
 // func BenchmarkServerStartStop(b *testing.B) {
 // 	for i := 0; i < b.N; i++ {
@@ -54,7 +55,8 @@ func startServerForBenchWithConfig(b *testing.B, config *Config) *SocketServer {
 
 func BenchmarkServerConnect(b *testing.B) {
 	b.StopTimer()
-	config := serverBenchConfig()
+	config, teardown := serverBenchConfig(b)
+	defer teardown()
 	srv := newTestServer(config)
 	defer closeTestServer(b, srv)
 
@@ -67,7 +69,8 @@ func BenchmarkServerConnect(b *testing.B) {
 
 func BenchmarkServerPing(b *testing.B) {
 	b.StopTimer()
-	config := serverBenchConfig()
+	config, teardown := serverBenchConfig(b)
+	defer teardown()
 	srv := newTestServer(config)
 	defer closeTestServer(b, srv)
 
@@ -82,7 +85,8 @@ func BenchmarkServerPing(b *testing.B) {
 
 func BenchmarkServerMsg(b *testing.B) {
 	b.StopTimer()
-	config := serverBenchConfig()
+	config, teardown := serverBenchConfig(b)
+	defer teardown()
 	srv := newTestServer(config)
 	defer closeTestServer(b, srv)
 
@@ -99,7 +103,8 @@ func BenchmarkServerMsg(b *testing.B) {
 
 func BenchmarkServerRead(b *testing.B) {
 	b.StopTimer()
-	config := serverBenchConfigWithOpts(false)
+	config, teardown := serverBenchConfig(b)
+	defer teardown()
 	srv := newTestServer(config)
 	defer closeTestServer(b, srv)
 
@@ -125,7 +130,8 @@ func BenchmarkServerRead(b *testing.B) {
 
 func BenchmarkServerTail(b *testing.B) {
 	b.StopTimer()
-	config := serverBenchConfig()
+	config, teardown := serverBenchConfig(b)
+	defer teardown()
 	srv := newTestServer(config)
 	defer closeTestServer(b, srv)
 
@@ -147,7 +153,8 @@ func BenchmarkServerTail(b *testing.B) {
 
 func BenchmarkServerTailTwenty(b *testing.B) {
 	b.StopTimer()
-	config := serverBenchConfig()
+	config, teardown := serverBenchConfig(b)
+	defer teardown()
 	srv := newTestServer(config)
 	defer closeTestServer(b, srv)
 
@@ -175,7 +182,8 @@ func BenchmarkServerTailTwenty(b *testing.B) {
 
 func BenchmarkServerLoadTest(b *testing.B) {
 	b.StopTimer()
-	config := serverBenchConfigWithOpts(true)
+	config, teardown := serverBenchConfig(b)
+	defer teardown()
 	srv := newTestServer(config)
 	defer closeTestServer(b, srv)
 

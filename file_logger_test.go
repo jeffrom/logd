@@ -34,7 +34,8 @@ func setupFileLoggerConfig(t testing.TB, config *Config) (*Config, Logger, func(
 
 	return config, logger, func() {
 		dir := path.Dir(config.LogFile)
-		if dir != "testdata" {
+		t.Logf("Deleting %s", dir)
+		if dir != "testdata" && len(dir) > 0 && dir[0] != '.' {
 			os.RemoveAll(dir)
 		}
 
@@ -50,6 +51,7 @@ func setupFileLogger(t testing.TB) (*Config, Logger, func()) {
 	config.PartitionSize = 2048
 	config.LogFile = tmpLog()
 
+	// t.Logf("test logs at: %s", config.LogFile)
 	return setupFileLoggerConfig(t, config)
 }
 
