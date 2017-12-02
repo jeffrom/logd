@@ -12,10 +12,9 @@ import (
 	"syscall"
 	"time"
 
-	"gopkg.in/urfave/cli.v1"
-
 	"github.com/jeffrom/logd"
 	"github.com/pkg/errors"
+	"github.com/urfave/cli"
 	"github.com/urfave/cli/altsrc"
 )
 
@@ -96,21 +95,28 @@ func cmdAction(config *logd.Config, cmd logd.CmdType) func(c *cli.Context) error
 
 		scanner := bufio.NewScanner(os.Stdin)
 		scanner.Split(bufio.ScanLines)
+		var lastResp *logd.Response
 		for scanner.Scan() {
 			b := scanner.Bytes()
 			resp, err := client.Do(logd.NewCommand(config, cmd, b))
+			lastResp = resp
 			if err == io.EOF {
 				return nil
 			}
 			if err != nil {
 				panic(err)
 			}
-			fmt.Println(formatResp(resp, nil))
+			if cmd != logd.CmdMessage {
+				fmt.Println(formatResp(resp, nil))
+			}
 			if err := checkErrResp(resp); err != nil {
 				return err
 			}
 		}
 
+		if cmd == logd.CmdMessage {
+			fmt.Println(formatResp(lastResp, nil))
+		}
 		return nil
 	}
 }
