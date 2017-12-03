@@ -42,6 +42,7 @@
 - [ ] documentation with many use cases, event log, pub sub, replication,
   changing master
 - [ ] keep track of running delete hooks, make part of graceful shutdown
+- [ ] track / limit / reuse concurrent fds in use
 - [ ] CONTRIBUTORS.md
 
 
