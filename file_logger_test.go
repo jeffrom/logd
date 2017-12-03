@@ -34,7 +34,7 @@ func setupFileLoggerConfig(t testing.TB, config *Config) (*Config, Logger, func(
 
 	return config, logger, func() {
 		dir := path.Dir(config.LogFile)
-		t.Logf("Deleting %s", dir)
+		// t.Logf("Deleting %s", dir)
 		if dir != "testdata" && len(dir) > 0 && dir[0] != '.' {
 			os.RemoveAll(dir)
 		}
