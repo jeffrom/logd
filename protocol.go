@@ -276,7 +276,7 @@ type protocolReader struct {
 func newProtocolReader(config *Config) *protocolReader {
 	return &protocolReader{
 		config: config,
-		br:     bufio.NewReaderSize(bytes.NewReader([]byte("")), config.PartitionSize),
+		br:     bufio.NewReaderSize(bytes.NewReader([]byte("")), 1024*8),
 	}
 }
 
