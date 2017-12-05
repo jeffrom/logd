@@ -81,7 +81,7 @@ func newProtocolScanner(config *Config, r io.Reader) *ProtocolScanner {
 	// is a bufio.Reader?
 	return &ProtocolScanner{
 		config: config,
-		br:     bufio.NewReaderSize(r, config.PartitionSize),
+		br:     bufio.NewReaderSize(r, 1024*8),
 	}
 }
 

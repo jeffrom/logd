@@ -218,7 +218,7 @@ func TestServerSleep(t *testing.T) {
 // }
 
 func TestServerInvalidRequests(t *testing.T) {
-	t.SkipNow()
+	// t.SkipNow()
 	config := testConfig(newMemLogger())
 	srv := newTestServer(config)
 	defer closeTestServer(t, srv)
@@ -243,11 +243,12 @@ func TestServerInvalidRequests(t *testing.T) {
 			"Server should not accept missing message argument",
 		},
 
-		{
-			NewCommand(clientConfig, CmdRead),
-			NewClientErrResponse(clientConfig, []byte("invalid request")),
-			"Server should not accept missing read argument",
-		},
+		// TODO need to DoRead for this
+		// {
+		// 	NewCommand(clientConfig, CmdRead),
+		// 	NewClientErrResponse(clientConfig, []byte("invalid request")),
+		// 	"Server should not accept missing read argument",
+		// },
 
 		{
 			NewCommand(clientConfig, CmdHead, []byte("0")),

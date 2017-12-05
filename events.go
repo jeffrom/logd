@@ -263,6 +263,7 @@ func (q *eventQ) parseRead(cmd *Command) (uint64, uint64, error) {
 }
 
 func (q *eventQ) handleHead(cmd *Command) {
+	fmt.Printf("%s\n", cmd)
 	if len(cmd.args) != 0 {
 		cmd.respond(NewClientErrResponse(q.config, errRespInvalid))
 		return
