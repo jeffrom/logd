@@ -61,14 +61,18 @@ type fileIndex struct {
 	data []*fileIndexCursor
 
 	buf *bytes.Buffer
+	r   io.ReadCloser
+	w   io.WriteCloser
 	br  *bufio.Reader
 	bw  *bufio.Writer
 }
 
-func newFileIndex(config *Config, w io.Writer, r io.Reader) *fileIndex {
+func newFileIndex(config *Config, w io.WriteCloser, r io.ReadCloser) *fileIndex {
 	idx := &fileIndex{
 		config: config,
 		buf:    &bytes.Buffer{},
+		r:      r,
+		w:      w,
 		br:     bufio.NewReader(r),
 		bw:     bufio.NewWriter(w),
 	}
@@ -79,6 +83,12 @@ func newFileIndex(config *Config, w io.Writer, r io.Reader) *fileIndex {
 func (idx *fileIndex) shutdown() error {
 	if err := idx.bw.Flush(); err != nil {
 		return errors.Wrap(err, "failed to flush index to disk on shutdown")
+	}
+	if idx.r != nil {
+		idx.r.Close()
+	}
+	if idx.w != nil {
+		idx.w.Close()
 	}
 	return nil
 }
