@@ -7,33 +7,30 @@
 - [ ] large benchmarking suite
     - server/client startup/shutdown
     - all commands
-- [ ] after the tests are solid, go through all the code and reorg
+    - error handling cases
 - [ ] finish command set, including STATS, REFUSE, ACCEPT
-    - refuse(_at) / accept(_at) should be able to synchronize switching at
+    - `refuse(_at)` / `accept(_at)` should be able to synchronize switching at
       partition boundaries, as well as ids.
-- [ ] REPLICATE can just call READ internally for now, later it should have a
-  different protocol
 - [ ] make consistency guarantees configurable. fast by default but also force
   disk flush before returning success if that's desired.
-    - most strict can use `creat(O_SYNC)`, or maybe just flush before responding
-      to each command
+    - most strict can use `creat(O_SYNC)`, or maybe just flush before
+      responding to each command
     - least strict just needs to fsync during shutdown
     - have a flush interval option. also document how it may be better to just
       change the dirty page cache kernel settings. this can be implemented by
       just putting a flush command into the queue at an interval.
 - [ ] audit all panics: we should only panic when there's a fatal error.
     - mostly return all the way up to main
-- [ ] same protocol for file storage as network transfer simplifies the app and
-  probably makes it easier to leverage sendfile without calling it directly
 - [ ] minimize IO layers as much as possible. io.Copy is ideal, probably.
     - would syscall.Fdatasync instead of Flush help? seems likely.
+- [ ] keep track of running delete hooks, make part of graceful shutdown
 - [ ] seeking/reading the log when we don't need to (calling Setup, probably)
 - [ ] evaluate where we can use a mutex instead of channels
 - [ ] compression
 - [ ] need to check the return value of Close()? May contain errors from
   previous delayed io.
 - [ ] after tests and refactoring, optimize. shoot for 0 allocations and do as
-  little work as possible. Also make sure sendfile is being used.
+  little work as possible.
     - using preallocated buffer + end position pointer so the buffer doesn't
       need to be cleared
 - [ ] figure out linting
@@ -41,12 +38,15 @@
   while under load
 - [ ] documentation with many use cases, event log, pub sub, replication,
   changing master
-- [ ] keep track of running delete hooks, make part of graceful shutdown
 - [ ] track / limit / reuse concurrent fds in use
-- [ ] CONTRIBUTORS.md
 
 
 # COMPLETED
+
+## DEC 2017
+
+- [X] same protocol for file storage as network transfer
+- [X] use sendfile
 
 ## OCT 2017
 
