@@ -209,7 +209,7 @@ func (q *eventQ) handleRead(cmd *Command) {
 
 func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 	resp := newResponse(q.config, RespOK)
-	resp.readerC = make(chan io.Reader, 20)
+	resp.readerC = make(chan io.Reader, 100)
 	cmd.respond(resp)
 	cmd.waitForReady()
 
@@ -263,7 +263,6 @@ func (q *eventQ) parseRead(cmd *Command) (uint64, uint64, error) {
 }
 
 func (q *eventQ) handleHead(cmd *Command) {
-	fmt.Printf("%s\n", cmd)
 	if len(cmd.args) != 0 {
 		cmd.respond(NewClientErrResponse(q.config, errRespInvalid))
 		return

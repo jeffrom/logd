@@ -273,10 +273,18 @@ func (l *fileLogger) Range(start, end uint64) (logRangeIterator, error) {
 		return nil, errors.Wrap(perr, "failed to get range lower bound")
 	}
 
+	if err := l.parts.setReadHandle(currpart); err != nil {
+		return nil, errors.Wrap(err, "failed to make new read handle after range")
+	}
 	if _, serr := l.parts.r.Seek(curroff, io.SeekStart); serr != nil {
 		return nil, errors.Wrap(serr, "failed to seek log in range query")
 	}
+
 	r := l.parts.r
+	l.parts.r = nil
+	if err := l.parts.setReadHandle(l.parts.currReadPart); err != nil {
+		return nil, errors.Wrap(err, "failed to make new read handle after range")
+	}
 
 	var lf logReadableFile
 	fn := func() (logReadableFile, error) {

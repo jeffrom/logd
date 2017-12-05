@@ -37,25 +37,27 @@ func (p *filePartitions) Write(b []byte) (int, error) {
 }
 
 func (p *filePartitions) shutdown() error {
-	var firstErr error
+	// var firstErr error
 
-	if err := p.w.Close(); err != nil {
-		err = errors.Wrap(err, "failed closing writeable file during shutdown")
-		log.Printf("%+v", err)
-		if firstErr == nil {
-			firstErr = err
-		}
-	}
+	// if err := p.w.Close(); err != nil {
+	// 	err = errors.Wrap(err, "failed closing writeable file during shutdown")
+	// 	log.Printf("%+v", err)
+	// 	if firstErr == nil {
+	// 		firstErr = err
+	// 	}
+	// }
 
-	if err := p.r.Close(); err != nil {
-		err = errors.Wrap(err, "failed closing readable file during shutdown")
-		log.Printf("%+v", err)
-		if firstErr == nil {
-			firstErr = err
-		}
-	}
+	// if err := p.r.Close(); err != nil {
+	// 	err = errors.Wrap(err, "failed closing readable file during shutdown")
+	// 	log.Printf("%+v", err)
+	// 	if firstErr == nil {
+	// 		firstErr = err
+	// 	}
+	// }
 
-	return firstErr
+	p.w.Close()
+	p.r.Close()
+	return nil
 }
 
 func (p *filePartitions) setCurrentFileHandles(create bool) error {

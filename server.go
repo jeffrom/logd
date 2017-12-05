@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -344,6 +345,7 @@ func (s *SocketServer) handleSubscriber(conn *conn, cmd *Command, resp *Response
 	for {
 		select {
 		case r := <-resp.readerC:
+			debugf(s.config, "%s <-reader: %+v", conn.RemoteAddr(), r)
 			if _, err := conn.readFrom(r); err != nil {
 				log.Printf("%s error: %+v", conn.RemoteAddr(), err)
 				return
@@ -356,12 +358,20 @@ func (s *SocketServer) handleSubscriber(conn *conn, cmd *Command, resp *Response
 			// 	}
 			// }
 
-			if closer, ok := r.(io.Closer); ok {
-				if err := closer.Close(); err != nil {
+			lr, ok := r.(*io.LimitedReader)
+			if ok {
+				r = lr.R
+			}
+			f, ok := r.(*os.File)
+			if ok {
+				debugf(s.config, "%s: closing %s", conn.RemoteAddr(), f.Name())
+				if err := f.Close(); err != nil {
 					log.Printf("error closing reader to %s: %+v", conn.RemoteAddr(), err)
 					return
 				}
+
 			}
+
 		case <-cmd.done:
 			conn.flush()
 			return
