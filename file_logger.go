@@ -172,6 +172,11 @@ func (l *fileLogger) getPartOffset(id uint64, inclusive bool) (uint64, int64, er
 			return 0, 0, errors.Wrap(err, "failed to create index")
 		}
 	}
+	// catch up any new indexes written
+	if _, err := l.index.loadFromReader(); err != nil {
+		return 0, 0, errors.Wrap(err, "failed to initialize index")
+	}
+
 	part, offset := l.index.Get(id)
 
 	if err := l.parts.setReadHandle(part); err != nil {

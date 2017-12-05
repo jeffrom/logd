@@ -221,7 +221,12 @@ func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 	}
 
 	iterator, err := q.log.Range(startID, end)
-	panicOnError(err)
+	if err != nil {
+		log.Printf("failed to handle read command: %+v", err)
+		resp.sendEOF()
+		cmd.finish()
+		return
+	}
 
 	for {
 		lf, err := iterator.Next()
