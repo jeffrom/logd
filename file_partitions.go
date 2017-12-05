@@ -55,8 +55,12 @@ func (p *filePartitions) shutdown() error {
 	// 	}
 	// }
 
-	p.w.Close()
-	p.r.Close()
+	if p.w != nil {
+		p.w.Close()
+	}
+	if p.r != nil {
+		p.r.Close()
+	}
 	return nil
 }
 

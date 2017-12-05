@@ -263,6 +263,7 @@ func (l *fileLogger) Range(start, end uint64) (logRangeIterator, error) {
 	debugf(l.config, "Range(%d, %d)", start, end)
 
 	lcopy := newFileLogger(l.config)
+	defer lcopy.Shutdown()
 	endpart, endoff, pcerr := lcopy.getPartOffset(end, true)
 	if pcerr != nil {
 		return nil, errors.Wrap(pcerr, "failed to get range upper bound")
