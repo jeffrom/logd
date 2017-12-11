@@ -302,18 +302,14 @@ func (s *SocketServer) handleClient(conn *conn) {
 		}
 
 		respBytes := resp.Bytes()
-		if cmd.name == CmdClose {
-			debugf(s.config, "closing %s", conn.RemoteAddr())
-			if _, err := conn.write(respBytes); handleConnErr(s.config, err, conn) != nil {
-				log.Printf("error closing connection to %s: %+v", conn.RemoteAddr(), err)
-				return
-			}
-			break
-		}
 
 		if _, err := conn.write(respBytes); handleConnErr(s.config, err, conn) != nil {
 			log.Printf("error writing to %s: %+v", conn.RemoteAddr(), err)
 			return
+		}
+		if cmd.name == CmdClose {
+			debugf(s.config, "closing %s", conn.RemoteAddr())
+			break
 		}
 		if cmd.name == CmdRead || cmd.name == CmdReplicate {
 			cmd.signalReady()
@@ -351,13 +347,7 @@ func (s *SocketServer) handleSubscriber(conn *conn, cmd *Command, resp *Response
 				return
 			}
 
-			// if flusher, ok := r.(protocolFlusher); ok && flusher.shouldFlush() {
-			// 	if err := conn.flush(); err != nil {
-			// 		log.Printf("%s error: %+v", conn.RemoteAddr(), err)
-			// 		return
-			// 	}
-			// }
-
+			// unwrap the os.file, same as go stdlib sendfile optimization logic
 			lr, ok := r.(*io.LimitedReader)
 			if ok {
 				r = lr.R
@@ -369,7 +359,6 @@ func (s *SocketServer) handleSubscriber(conn *conn, cmd *Command, resp *Response
 					log.Printf("error closing reader to %s: %+v", conn.RemoteAddr(), err)
 					return
 				}
-
 			}
 
 		case <-cmd.done:
