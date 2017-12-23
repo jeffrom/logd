@@ -2,8 +2,6 @@
 
 # TODO
 
-* [ ] `STATS` command
-  * record READ misses
 * [ ] correctly read when partition 0 has been deleted
 * [ ] audit all panics: we should only panic when there's a fatal error.
   * mostly return all the way up to main
@@ -19,8 +17,8 @@
   * probably want to be able to have the server close a connection and tell the
     client where they should try to reconnect?
 * [ ] `STATS` is a lot simpler after refactoring response logic. there
-  shouldn't be cmd.respC AND resp.readerC. all server response bytes should go
-  through readerC.
+      shouldn't be cmd.respC AND resp.readerC. all server response bytes should go
+      through one channel.
 * [ ] documentation with many use cases, event log, pub sub, replication,
       changing master
 * [ ] figure out linting
@@ -55,6 +53,7 @@
 * [ ] Read from end of log
   * `MIN` command? since we can delete old partitions
   * `READ -1 0` maybe to read from the tail?
+* [ ] record READ misses
 
 # COMPLETED
 
@@ -62,6 +61,7 @@
 
 * [x] same protocol for file storage as network transfer
 * [x] use sendfile
+* [x] `STATS` command
 
 ## OCT 2017
 
