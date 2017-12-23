@@ -26,7 +26,9 @@ type stats struct {
 }
 
 var allStatKeys = []string{
+	"command_errors",
 	"connections",
+	"connection_errors",
 	"subscriptions",
 	"total_bytes_read",
 	"total_bytes_written",

@@ -278,7 +278,9 @@ func (s *SocketServer) handleClient(conn *conn) {
 		resp, err := s.q.pushCommand(cmd)
 		conn.readerC = resp.readerC
 		s.q.stats.incr("total_commands")
+		// TODO different error helper for command v connection errors?
 		if cerr := handleConnErr(s.config, err, conn); cerr != nil {
+			s.q.stats.incr("command_errors")
 			return
 		}
 
@@ -295,6 +297,7 @@ func (s *SocketServer) handleClient(conn *conn) {
 		}
 
 		if werr := conn.setWriteDeadline(); werr != nil {
+			s.q.stats.incr("connection_errors")
 			log.Printf("error setting %s write deadline: %+v", conn.RemoteAddr(), werr)
 			return
 		}
@@ -304,6 +307,7 @@ func (s *SocketServer) handleClient(conn *conn) {
 		n, err := conn.write(respBytes)
 		s.q.stats.add("total_bytes_written", int64(n))
 		if handleConnErr(s.config, err, conn) != nil {
+			s.q.stats.incr("connection_errors")
 			log.Printf("error writing to %s: %+v", conn.RemoteAddr(), err)
 			return
 		}
