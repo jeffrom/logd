@@ -1,8 +1,11 @@
 package main
 
 import (
+	"log"
 	"os"
+	"os/signal"
 	"sort"
+	"syscall"
 
 	"gopkg.in/urfave/cli.v1"
 	"gopkg.in/urfave/cli.v1/altsrc"
@@ -114,13 +117,21 @@ func runApp(args []string) {
 			if err := logd.CheckIndex(config); err != nil {
 				panic(err)
 			}
-		} else {
-			srv := logd.NewServer(config.Hostport, config)
-			if err := srv.ListenAndServe(); err != nil {
-				return err
-			}
+			return nil
 		}
-		return nil
+
+		srv := logd.NewServer(config.Hostport, config)
+
+		stopC := make(chan os.Signal, 1)
+		signal.Notify(stopC, os.Interrupt, syscall.SIGTERM)
+		go func() {
+			for range stopC {
+				log.Print("Caught signal. Exiting...")
+				srv.Stop()
+			}
+		}()
+
+		return srv.ListenAndServe()
 	}
 
 	sort.Sort(cli.FlagsByName(app.Flags))

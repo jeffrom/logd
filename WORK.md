@@ -3,9 +3,8 @@
 # TODO
 
 * [ ] `STATS` command
-  * `STATS` is a lot simpler after refactoring response logic. there shouldn't
-    be cmd.respC AND resp.readerC. all server response bytes should go through
-    readerC.
+  * record READ misses
+* [ ] correctly read when partition 0 has been deleted
 * [ ] audit all panics: we should only panic when there's a fatal error.
   * mostly return all the way up to main
 * [ ] put delete hooks in a queue, keep track of running delete hooks, make
@@ -19,6 +18,9 @@
 * [ ] `REFUSE`, `ACCEPT` commands.
   * probably want to be able to have the server close a connection and tell the
     client where they should try to reconnect?
+* [ ] `STATS` is a lot simpler after refactoring response logic. there
+  shouldn't be cmd.respC AND resp.readerC. all server response bytes should go
+  through readerC.
 * [ ] documentation with many use cases, event log, pub sub, replication,
       changing master
 * [ ] figure out linting

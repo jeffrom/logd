@@ -5,9 +5,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 )
 
@@ -26,9 +23,10 @@ type eventQ struct {
 	currID        uint64
 	in            chan *Command
 	close         chan struct{}
-	subscriptions map[chan *Response]*Subscription
+	subscriptions map[UUID]*Subscription
 	log           Logger
 	client        *Client
+	stats         *stats
 }
 
 func newEventQ(config *Config) *eventQ {
@@ -40,11 +38,10 @@ func newEventQ(config *Config) *eventQ {
 		config:        config,
 		in:            make(chan *Command, 0),
 		close:         make(chan struct{}),
-		subscriptions: make(map[chan *Response]*Subscription),
+		subscriptions: make(map[UUID]*Subscription),
 		log:           config.Logger,
+		stats:         newStats(),
 	}
-
-	q.handleSignals()
 
 	return q
 }
@@ -88,6 +85,8 @@ func (q *eventQ) loop() {
 				q.handleRead(cmd)
 			case CmdHead:
 				q.handleHead(cmd)
+			case CmdStats:
+				q.handleStats(cmd)
 			case CmdPing:
 				q.handlePing(cmd)
 			case CmdClose:
@@ -151,6 +150,8 @@ func (q *eventQ) handleMsg(cmd *Command) {
 	}
 	q.currID = id + 1
 
+	q.stats.incr("total_writes")
+
 	resp := newResponse(q.config, RespOK)
 	resp.ID = id
 	cmd.respond(resp)
@@ -161,12 +162,11 @@ func (q *eventQ) handleMsg(cmd *Command) {
 func (q *eventQ) publishMessages(cmd *Command, msgs [][]byte) {
 	debugf(q.config, "publishing to %d subscribers", len(q.subscriptions))
 	for _, sub := range q.subscriptions {
-		go func(sub *Subscription) {
-			for i := range msgs {
-				sub.send(msgs[i])
-			}
-
-		}(sub)
+		// go func(sub *Subscription) {
+		for i := range msgs {
+			sub.send(msgs[i])
+		}
+		// }(sub)
 	}
 }
 
@@ -204,12 +204,14 @@ func (q *eventQ) handleRead(cmd *Command) {
 		return
 	}
 
+	q.stats.incr("total_reads")
 	q.doRead(cmd, startID, limit)
 }
 
 func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 	resp := newResponse(q.config, RespOK)
-	resp.readerC = make(chan io.Reader, 100)
+	resp.readerC = make(chan io.Reader, 20)
+
 	cmd.respond(resp)
 	cmd.waitForReady()
 
@@ -240,7 +242,7 @@ func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 	}
 
 	if limit == 0 { // read forever
-		q.subscriptions[cmd.respC] = newSubscription(resp.readerC, cmd.done)
+		q.subscriptions[cmd.connID] = newSubscription(resp.readerC, cmd.done)
 	} else {
 		resp.sendEOF()
 		cmd.finish()
@@ -282,6 +284,18 @@ func (q *eventQ) handleHead(cmd *Command) {
 	}
 }
 
+func (q *eventQ) handleStats(cmd *Command) {
+	if len(cmd.args) != 0 {
+		cmd.respond(NewClientErrResponse(q.config, errRespInvalid))
+		return
+	}
+
+	resp := newResponse(q.config, RespOK)
+	resp.body = q.stats.bytes()
+
+	cmd.respond(resp)
+}
+
 func (q *eventQ) handlePing(cmd *Command) {
 	if len(cmd.args) != 0 {
 		cmd.respond(NewClientErrResponse(q.config, errRespInvalid))
@@ -297,13 +311,12 @@ func (q *eventQ) handleClose(cmd *Command) {
 		return
 	}
 
-	if sub, ok := q.subscriptions[cmd.respC]; ok {
+	if sub, ok := q.subscriptions[cmd.connID]; ok {
 		sub.finish()
 	}
-	delete(q.subscriptions, cmd.respC)
+	delete(q.subscriptions, cmd.connID)
 
 	cmd.respond(newResponse(q.config, RespOK))
-	// cmd.finish()
 }
 
 func (q *eventQ) handleSleep(cmd *Command) {
@@ -342,21 +355,6 @@ func (q *eventQ) pushCommand(cmd *Command) (*Response, error) {
 	q.in <- cmd
 	resp := <-cmd.respC
 	return resp, nil
-}
-
-func (q *eventQ) handleSignals() {
-	go q.handleKill()
-}
-
-func (q *eventQ) handleKill() {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-
-	for range c {
-		log.Print("Caught signal. Exiting...")
-		q.handleShutdown(nil)
-		os.Exit(0)
-	}
 }
 
 // func (q *eventQ) handleHup() {

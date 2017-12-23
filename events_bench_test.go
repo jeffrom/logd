@@ -2,9 +2,15 @@ package logd
 
 import (
 	"io"
+	"io/ioutil"
+	"log"
 	"runtime/debug"
 	"testing"
 )
+
+func init() {
+	log.SetOutput(ioutil.Discard)
+}
 
 func eventQBenchConfig() *Config {
 	config := NewConfig()
@@ -12,40 +18,47 @@ func eventQBenchConfig() *Config {
 	config.ClientTimeout = 500
 	config.MaxChunkSize = 1024 * 10
 	config.IndexCursorSize = 1000
-
-	logger := newMemLogger()
-	// logger.returnErr = loggerShouldErr
+	config.PartitionSize = 2048
 
 	config.Verbose = false
-	config.Logger = logger
 
 	return config
 }
 
-func startQForBench(b *testing.B) *eventQ {
-	q := newEventQ(eventQBenchConfig())
+func startQForBench(b *testing.B) (*eventQ, func()) {
+	config := eventQBenchConfig()
+	config.LogFileMode = 0644
+	config.LogFile = tmpLog()
+	config, _, shutdown := setupFileLoggerConfig(b, config)
+
+	q := newEventQ(config)
 	if err := q.start(); err != nil {
 		b.Logf("%s", debug.Stack())
 		b.Fatalf("error starting queue: %v", err)
 	}
-	return q
+	return q, shutdown
 }
 
 func BenchmarkEventQLifecycle(b *testing.B) {
 	config := eventQBenchConfig()
+	config.LogFileMode = 0644
+	config.LogFile = tmpLog()
 
 	for i := 0; i < b.N; i++ {
+		config, _, shutdown := setupFileLoggerConfig(b, config)
 		q := newEventQ(config)
 		q.start()
 		q.handleShutdown(nil)
 		q.stop()
+		shutdown()
 	}
 }
 
 func BenchmarkEventQPing(b *testing.B) {
 	b.StopTimer()
 	config := eventQBenchConfig()
-	q := startQForBench(b)
+	q, shutdown := startQForBench(b)
+	defer shutdown()
 	defer stopQ(b, q)
 
 	b.StartTimer()
@@ -57,7 +70,8 @@ func BenchmarkEventQPing(b *testing.B) {
 func BenchmarkEventQLogOne(b *testing.B) {
 	b.StopTimer()
 	config := eventQBenchConfig()
-	q := startQForBench(b)
+	q, shutdown := startQForBench(b)
+	defer shutdown()
 	defer stopQ(b, q)
 
 	msg := []byte("hey i'm a message")
@@ -70,7 +84,8 @@ func BenchmarkEventQLogOne(b *testing.B) {
 func BenchmarkEventQLogFive(b *testing.B) {
 	b.StopTimer()
 	config := eventQBenchConfig()
-	q := startQForBench(b)
+	q, shutdown := startQForBench(b)
+	defer shutdown()
 	defer stopQ(b, q)
 
 	msg := []byte("hey i'm a message")
@@ -83,8 +98,10 @@ func BenchmarkEventQLogFive(b *testing.B) {
 func BenchmarkEventQReadOne(b *testing.B) {
 	b.StopTimer()
 	config := eventQBenchConfig()
-	q := startQForBench(b)
+	q, shutdown := startQForBench(b)
+	defer shutdown()
 	defer stopQ(b, q)
+
 	q.pushCommand(NewCommand(config, CmdMessage, []byte("hey i'm a message")))
 
 	b.StartTimer()
@@ -99,8 +116,10 @@ func BenchmarkEventQReadOne(b *testing.B) {
 func BenchmarkEventQReadFromHeadOne(b *testing.B) {
 	b.StopTimer()
 	config := eventQBenchConfig()
-	q := startQForBench(b)
+	q, shutdown := startQForBench(b)
+	defer shutdown()
 	defer stopQ(b, q)
+
 	msg := []byte("hey i'm a message")
 	cmd := NewCommand(config, CmdRead, []byte("1"), []byte("0"))
 	resp, _ := q.pushCommand(cmd)
@@ -116,7 +135,8 @@ func BenchmarkEventQReadFromHeadOne(b *testing.B) {
 func BenchmarkEventQReadFromHeadTen(b *testing.B) {
 	b.StopTimer()
 	config := eventQBenchConfig()
-	q := startQForBench(b)
+	q, shutdown := startQForBench(b)
+	defer shutdown()
 	defer stopQ(b, q)
 	msg := []byte("hey i'm a message")
 
@@ -139,16 +159,16 @@ func BenchmarkEventQReadFromHeadTen(b *testing.B) {
 
 func drainReaderChan(readerC chan io.Reader) {
 	n := 0
-Loop:
 	for {
 		select {
 		case <-readerC:
 			n++
+			// case <-time.After(time.Millisecond * 200):
+			// 	panic("timed out waiting for messages on readerC")
 		default:
-			if n == 0 {
-				continue
+			if n > 0 {
+				return
 			}
-			break Loop
 		}
 	}
 }

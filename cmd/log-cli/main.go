@@ -38,11 +38,15 @@ func checkErrResp(resp *logd.Response) error {
 }
 
 func formatResp(resp *logd.Response, args []string) string {
-	respBytes := bytes.TrimRight(resp.Bytes(), "\r\n")
+	var out bytes.Buffer
+	respBytes := resp.Bytes()
 	isOk := bytes.HasPrefix(respBytes, []byte("OK "))
 	respBytes = bytes.TrimLeft(respBytes, "OK ")
-	var out bytes.Buffer
-	if isOk && args != nil {
+
+	idx := bytes.Index(respBytes, []byte(" "))
+	if idx > 0 {
+		respBytes = respBytes[idx+1:]
+	} else if isOk && args != nil {
 		var lastID uint64
 		if _, err := fmt.Sscanf(string(respBytes), "%d", &lastID); err != nil {
 			panic(err)
@@ -52,7 +56,7 @@ func formatResp(resp *logd.Response, args []string) string {
 			out.WriteString(fmt.Sprintf("%d\n", i))
 		}
 	}
-	out.Write(respBytes)
+	out.Write(bytes.TrimRight(respBytes, "\r\n"))
 	return out.String()
 }
 
@@ -275,11 +279,6 @@ func runApp(args []string) {
 			Action: cmdAction(config, logd.CmdMessage),
 		},
 		{
-			Name:   "shutdown",
-			Usage:  "shutdown the server (debug only)",
-			Action: cmdAction(config, logd.CmdShutdown),
-		},
-		{
 			Name:  "read",
 			Usage: "read from the log",
 			Flags: append([]cli.Flag{
@@ -302,6 +301,16 @@ func runApp(args []string) {
 				},
 			}, flags...),
 			Action: doReadCmdAction(config),
+		},
+		{
+			Name:   "stats",
+			Usage:  "get running server stats",
+			Action: cmdAction(config, logd.CmdStats),
+		},
+		{
+			Name:   "shutdown",
+			Usage:  "shutdown the server (debug only)",
+			Action: cmdAction(config, logd.CmdShutdown),
 		},
 	}
 

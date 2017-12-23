@@ -27,7 +27,7 @@ func newTestServer(config *Config) *SocketServer {
 }
 
 func closeTestServer(t testing.TB, srv *SocketServer) {
-	srv.stop()
+	srv.Stop()
 	srv.connMu.Lock()
 	defer srv.connMu.Unlock()
 	if len(srv.conns) > 0 {

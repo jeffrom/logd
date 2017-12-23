@@ -39,9 +39,6 @@ type SocketServer struct {
 
 	q       *eventQ
 	replica *Replica
-
-	stats    *stats
-	statlock sync.RWMutex
 }
 
 // NewServer will return a new instance of a log server
@@ -64,7 +61,6 @@ func NewServer(addr string, config *Config) *SocketServer {
 		stopC:        make(chan struct{}),
 		shutdownC:    make(chan struct{}),
 		q:            q,
-		stats:        &stats{},
 	}
 }
 
@@ -82,10 +78,6 @@ func (s *SocketServer) listenAndServe(wait bool) error {
 	if outerErr != nil {
 		return outerErr
 	}
-
-	s.statlock.Lock()
-	s.stats.startedAt = time.Now().UTC()
-	s.statlock.Unlock()
 
 	log.Printf("Serving at %s", s.ln.Addr())
 	if wait {
@@ -144,6 +136,7 @@ func (s *SocketServer) accept() {
 			break
 		}
 
+		s.q.stats.incr("total_connections")
 		debugf(s.config, "accept: %s", rawConn.RemoteAddr())
 
 		conn := newServerConn(rawConn, s.config)
@@ -162,6 +155,7 @@ func (s *SocketServer) goServe() {
 	s.ready()
 }
 
+// shutdown shuts down the server
 func (s *SocketServer) shutdown() error {
 	defer func() {
 		s.shutdownC <- struct{}{}
@@ -211,8 +205,10 @@ func (s *SocketServer) logConns() {
 	log.Printf("connection states (%d): %s", len(states), strings.Join(states, ", "))
 }
 
-func (s *SocketServer) stop() {
+// Stop can be called to shut down the server
+func (s *SocketServer) Stop() {
 	s.stopC <- struct{}{}
+
 	<-s.shutdownC
 }
 
@@ -247,10 +243,10 @@ func handleConnErr(config *Config, err error, conn *conn) error {
 }
 
 func (s *SocketServer) handleClient(conn *conn) {
-	counts.Add("clients", 1)
+	s.q.stats.incr("connections")
 
 	defer func() {
-		counts.Add("clients", -1)
+		s.q.stats.decr("connections")
 
 		s.removeConn(conn)
 		conn.close()
@@ -271,6 +267,7 @@ func (s *SocketServer) handleClient(conn *conn) {
 		if cerr := handleConnErr(s.config, err, conn); cerr != nil {
 			return
 		}
+		cmd.connID = conn.id
 		debugf(s.config, "%s<-%s: %s", conn.LocalAddr(), conn.RemoteAddr(), cmd)
 
 		if s.isShuttingDown() {
@@ -280,6 +277,7 @@ func (s *SocketServer) handleClient(conn *conn) {
 		// push to event queue and wait for a result
 		resp, err := s.q.pushCommand(cmd)
 		conn.readerC = resp.readerC
+		s.q.stats.incr("total_commands")
 		if cerr := handleConnErr(s.config, err, conn); cerr != nil {
 			return
 		}
@@ -292,18 +290,20 @@ func (s *SocketServer) handleClient(conn *conn) {
 
 		if cmd.name == CmdShutdown && resp.Status == RespOK {
 			s.removeConn(conn)
-			s.stop()
+			s.Stop()
 			return
 		}
 
-		if err := conn.setWriteDeadline(); err != nil {
-			log.Printf("error setting %s write deadline: %+v", conn.RemoteAddr(), err)
+		if werr := conn.setWriteDeadline(); werr != nil {
+			log.Printf("error setting %s write deadline: %+v", conn.RemoteAddr(), werr)
 			return
 		}
 
 		respBytes := resp.Bytes()
 
-		if _, err := conn.write(respBytes); handleConnErr(s.config, err, conn) != nil {
+		n, err := conn.write(respBytes)
+		s.q.stats.add("total_bytes_written", int64(n))
+		if handleConnErr(s.config, err, conn) != nil {
 			log.Printf("error writing to %s: %+v", conn.RemoteAddr(), err)
 			return
 		}
@@ -311,7 +311,7 @@ func (s *SocketServer) handleClient(conn *conn) {
 			debugf(s.config, "closing %s", conn.RemoteAddr())
 			break
 		}
-		if cmd.name == CmdRead || cmd.name == CmdReplicate {
+		if cmd.name == CmdRead {
 			cmd.signalReady()
 		}
 
@@ -329,6 +329,7 @@ func (s *SocketServer) finishRequest(conn *conn, cmd *Command, resp *Response) {
 			log.Printf("error setting write deadline to %s: %+v", conn.RemoteAddr(), err)
 			return
 		}
+
 		go s.handleSubscriber(conn, cmd, resp)
 	} else {
 		conn.setState(connStateInactive)
@@ -336,36 +337,54 @@ func (s *SocketServer) finishRequest(conn *conn, cmd *Command, resp *Response) {
 }
 
 func (s *SocketServer) handleSubscriber(conn *conn, cmd *Command, resp *Response) {
-	defer conn.close()
+	s.q.stats.incr("subscriptions")
+	s.q.stats.incr("total_subscriptions")
+	defer func() {
+		s.q.stats.decr("subscriptions")
+		conn.close()
+	}()
 
 	for {
 		select {
 		case r := <-resp.readerC:
 			debugf(s.config, "%s <-reader: %+v", conn.RemoteAddr(), r)
-			if _, err := conn.readFrom(r); err != nil {
-				log.Printf("%s error: %+v", conn.RemoteAddr(), err)
+
+			if err := s.sendReader(r, conn); err != nil {
 				return
 			}
 
-			// unwrap the os.file, same as go stdlib sendfile optimization logic
-			lr, ok := r.(*io.LimitedReader)
-			if ok {
-				r = lr.R
-			}
-			f, ok := r.(*os.File)
-			if ok {
-				debugf(s.config, "%s: closing %s", conn.RemoteAddr(), f.Name())
-				if err := f.Close(); err != nil {
-					log.Printf("error closing reader to %s: %+v", conn.RemoteAddr(), err)
-					return
-				}
-			}
-
 		case <-cmd.done:
-			conn.flush()
+			debugf(s.config, "%s: received <-done", conn.RemoteAddr())
+			if err := conn.flush(); err != nil {
+				log.Printf("error flushing connection while closing: %+v", err)
+			}
 			return
 		}
 	}
+}
+
+func (s *SocketServer) sendReader(r io.Reader, conn *conn) error {
+	n, err := conn.readFrom(r)
+	s.q.stats.add("total_bytes_written", int64(n))
+	if err != nil {
+		log.Printf("%s error: %+v", conn.RemoteAddr(), err)
+		return err
+	}
+
+	// unwrap the os.file, same as go stdlib sendfile optimization logic
+	lr, ok := r.(*io.LimitedReader)
+	if ok {
+		r = lr.R
+	}
+	f, ok := r.(*os.File)
+	if ok {
+		debugf(s.config, "%s: closing %s", conn.RemoteAddr(), f.Name())
+		if err := f.Close(); err != nil {
+			log.Printf("error closing reader to %s: %+v", conn.RemoteAddr(), err)
+			return err
+		}
+	}
+	return nil
 }
 
 func panicOnError(err error) {

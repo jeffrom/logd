@@ -7,7 +7,8 @@ package logd
 
 // normal responses look like:
 //
-// OK <id> <body>\r\n
+// OK <id>\r\n
+// OK <len> <body>\r\n
 // ERR <reason>\r\n
 // ERR_CLIENT <reason>\r\n
 // EOF\r\n
@@ -250,8 +251,12 @@ func (pw *protocolWriter) writeResponse(r *Response) []byte {
 	if r.ID != 0 {
 		buf.WriteByte(' ')
 		buf.WriteString(strconv.FormatUint(r.ID, 10))
-	}
-	if r.body != nil {
+	} else if r.Status == RespOK && r.body != nil {
+		buf.WriteByte(' ')
+		buf.WriteString(strconv.FormatInt(int64(len(r.body)), 10))
+		buf.WriteByte(' ')
+		buf.Write(r.body)
+	} else if r.body != nil {
 		buf.WriteByte(' ')
 		buf.Write(r.body)
 	}
@@ -339,14 +344,38 @@ func (pr *protocolReader) readResponse(r io.Reader) (*Response, error) {
 	if bytes.Equal(parts[0], []byte("OK")) {
 		resp = newResponse(pr.config, RespOK)
 		if len(parts) > 1 {
-			if _, err := fmt.Sscanf(string(parts[1]), "%d", &resp.ID); err != nil {
-				return nil, errors.Wrap(err, "failed to parse response id")
+			var n uint64
+
+			subParts := bytes.SplitN(parts[1], []byte(" "), 2)
+
+			_, err := fmt.Sscanf(string(subParts[0]), "%d", &n)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to parse response id or body length")
+			}
+
+			if len(subParts) > 1 { // this is an OK string response. ie from STATS
+
+				rest := bytes.Join(subParts[1:], []byte(" "))
+				rest = append(rest, []byte("\r\n")...)
+				if uint64(len(rest)) < n {
+					restBytes := make([]byte, n-uint64(len(rest)))
+					if _, err := io.ReadFull(pr.br, restBytes); err != nil {
+						return nil, errors.Wrap(err, "failed to read OK body")
+					}
+
+					rest = append(rest, restBytes...)
+				}
+
+				resp.body = rest
+				if n != uint64(len(rest)) {
+					return resp, errors.Wrap(errInvalidBodyLength, "failed to read OK body")
+				}
+			} else { // just want the ID
+				resp.ID = n
 			}
 		}
 	} else if bytes.Equal(parts[0], []byte("+EOF")) {
 		resp = newResponse(pr.config, RespEOF)
-		// } else if parts[0][0] == '+' {
-		// 	resp = newResponse(pr.config, RespContinue)
 	} else if bytes.Equal(parts[0], []byte("ERR")) {
 		var arg []byte
 		if len(parts) > 1 {

@@ -1,7 +1,6 @@
 package logd
 
 import (
-	"expvar"
 	"fmt"
 	"log"
 	"os"
@@ -10,8 +9,6 @@ import (
 	"strings"
 	"time"
 )
-
-var counts = expvar.NewMap("logd")
 
 func init() {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)

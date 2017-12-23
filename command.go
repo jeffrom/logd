@@ -30,6 +30,9 @@ const (
 	// CmdHead is a head command type.
 	CmdHead
 
+	// CmdStats returns some internal stats.
+	CmdStats
+
 	// CmdPing is a ping command type.
 	CmdPing
 
@@ -55,6 +58,8 @@ func (cmd *CmdType) String() string {
 		return "READ"
 	case CmdHead:
 		return "HEAD"
+	case CmdStats:
+		return "STATS"
 	case CmdPing:
 		return "PING"
 	case CmdClose:
@@ -67,9 +72,41 @@ func (cmd *CmdType) String() string {
 	return fmt.Sprintf("<unknown_command %q>", *cmd)
 }
 
+func cmdNamefromBytes(b []byte) CmdType {
+	if bytes.Equal(b, []byte("MSG")) {
+		return CmdMessage
+	}
+	if bytes.Equal(b, []byte("RAWMSG")) {
+		return CmdMessage
+	}
+	if bytes.Equal(b, []byte("READ")) {
+		return CmdRead
+	}
+	if bytes.Equal(b, []byte("HEAD")) {
+		return CmdHead
+	}
+	if bytes.Equal(b, []byte("STATS")) {
+		return CmdStats
+	}
+	if bytes.Equal(b, []byte("PING")) {
+		return CmdPing
+	}
+	if bytes.Equal(b, []byte("CLOSE")) {
+		return CmdClose
+	}
+	if bytes.Equal(b, []byte("SHUTDOWN")) {
+		return CmdShutdown
+	}
+	if bytes.Equal(b, []byte("SLEEP")) {
+		return CmdSleep
+	}
+	return 0
+}
+
 // Command is an input received by a caller
 type Command struct {
 	config *Config
+	connID UUID
 	name   CmdType
 	args   [][]byte
 	respC  chan *Response
@@ -127,10 +164,12 @@ func (cmd *Command) respond(resp *Response) {
 }
 
 func (cmd *Command) finish() {
+	debugf(cmd.config, "cmd <-done")
 	select {
 	case cmd.done <- struct{}{}:
 	default:
 	}
+
 }
 
 func (cmd *Command) signalReady() {
@@ -151,34 +190,6 @@ func (cmd *Command) waitForReady() {
 
 func (cmd *Command) cancelSleep() {
 	cmd.wake <- struct{}{}
-}
-
-func cmdNamefromBytes(b []byte) CmdType {
-	if bytes.Equal(b, []byte("MSG")) {
-		return CmdMessage
-	}
-	if bytes.Equal(b, []byte("RAWMSG")) {
-		return CmdMessage
-	}
-	if bytes.Equal(b, []byte("READ")) {
-		return CmdRead
-	}
-	if bytes.Equal(b, []byte("HEAD")) {
-		return CmdHead
-	}
-	if bytes.Equal(b, []byte("PING")) {
-		return CmdPing
-	}
-	if bytes.Equal(b, []byte("CLOSE")) {
-		return CmdClose
-	}
-	if bytes.Equal(b, []byte("SHUTDOWN")) {
-		return CmdShutdown
-	}
-	if bytes.Equal(b, []byte("SLEEP")) {
-		return CmdSleep
-	}
-	return 0
 }
 
 func parseNumber(b []byte) (uint64, error) {
