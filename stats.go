@@ -89,13 +89,19 @@ func (s *stats) bytes() []byte {
 	for _, k := range keys {
 		v := s.counts[k]
 
-		buf.WriteString(k)
-		buf.WriteString(": ")
+		writeStringOrPanic(buf, k)
+		writeStringOrPanic(buf, ": ")
 
-		buf.WriteString(strconv.FormatInt(v, 10))
-		buf.WriteString("\r\n")
+		writeStringOrPanic(buf, strconv.FormatInt(v, 10))
+		writeStringOrPanic(buf, "\r\n")
 	}
 
 	// fmt.Printf("%q\n", buf.Bytes())
 	return buf.Bytes()
+}
+
+func writeStringOrPanic(buf *bytes.Buffer, s string) {
+	if _, err := buf.WriteString(s); err != nil {
+		panic(err)
+	}
 }
