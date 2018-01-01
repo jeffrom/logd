@@ -3,6 +3,7 @@
 # TODO
 
 * [ ] correctly read when partition 0 has been deleted
+* [ ] ensure subscription connection is closed when _not_ reading forever
 * [ ] audit all panics: we should only panic when there's a fatal error.
   * mostly return all the way up to main
 * [ ] put delete hooks in a queue, keep track of running delete hooks, make
