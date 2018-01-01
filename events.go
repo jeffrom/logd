@@ -230,14 +230,13 @@ func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 		return
 	}
 
-	for {
-		lf, err := iterator.Next()
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			panic(err)
+	for iterator.Next() {
+		if err := iterator.Error(); err != nil {
+			log.Printf("failed to read log range iterator: %+v", err)
+			resp.sendEOF()
+			cmd.finish()
 		}
+		lf := iterator.LogFile()
 		resp.sendChunk(lf)
 	}
 

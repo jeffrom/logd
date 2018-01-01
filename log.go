@@ -70,7 +70,9 @@ type logRanger interface {
 }
 
 type logRangeIterator interface {
-	Next() (logReadableFile, error)
+	Next() bool
+	Error() error
+	LogFile() logReadableFile
 }
 
 type logFile struct {

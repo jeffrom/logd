@@ -91,6 +91,7 @@ func (l *memLogger) Copy() Logger {
 	return ml
 }
 
+// Range returns the log ids as files. start and end are inclusive.
 func (l *memLogger) Range(start, end uint64) (logRangeIterator, error) {
 	var msgs [][]byte
 	copy(msgs, l.messages)
@@ -107,14 +108,27 @@ func (l *memLogger) Range(start, end uint64) (logRangeIterator, error) {
 
 type memIterator struct {
 	next func() (logReadableFile, error)
+	err  error
+	lf   logReadableFile
 }
 
 func memIteratorFunc(fn func() (logReadableFile, error)) *memIterator {
 	return &memIterator{next: fn}
 }
 
-func (mi *memIterator) Next() (logReadableFile, error) {
-	return mi.next()
+func (mi *memIterator) Next() bool {
+	lf, err := mi.next()
+	mi.lf = lf
+	mi.err = err
+	return err == nil
+}
+
+func (mi *memIterator) Error() error {
+	return mi.err
+}
+
+func (mi *memIterator) LogFile() logReadableFile {
+	return mi.lf
 }
 
 type memFile struct {

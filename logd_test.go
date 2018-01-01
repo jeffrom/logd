@@ -24,6 +24,14 @@ var someLines = [][]byte{
 	[]byte("Even the most perfect reproduction of a work of art is lacking in one element: its presence in time and space, its unique existence at the place where it happens to be. This unique existence of the work of art determined the history to which it was subject throughout the time of its existence. This includes the changes which it may have suffered in physical condition over the years as well as the various changes in its ownership. The traces of the first can be revealed only by chemical or physical analyses which it is impossible to perform on a reproduction; changes of ownership are subject to a tradition which must be traced from the situation of the original."),
 }
 
+var benjaminLines = [][]byte{
+	[]byte("Because he never raises his eyes to the great and the meaningful, the philistine has taken experience as his gospel. It has become for him a message about life's commonness. But he has never grasped that there exists something other than experience, that there are values—inexperienceable—which we serve."),
+	[]byte("Jede Äußerung menschlichen Geisteslebens kann als eine Art der Sprache aufgefaßt werden, und diese Auffassung erschließt nach Art einer wahrhaften Methode überall neue Fragestellungen."),
+	[]byte("There is no muse of philosophy, nor is there one of translation."),
+	[]byte("A religion may be discerned in capitalism—that is to say, capitalism serves essentially to allay the same anxieties, torments, and disturbances to which the so-called religions offered answers."),
+	[]byte("Capitalism is presumably the first case of a blaming, rather than a repenting cult. ... An enormous feeling of guilt not itself knowing how to repent, grasps at the cult, not in order to repent for this guilt, but to make it universal, to hammer it into consciousness and finally and above all to include God himself in this guilt."),
+}
+
 func defaultTestConfig() *Config {
 
 	return &Config{

@@ -327,40 +327,31 @@ func (l *fileLogger) Range(start, end uint64) (logRangeIterator, error) {
 
 type partitionIterator struct {
 	next func() (logReadableFile, error)
+	err  error
+	lf   logReadableFile
 }
 
 func partitionIteratorFunc(next func() (logReadableFile, error)) *partitionIterator {
 	return &partitionIterator{next: next}
 }
 
-func (pi *partitionIterator) Next() (logReadableFile, error) {
-	return pi.next()
+func (pi *partitionIterator) Next() bool {
+	lf, err := pi.next()
+	pi.lf = lf
+	if err != nil {
+		pi.err = err
+		return false
+	}
+	return true
 }
 
-// func (l *fileLogger) rangeIterator(sizes []int64, readers []io.Reader, closers []func() error) *partitionIterator {
-// 	return partitionIteratorFunc(func() (int64, io.Reader, error) {
-// 		var r io.Reader
-// 		var size int64
-// 		if len(readers) == 0 {
-// 			closeAll(closers)
-// 			return 0, nil, io.EOF
-// 		}
+func (pi *partitionIterator) Error() error {
+	return pi.err
+}
 
-// 		// close the previous reader
-// 		if len(closers) > len(readers) {
-// 			var closer func() error
-// 			closer, closers = closers[0], closers[1:]
-// 			if err := closer(); err != nil {
-// 				closeAll(closers)
-// 				return 0, nil, err
-// 			}
-// 		}
-
-// 		r, readers = readers[0], readers[1:]
-// 		size, sizes = sizes[0], sizes[1:]
-// 		return size, r, nil
-// 	})
-// }
+func (pi *partitionIterator) LogFile() logReadableFile {
+	return pi.lf
+}
 
 func closeAll(closers []func() error) error {
 	var firstErr error
