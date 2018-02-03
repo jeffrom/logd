@@ -11,6 +11,12 @@ import (
 	"time"
 )
 
+type protocolError string
+
+func (pe protocolError) Error() string {
+	return fmt.Sprintf("%s (possible server error)", string(pe))
+}
+
 // Client represents a connection to the database
 type Client struct {
 	conn   net.Conn
@@ -69,87 +75,6 @@ func DialConfig(addr string, config *Config, conns ...net.Conn) (*Client, error)
 
 }
 
-func (c *Client) writeCommand(cmd *Command) error {
-	if err := c.conn.SetWriteDeadline(time.Now().Add(c.writeTimeout)); err != nil {
-		return err
-	}
-	if _, err := c.bw.Write(c.pw.writeCommand(cmd)); err != nil {
-		return err
-	}
-	if err := c.flush(); err != nil {
-		return err
-	}
-	debugf(c.config, "%s->%s: %q", c.conn.LocalAddr(), c.conn.RemoteAddr(), cmd.Bytes())
-	return nil
-}
-
-func (c *Client) flush() error {
-	// return nil
-	return c.bw.Flush()
-}
-
-func (c *Client) readResponse() (*Response, error) {
-	if err := c.conn.SetReadDeadline(time.Now().Add(c.readTimeout)); err != nil {
-		return nil, err
-	}
-	resp, err := c.pr.readResponse(c.conn)
-	if err != nil {
-		return nil, err
-	}
-
-	debugf(c.config, "%s<-%s: %q", c.conn.LocalAddr(), c.conn.RemoteAddr(), resp.Bytes())
-	return resp, nil
-}
-
-func (c *Client) readScanResponse() (*ProtocolScanner, error) {
-	resp, err := c.pr.readResponse(c.conn)
-	if c.handleErr(err) != nil {
-		return nil, err
-	}
-
-	debugf(c.config, "initial scan response: %s", resp.Status)
-
-	if err := c.conn.SetReadDeadline(time.Now().Add(c.readTimeout)); err != nil {
-		return nil, err
-	}
-	return newProtocolScanner(c.config, c.pr.br), nil
-}
-
-// Close closes the client connection.
-func (c *Client) Close() error {
-	debugf(c.config, "closing %s->%s", c.conn.LocalAddr(), c.conn.RemoteAddr())
-
-	err := c.writeCommand(NewCommand(c.config, CmdClose))
-	if c.handleErr(err) != nil {
-		log.Printf("%s: close error: %+v", c.conn.RemoteAddr(), err)
-		c.conn.Close()
-		return err
-	}
-
-	_, err = c.readResponse()
-	if c.handleErr(err) != nil {
-		log.Printf("%s: close error: %+v", c.conn.RemoteAddr(), err)
-		c.conn.Close()
-		return err
-	}
-
-	debugf(c.config, "closing conn")
-	return c.handleErr(c.conn.Close())
-}
-
-func (c *Client) handleErr(err error) error {
-	if err == nil {
-		return err
-	}
-	if err == io.EOF {
-		debugf(c.config, "%s closed the connection", c.conn.RemoteAddr())
-	}
-	if err, ok := err.(net.Error); ok && err.Timeout() {
-		debugf(c.config, "%s timed out", c.conn.RemoteAddr())
-	}
-	return err
-}
-
 // Do executes a command and returns the response.
 func (c *Client) Do(cmds ...*Command) (*Response, error) {
 	for _, cmd := range cmds {
@@ -199,10 +124,85 @@ func (c *Client) SetDeadline(t time.Time) error {
 	return c.conn.SetDeadline(t)
 }
 
-type protocolError string
+// Close closes the client connection.
+func (c *Client) Close() error {
+	debugf(c.config, "closing %s->%s", c.conn.LocalAddr(), c.conn.RemoteAddr())
 
-func (pe protocolError) Error() string {
-	return fmt.Sprintf("%s (possible server error)", string(pe))
+	err := c.writeCommand(NewCommand(c.config, CmdClose))
+	if c.handleErr(err) != nil {
+		log.Printf("%s: close error: %+v", c.conn.RemoteAddr(), err)
+		c.conn.Close()
+		return err
+	}
+
+	_, err = c.readResponse()
+	if c.handleErr(err) != nil {
+		log.Printf("%s: close error: %+v", c.conn.RemoteAddr(), err)
+		c.conn.Close()
+		return err
+	}
+
+	debugf(c.config, "closing conn")
+	return c.handleErr(c.conn.Close())
+}
+
+func (c *Client) writeCommand(cmd *Command) error {
+	if err := c.conn.SetWriteDeadline(time.Now().Add(c.writeTimeout)); err != nil {
+		return err
+	}
+	if _, err := c.bw.Write(c.pw.writeCommand(cmd)); err != nil {
+		return err
+	}
+	if err := c.flush(); err != nil {
+		return err
+	}
+	debugf(c.config, "%s->%s: %q", c.conn.LocalAddr(), c.conn.RemoteAddr(), cmd.Bytes())
+	return nil
+}
+
+func (c *Client) flush() error {
+	// return nil
+	return c.bw.Flush()
+}
+
+func (c *Client) readResponse() (*Response, error) {
+	if err := c.conn.SetReadDeadline(time.Now().Add(c.readTimeout)); err != nil {
+		return nil, err
+	}
+	resp, err := c.pr.readResponse(c.conn)
+	if err != nil {
+		return nil, err
+	}
+
+	debugf(c.config, "%s<-%s: %q", c.conn.LocalAddr(), c.conn.RemoteAddr(), resp.Bytes())
+	return resp, nil
+}
+
+func (c *Client) readScanResponse() (*ProtocolScanner, error) {
+	resp, err := c.pr.readResponse(c.conn)
+	if c.handleErr(err) != nil {
+		return nil, err
+	}
+
+	debugf(c.config, "initial scan response: %s", resp.Status)
+
+	if err := c.conn.SetReadDeadline(time.Now().Add(c.readTimeout)); err != nil {
+		return nil, err
+	}
+	return newProtocolScanner(c.config, c.pr.br), nil
+}
+
+func (c *Client) handleErr(err error) error {
+	if err == nil {
+		return err
+	}
+	if err == io.EOF {
+		debugf(c.config, "%s closed the connection", c.conn.RemoteAddr())
+	}
+	if err, ok := err.(net.Error); ok && err.Timeout() {
+		debugf(c.config, "%s timed out", c.conn.RemoteAddr())
+	}
+	return err
 }
 
 func (c *Client) readLine() ([]byte, error) {
