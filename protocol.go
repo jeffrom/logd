@@ -44,6 +44,8 @@ var errReadStopped = errors.New("read stopped by other side")
 var errInvalidProtocolLine = errors.New("invalid protocol line")
 var errInvalidBodyLength = errors.New("invalid body length")
 var errCrcChecksumMismatch = errors.New("crc checksum mismatch")
+var errNotFound = errors.New("id not found")
+var errRangeNotFound = errors.New("id range not found")
 
 type protocolFlusher interface {
 	shouldFlush() bool

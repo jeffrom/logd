@@ -122,8 +122,6 @@ func (l *fileLogger) Flush() error {
 	return nil
 }
 
-// TODO break this out into a Read and ReadPartition function, the latter of
-// which stops on the current partition. we need this to accurately seek
 func (l *fileLogger) Read(b []byte) (int, error) {
 	var err error
 	var read int

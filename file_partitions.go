@@ -147,7 +147,8 @@ func (p *filePartitions) setReadHandle(n uint64) error {
 
 	r, err := os.Open(path)
 	if err != nil {
-		return errors.Wrap(err, "failed to open log for reading")
+		debugf(p.config, "failed to open log for reading: %+v", err)
+		return errors.Wrap(errNotFound, "failed to open log for reading")
 	}
 	p.r = newLogFile(r)
 	return nil
