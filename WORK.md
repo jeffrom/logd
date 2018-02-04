@@ -5,20 +5,21 @@
 * [ ] correctly read when partition 0 has been deleted
   * should return a not found error
 * [ ] read from the beginning of the log
-* [ ] ensure subscription connection is closed when _not_ reading forever
+* [X] ensure subscription connection is closed when _not_ reading forever
 * [ ] audit all panics: we should only panic when there's a fatal error.
   * mostly return all the way up to main
 * [ ] put delete hooks in a queue, keep track of running delete hooks, make
       part of graceful shutdown
 * [ ] need to check the return value of Close(). May contain errors from
       previous delayed io.
-* [ ] log file compression
 * [ ] make synchronization idiomatic w/ stuff like https://udhos.github.io/golang-concurrency-tricks/
 * [ ] backpressure in the form of max concurrent connections
+* [ ] clear index entries that have been deleted
 
 # later
 
 * [ ] `REFUSE`, `ACCEPT` commands.
+* [ ] log file compression
   * probably want to be able to have the server close a connection and tell the
     client where they should try to reconnect?
 * [ ] `STATS` is a lot simpler after refactoring response logic. there
@@ -32,7 +33,7 @@
   * all commands
   * error handling cases
 * [ ] seeking/reading the log when we don't need to (calling Setup, probably)
-* [ ] minimize IO layers as much as possible. io.Copy is ideal, probably.
+* [ ] minimize IO abstractions as much as possible. io.Copy is ideal, probably.
   * would syscall.Fdatasync instead of Flush help? seems likely.
 * [ ] evaluate async logic.
 * [ ] track / limit / reuse concurrent fds in use
