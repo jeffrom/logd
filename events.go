@@ -223,6 +223,9 @@ func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 		end = head
 	}
 
+	debugf(q.config, "adding subscription for %s", cmd.connID)
+	q.subscriptions[cmd.connID] = newSubscription(q.config, resp.readerC, cmd.done)
+
 	iterator, err := q.log.Range(startID, end)
 	if err != nil {
 		log.Printf("failed to handle read command: %+v", err)
@@ -241,9 +244,7 @@ func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 		resp.sendChunk(lf)
 	}
 
-	if limit == 0 { // read forever
-		q.subscriptions[cmd.connID] = newSubscription(q.config, resp.readerC, cmd.done)
-	} else {
+	if limit != 0 { // not reading forever
 		resp.sendEOF()
 		cmd.finish()
 	}
@@ -311,12 +312,15 @@ func (q *eventQ) handleClose(cmd *Command) {
 		return
 	}
 
+	// q.removeSubscription(cmd)
+	cmd.respond(newResponse(q.config, RespOK))
+}
+
+func (q *eventQ) removeSubscription(cmd *Command) {
 	if sub, ok := q.subscriptions[cmd.connID]; ok {
 		sub.finish()
 	}
 	delete(q.subscriptions, cmd.connID)
-
-	cmd.respond(newResponse(q.config, RespOK))
 }
 
 func (q *eventQ) handleSleep(cmd *Command) {

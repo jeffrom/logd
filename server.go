@@ -321,7 +321,7 @@ func (s *SocketServer) handleConnection(conn *conn) {
 			log.Printf("error writing to %s: %+v", conn.RemoteAddr(), err)
 			return
 		}
-		if s.handleClose(cmd) {
+		if s.handleClose(conn, cmd, resp) {
 			debugf(s.config, "closing %s", conn.RemoteAddr())
 			break
 		}
@@ -369,8 +369,20 @@ func (s *SocketServer) handleRead(conn *conn, cmd *Command, resp *Response) {
 	go s.handleSubscriber(conn, cmd, resp)
 }
 
-func (s *SocketServer) handleClose(cmd *Command) bool {
-	return cmd.name == CmdClose
+func (s *SocketServer) handleClose(conn *conn, cmd *Command, resp *Response) bool {
+	if cmd.name == CmdClose {
+		if sub, ok := s.q.subscriptions[conn.id]; ok && sub != nil {
+			if _, err := conn.readPending(); err != nil {
+				panic(err)
+			}
+			debugf(s.config, "sending <-sub.done")
+			s.q.removeSubscription(cmd)
+		} else {
+			debugf(s.config, "when closing, no subscription found")
+		}
+		return true
+	}
+	return false
 }
 
 func (s *SocketServer) handleShutdownRequest(conn *conn, cmd *Command, resp *Response) bool {

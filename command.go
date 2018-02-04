@@ -157,10 +157,12 @@ func (cmd *Command) Bytes() []byte {
 
 func (cmd *Command) respond(resp *Response) {
 	debugf(cmd.config, "<-response: %q", resp)
-	cmd.respC <- resp
+	select {
+	case cmd.respC <- resp:
+	}
 
 	close(cmd.respC)
-	// cmd.respC = nil
+	cmd.respC = nil
 }
 
 func (cmd *Command) finish() {
