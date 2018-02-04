@@ -4,6 +4,8 @@
 
 * [ ] correctly read when partition 0 has been deleted
   * should return a not found error
+  * client should exit with not found error by default
+  * should have a client flag to read from the end in this case
 * [ ] read from the beginning of the log
 * [X] ensure subscription connection is closed when _not_ reading forever
 * [ ] audit all panics: we should only panic when there's a fatal error.
