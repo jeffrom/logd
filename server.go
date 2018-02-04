@@ -81,7 +81,9 @@ func (s *SocketServer) listenAndServe(wait bool) error {
 
 	log.Printf("Serving at %s", s.ln.Addr())
 	if wait {
-		s.readyC <- struct{}{}
+		select {
+		case s.readyC <- struct{}{}:
+		}
 	}
 
 	go s.accept()
@@ -110,7 +112,9 @@ func (s *SocketServer) listenAndServe(wait bool) error {
 
 // ready signals that the application is ready to serve on this host:port
 func (s *SocketServer) ready() {
-	<-s.readyC
+	select {
+	case <-s.readyC:
+	}
 }
 
 func (s *SocketServer) isShuttingDown() bool {
@@ -142,7 +146,10 @@ func (s *SocketServer) accept() {
 		conn := newServerConn(rawConn, s.config)
 		s.addConn(conn)
 
-		s.connIn <- conn
+		select {
+		case s.connIn <- conn:
+		}
+
 	}
 }
 
@@ -158,7 +165,9 @@ func (s *SocketServer) goServe() {
 // shutdown shuts down the server
 func (s *SocketServer) shutdown() error {
 	defer func() {
-		s.shutdownC <- struct{}{}
+		select {
+		case s.shutdownC <- struct{}{}:
+		}
 	}()
 
 	s.mu.Lock()
@@ -207,9 +216,13 @@ func (s *SocketServer) logConns() {
 
 // Stop can be called to shut down the server
 func (s *SocketServer) Stop() {
-	s.stopC <- struct{}{}
+	select {
+	case s.stopC <- struct{}{}:
+	}
 
-	<-s.shutdownC
+	select {
+	case <-s.shutdownC:
+	}
 }
 
 func (s *SocketServer) addConn(conn *conn) {

@@ -351,9 +351,14 @@ func (q *eventQ) handleShutdown(cmd *Command) error {
 }
 
 func (q *eventQ) pushCommand(cmd *Command) (*Response, error) {
-	q.in <- cmd
-	resp := <-cmd.respC
-	return resp, nil
+	select {
+	case q.in <- cmd:
+	}
+
+	select {
+	case resp := <-cmd.respC:
+		return resp, nil
+	}
 }
 
 // func (q *eventQ) handleHup() {

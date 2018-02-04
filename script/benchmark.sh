@@ -37,7 +37,8 @@ set -e
 
 go test -run="^$" -bench="${RUN:-.}" \
     -benchmem \
-    -benchtime=2s \
+    -benchtime=1s \
+    -blockprofile=block.pprof \
     -cpuprofile=cpu.pprof \
     -memprofile=mem.pprof \
     -mutexprofile=mutex.pprof \

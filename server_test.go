@@ -149,16 +149,25 @@ func TestTailServer(t *testing.T) {
 	checkError(t, err)
 
 	go func() {
-		<-sent
+		select {
+		case <-sent:
+		}
+
 		checkScan(t, scanner, msg)
-		success <- struct{}{}
+
+		select {
+		case success <- struct{}{}:
+		}
 	}()
 
 	resp, err := writerClient.Do(NewCommand(clientConfig, CmdMessage, msg))
 	checkError(t, err)
 	checkRespOKID(t, resp, 1)
 
-	sent <- struct{}{}
+	select {
+	case sent <- struct{}{}:
+	}
+
 	waitForChannel(t, success)
 
 	secondTailClient := newTestClient(clientConfig, srv)
@@ -169,9 +178,15 @@ func TestTailServer(t *testing.T) {
 	checkScan(t, secondScanner, msg)
 
 	go func() {
-		<-sent
+		select {
+		case <-sent:
+		}
+
 		checkScan(t, secondScanner, msg)
-		success <- struct{}{}
+
+		select {
+		case success <- struct{}{}:
+		}
 	}()
 
 	msg = []byte("another cool message")
@@ -179,15 +194,28 @@ func TestTailServer(t *testing.T) {
 	checkError(t, err)
 	checkRespOKID(t, resp, 2)
 
-	sent <- struct{}{}
+	select {
+	case sent <- struct{}{}:
+	}
+
 	waitForChannel(t, success)
 
 	go func() {
-		<-sent
+		select {
+		case <-sent:
+		}
+
 		checkScan(t, scanner, msg)
-		success <- struct{}{}
+
+		select {
+		case success <- struct{}{}:
+		}
 	}()
-	sent <- struct{}{}
+
+	select {
+	case sent <- struct{}{}:
+	}
+
 	waitForChannel(t, success)
 }
 

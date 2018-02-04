@@ -151,7 +151,8 @@ func BenchmarkServerTail(b *testing.B) {
 	}
 }
 
-func BenchmarkServerTailTwenty(b *testing.B) {
+func BenchmarkServerTailTen(b *testing.B) {
+	total := 10
 	b.StopTimer()
 	config, teardown := serverBenchConfig(b)
 	defer teardown()
@@ -162,7 +163,7 @@ func BenchmarkServerTailTwenty(b *testing.B) {
 	defer writerClient.Close()
 
 	var scanners []*ProtocolScanner
-	for i := 0; i < 20; i++ {
+	for i := 0; i < total; i++ {
 		client := newTestClient(config, srv)
 		defer client.Close()
 
@@ -181,6 +182,7 @@ func BenchmarkServerTailTwenty(b *testing.B) {
 }
 
 func BenchmarkServerLoadTest(b *testing.B) {
+	total := 25
 	b.StopTimer()
 	config, teardown := serverBenchConfig(b)
 	defer teardown()
@@ -191,14 +193,14 @@ func BenchmarkServerLoadTest(b *testing.B) {
 	defer client.Close()
 
 	var writers []*Client
-	for i := 0; i < 50; i++ {
+	for i := 0; i < total; i++ {
 		writerClient := newTestClient(config, srv)
 		defer writerClient.Close()
 		writers = append(writers, writerClient)
 	}
 
 	var scanners []*ProtocolScanner
-	for i := 0; i < 50; i++ {
+	for i := 0; i < total; i++ {
 		client := newTestClient(config, srv)
 		defer client.Close()
 
@@ -211,7 +213,7 @@ func BenchmarkServerLoadTest(b *testing.B) {
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		for ii := 0; ii < 50; ii++ {
+		for ii := 0; ii < total; ii++ {
 			connwg.Add(1)
 			go func() {
 				client := newTestClient(config, srv)

@@ -14,6 +14,7 @@
       previous delayed io.
 * [ ] log file compression
 * [ ] make synchronization idiomatic w/ stuff like https://udhos.github.io/golang-concurrency-tricks/
+* [ ] backpressure in the form of max concurrent connections
 
 # later
 
