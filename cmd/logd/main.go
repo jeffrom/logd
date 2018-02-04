@@ -6,6 +6,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"runtime"
 	"sort"
 	"syscall"
 
@@ -134,6 +135,7 @@ func runApp(args []string) {
 		}()
 
 		go func() {
+			runtime.SetBlockProfileRate(10000)
 			log.Println(http.ListenAndServe("localhost:6060", nil))
 		}()
 

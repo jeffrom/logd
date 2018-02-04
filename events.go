@@ -312,7 +312,7 @@ func (q *eventQ) handleClose(cmd *Command) {
 		return
 	}
 
-	// q.removeSubscription(cmd)
+	q.removeSubscription(cmd)
 	cmd.respond(newResponse(q.config, RespOK))
 }
 

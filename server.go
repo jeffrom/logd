@@ -370,17 +370,7 @@ func (s *SocketServer) handleRead(conn *conn, cmd *Command, resp *Response) {
 }
 
 func (s *SocketServer) handleClose(conn *conn, cmd *Command, resp *Response) bool {
-	if cmd.name != CmdClose {
-		return false
-	}
-
-	if sub, ok := s.q.subscriptions[conn.id]; ok && sub != nil {
-		debugf(s.config, "%s(%s): closing subscription", conn.RemoteAddr(), conn.getState())
-		s.q.removeSubscription(cmd)
-	} else {
-		debugf(s.config, "when closing, no subscription found")
-	}
-	return true
+	return cmd.name == CmdClose
 }
 
 func (s *SocketServer) handleShutdownRequest(conn *conn, cmd *Command, resp *Response) bool {

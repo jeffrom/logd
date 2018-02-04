@@ -182,6 +182,7 @@ func BenchmarkServerTailTen(b *testing.B) {
 }
 
 func BenchmarkServerLoadTest(b *testing.B) {
+	// b.SkipNow()
 	total := 25
 	b.StopTimer()
 	config, teardown := serverBenchConfig(b)
