@@ -13,6 +13,7 @@
 * [ ] need to check the return value of Close(). May contain errors from
       previous delayed io.
 * [ ] log file compression
+* [ ] make synchronization idiomatic w/ stuff like https://udhos.github.io/golang-concurrency-tricks/
 
 # later
 

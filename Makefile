@@ -11,6 +11,7 @@ clean:
 	@echo "Cleaning generated development files..."
 	rm -f $(GENERATED_FILES)
 	rm -rf integration_test/out/* report/*
+	rm -rf /tmp/__logd-testdata__*
 
 .PHONY: clean.docker
 clean.docker:

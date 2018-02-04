@@ -5,17 +5,51 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"os"
 	"path"
 	"runtime/debug"
 	"testing"
 )
 
+const logDirPrefix = "__logd-testdata__"
+
+// var randSrc *rand.Rand
+
+// func init() {
+// 	randSrc = rand.New(rand.NewSource(time.Now().UnixNano()))
+// }
+
+// func randStr(l int) string {
+// 	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+// 	result := make([]byte, l)
+// 	for i := range result {
+// 		result[i] = chars[randSrc.Intn(len(chars))]
+// 	}
+// 	return string(result)
+// }
+
 func getTempdir() string {
-	dir, err := ioutil.TempDir("", "__log")
+	dir, err := ioutil.TempDir("", logDirPrefix)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to get tempdir: %+v", err))
 	}
+
+	//
+	// debugging
+	//
+
+	// fmt.Println(dir)
+	// ls, err := ioutil.ReadDir(dir)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// for _, f := range ls {
+	// 	fmt.Println(f.Name())
+	// }
+
+	//
+	//
+	//
+
 	return dir
 }
 
@@ -34,15 +68,16 @@ func setupFileLoggerConfig(t testing.TB, config *Config) (*Config, Logger, func(
 	}
 
 	return config, logger, func() {
-		dir := path.Dir(config.LogFile)
+		// dir := path.Dir(config.LogFile)
 		// t.Logf("Deleting %s", dir)
-		if dir != "testdata" && len(dir) > 0 && dir[0] != '.' {
-			os.RemoveAll(dir)
-		}
+		// if strings.Contains(dir, logDirPrefix) {
+		// 	os.RemoveAll(dir)
+		// }
 
 		if err := logger.(logManager).Shutdown(); err != nil {
 			t.Fatalf("error shutting down: %+v", err)
 		}
+
 	}
 }
 

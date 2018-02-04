@@ -45,7 +45,7 @@ func BenchmarkEventQLifecycle(b *testing.B) {
 	config.LogFile = tmpLog()
 
 	for i := 0; i < b.N; i++ {
-		config, _, shutdown := setupFileLoggerConfig(b, config)
+		_, _, shutdown := setupFileLoggerConfig(b, config)
 		q := newEventQ(config)
 		q.start()
 		q.handleShutdown(nil)
@@ -133,6 +133,7 @@ func BenchmarkEventQReadFromHeadOne(b *testing.B) {
 }
 
 func BenchmarkEventQReadFromHeadTen(b *testing.B) {
+	b.SkipNow()
 	b.StopTimer()
 	config := eventQBenchConfig()
 	q, shutdown := startQForBench(b)
