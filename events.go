@@ -37,7 +37,7 @@ func newEventQ(config *Config) *eventQ {
 
 	q := &eventQ{
 		config:        config,
-		in:            make(chan *Command, 0),
+		in:            make(chan *Command, 1000),
 		close:         make(chan struct{}),
 		subscriptions: make(map[UUID]*Subscription),
 		log:           config.Logger,
@@ -211,7 +211,7 @@ func (q *eventQ) handleRead(cmd *Command) {
 
 func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 	resp := newResponse(q.config, RespOK)
-	resp.readerC = make(chan io.Reader, 20)
+	resp.readerC = make(chan io.Reader, 1000)
 
 	cmd.respond(resp)
 	cmd.waitForReady()
