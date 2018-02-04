@@ -1,6 +1,7 @@
 package logd
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -241,7 +242,7 @@ func (q *eventQ) doRead(cmd *Command, startID uint64, limit uint64) {
 	}
 
 	if limit == 0 { // read forever
-		q.subscriptions[cmd.connID] = newSubscription(resp.readerC, cmd.done)
+		q.subscriptions[cmd.connID] = newSubscription(q.config, resp.readerC, cmd.done)
 	} else {
 		resp.sendEOF()
 		cmd.finish()
@@ -363,3 +364,32 @@ func (q *eventQ) pushCommand(cmd *Command) (*Response, error) {
 
 // func (q *eventQ) handleHup() {
 // }
+
+// Subscription is used to tail logs
+type Subscription struct {
+	config  *Config
+	readerC chan io.Reader
+	done    chan struct{}
+}
+
+func newSubscription(config *Config, readerC chan io.Reader, done chan struct{}) *Subscription {
+	return &Subscription{
+		config:  config,
+		readerC: readerC,
+		done:    done,
+	}
+}
+
+func (subs *Subscription) send(msg []byte) {
+	// fmt.Printf("<-bytes %q (subscription)\n", prettybuf(msg))
+	subs.readerC <- bytes.NewReader(msg)
+}
+
+func (subs *Subscription) finish() {
+	select {
+	case subs.done <- struct{}{}:
+		debugf(subs.config, "subscription <-done")
+	default:
+		debugf(subs.config, "tried but failed to close subscription")
+	}
+}

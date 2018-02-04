@@ -95,7 +95,7 @@ func (s *SocketServer) listenAndServe(wait bool) error {
 			s.logConns()
 			return s.shutdown()
 		case conn := <-s.connIn:
-			go s.handleClient(conn)
+			go s.handleConnection(conn)
 		}
 	}
 }
@@ -255,7 +255,7 @@ func handleConnErr(config *Config, err error, conn *conn) error {
 	return err
 }
 
-func (s *SocketServer) handleClient(conn *conn) {
+func (s *SocketServer) handleConnection(conn *conn) {
 	s.q.stats.incr("connections")
 
 	defer func() {
@@ -276,13 +276,13 @@ func (s *SocketServer) handleClient(conn *conn) {
 		}
 
 		// wait for a command
-		cmd, err := conn.pr.readCommand(conn)
+		cmd, err := s.readCommand(conn)
 		if cerr := handleConnErr(s.config, err, conn); cerr != nil {
 			return
 		}
-		cmd.connID = conn.id
 		debugf(s.config, "%s<-%s: %s", conn.LocalAddr(), conn.RemoteAddr(), cmd)
 
+		// just waited for io, so check if we're in shutdown
 		if s.isShuttingDown() {
 			break
 		}
@@ -291,24 +291,21 @@ func (s *SocketServer) handleClient(conn *conn) {
 		resp, err := s.q.pushCommand(cmd)
 		conn.readerC = resp.readerC
 		s.q.stats.incr("total_commands")
-		// TODO different error helper for command v connection errors?
 		if cerr := handleConnErr(s.config, err, conn); cerr != nil {
 			s.q.stats.incr("command_errors")
 			return
 		}
 
-		// for when another connection shut down the server while this one was
-		// waiting for a response
+		// now we've waited to hear back from the event queue, so check if we're in shutdown again
 		if s.isShuttingDown() {
 			break
 		}
 
-		if cmd.name == CmdShutdown && resp.Status == RespOK {
-			s.removeConn(conn)
-			s.Stop()
+		if s.handleShutdownRequest(conn, cmd, resp) {
 			return
 		}
 
+		// send a response
 		if werr := conn.setWriteDeadline(); werr != nil {
 			s.q.stats.incr("connection_errors")
 			log.Printf("error setting %s write deadline: %+v", conn.RemoteAddr(), werr)
@@ -316,41 +313,73 @@ func (s *SocketServer) handleClient(conn *conn) {
 		}
 
 		respBytes := resp.Bytes()
-
 		n, err := conn.write(respBytes)
 		s.q.stats.add("total_bytes_written", int64(n))
+
 		if handleConnErr(s.config, err, conn) != nil {
 			s.q.stats.incr("connection_errors")
 			log.Printf("error writing to %s: %+v", conn.RemoteAddr(), err)
 			return
 		}
-		if cmd.name == CmdClose {
+		if s.handleClose(cmd) {
 			debugf(s.config, "closing %s", conn.RemoteAddr())
 			break
 		}
-		if cmd.name == CmdRead {
-			cmd.signalReady()
-		}
 
-		s.finishRequest(conn, cmd, resp)
+		// handle a single read or go into subscriber state
+		s.handleRead(conn, cmd, resp)
+
+		// clean up the request in preparation for the next, or go into
+		// subscriber mode
+		s.finishCommand(conn, cmd, resp)
 	}
 }
 
-func (s *SocketServer) finishRequest(conn *conn, cmd *Command, resp *Response) {
-	if cmd.name == CmdRead {
-		debugf(s.config, "reading log messages to %s", conn.RemoteAddr())
-		conn.setState(connStateReading)
-		// continue the loop to accept additional commands
-
-		if err := conn.SetWriteDeadline(time.Time{}); err != nil {
-			log.Printf("error setting write deadline to %s: %+v", conn.RemoteAddr(), err)
-			return
-		}
-
-		go s.handleSubscriber(conn, cmd, resp)
-	} else {
-		conn.setState(connStateInactive)
+func (s *SocketServer) readCommand(conn *conn) (*Command, error) {
+	cmd, err := conn.pr.readCommand(conn)
+	if cmd != nil && conn != nil {
+		cmd.connID = conn.id
 	}
+	return cmd, err
+}
+
+func (s *SocketServer) finishCommand(conn *conn, cmd *Command, resp *Response) {
+	if cmd.name == CmdRead {
+		return
+	}
+
+	conn.setState(connStateInactive)
+}
+
+func (s *SocketServer) handleRead(conn *conn, cmd *Command, resp *Response) {
+	if cmd.name != CmdRead {
+		return
+	}
+
+	cmd.signalReady()
+	debugf(s.config, "reading log messages to %s", conn.RemoteAddr())
+	conn.setState(connStateReading)
+	// continue the loop to accept additional commands
+
+	if err := conn.SetWriteDeadline(time.Time{}); err != nil {
+		log.Printf("error setting write deadline to %s: %+v", conn.RemoteAddr(), err)
+		return
+	}
+
+	go s.handleSubscriber(conn, cmd, resp)
+}
+
+func (s *SocketServer) handleClose(cmd *Command) bool {
+	return cmd.name == CmdClose
+}
+
+func (s *SocketServer) handleShutdownRequest(conn *conn, cmd *Command, resp *Response) bool {
+	if cmd.name == CmdShutdown && resp.Status == RespOK {
+		s.removeConn(conn)
+		s.Stop()
+		return true
+	}
+	return false
 }
 
 func (s *SocketServer) handleSubscriber(conn *conn, cmd *Command, resp *Response) {

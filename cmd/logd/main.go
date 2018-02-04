@@ -2,6 +2,8 @@ package main
 
 import (
 	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"sort"
@@ -129,6 +131,10 @@ func runApp(args []string) {
 				log.Print("Caught signal. Exiting...")
 				srv.Stop()
 			}
+		}()
+
+		go func() {
+			log.Println(http.ListenAndServe("localhost:6060", nil))
 		}()
 
 		return srv.ListenAndServe()

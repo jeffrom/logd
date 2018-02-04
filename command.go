@@ -164,12 +164,12 @@ func (cmd *Command) respond(resp *Response) {
 }
 
 func (cmd *Command) finish() {
-	debugf(cmd.config, "cmd <-done")
 	select {
 	case cmd.done <- struct{}{}:
+		debugf(cmd.config, "cmd <-done")
 	default:
+		debugf(cmd.config, "tried but failed to finish command %s", cmd)
 	}
-
 }
 
 func (cmd *Command) signalReady() {
