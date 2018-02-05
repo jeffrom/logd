@@ -3,6 +3,7 @@
 # TODO
 
 * [ ] correctly read when partition 0 has been deleted
+  * reads/writes after startup should work
   * should return a not found error
   * client should exit with not found error by default
   * should have a client flag to read from the end in this case
@@ -12,6 +13,8 @@
   * mostly return all the way up to main
 * [ ] put delete hooks in a queue, keep track of running delete hooks, make
       part of graceful shutdown
+      * continue on startup when there are still pending delete hooks
+      * log delete hook output to logd stdout
 * [ ] need to check the return value of Close(). May contain errors from
       previous delayed io.
 * [ ] make synchronization idiomatic w/ stuff like https://udhos.github.io/golang-concurrency-tricks/
