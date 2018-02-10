@@ -15,7 +15,10 @@
 
 [[projects]]
   name = "gopkg.in/urfave/cli.v1"
-  packages = [".","altsrc"]
+  packages = [
+    ".",
+    "altsrc"
+  ]
   revision = "cfb38830724cc34fedffe9a2a29fb54fa9169cd1"
   version = "v1.20.0"
 
@@ -23,7 +26,7 @@
   branch = "v2"
   name = "gopkg.in/yaml.v2"
   packages = ["."]
-  revision = "eb3733d160e74a9c7e442f435eb3bea458e1d19f"
+  revision = "d670f9405373e636a5a2765eea47fac0c9bc91a4"
 
 [solve-meta]
   analyzer-name = "dep"
