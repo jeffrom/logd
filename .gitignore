@@ -18,3 +18,9 @@ report/
 /integration_test/out
 
 ./build/*
+
+# compiled test binaries
+server.test
+logger.test
+events.test
+protocol.test
