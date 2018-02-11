@@ -1,6 +1,7 @@
 
 PKGS ?= $(shell go list ./...)
-SHORT_PKGS ?= $(shell go list -f '{{.Name}}' ./...)
+SHORT_PKGS ?= $(shell go list -f '{{.Name}}' ./... | grep -v main)
+PKG_DIRS ?= $(shell go list -f '{{.Dir}}' ./...)
 
 GENERATED_FILES ?= __log* testdata/*.actual.golden logd.test log-cli.test *.pprof
 
@@ -11,7 +12,8 @@ all: build
 clean:
 	@echo "Cleaning generated development files..."
 	rm -f $(GENERATED_FILES)
-	$(foreach pkg,$(SHORT_PKGS),rm -f $(pkg)/testdata/*.actual.golden;)
+	$(foreach pkg,$(PKG_DIRS),rm -f $(pkg)/testdata/*.actual.golden;)
+	$(foreach pkg,$(SHORT_PKGS),rm -f $(pkg).test;)
 	rm -rf integration_test/out/* report/*
 	rm -rf /tmp/__logd-testdata__*
 
