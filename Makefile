@@ -11,6 +11,7 @@ all: build
 clean:
 	@echo "Cleaning generated development files..."
 	rm -f $(GENERATED_FILES)
+	$(foreach pkg,$(SHORT_PKGS),rm -f $(pkg)/testdata/*.actual.golden;)
 	rm -rf integration_test/out/* report/*
 	rm -rf /tmp/__logd-testdata__*
 
