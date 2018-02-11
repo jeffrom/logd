@@ -10,11 +10,16 @@ rotate() {
     while read -r f; do
         num="${f##./${fullpath}.}"
         nums+=("$num")
-    done < <(find "./${filedir}" -name "${filebase}.*")
+    done < <(find "./${filedir}" -name "*.${filebase}.*")
 
+    # if [ ${#nums[@]} -eq 0 ]; then
+    #     echo "no previous benchmark reports found"
+    #     return
+    # fi
     IFS=$'\n' sorted=($(sort -r <<<"${nums[*]}"))
     unset IFS
 
+    echo $sorted
     for n in ${sorted[*]}; do
         next=$((n+1))
         mv "${fullpath}.$n" "${fullpath}.$next"
@@ -35,12 +40,12 @@ set +e
 git log --oneline | head -n 1 > report/bench.out
 set -e
 
-go test -run="^$" -bench="${RUN:-.}" \
-    -benchmem \
-    -benchtime=1s \
-    -blockprofile=block.pprof \
-    -cpuprofile=cpu.pprof \
-    -memprofile=mem.pprof \
-    -mutexprofile=mutex.pprof \
-    -outputdir=report \
-    | tee -a report/bench.out
+# go test -run="^$" -bench="${RUN:-.}" \
+#     -benchmem \
+#     -benchtime=1s \
+#     -blockprofile=block.pprof \
+#     -cpuprofile=cpu.pprof \
+#     -memprofile=mem.pprof \
+#     -mutexprofile=mutex.pprof \
+#     -outputdir=report \
+#     | tee -a report/bench.out

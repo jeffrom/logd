@@ -12,10 +12,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jeffrom/logd"
 	"github.com/pkg/errors"
 	"gopkg.in/urfave/cli.v1"
 	"gopkg.in/urfave/cli.v1/altsrc"
+
+	"github.com/jeffrom/logd/client"
+	"github.com/jeffrom/logd/config"
+	"github.com/jeffrom/logd/protocol"
 )
 
 func toBytes(args []string) [][]byte {
@@ -27,17 +30,17 @@ func toBytes(args []string) [][]byte {
 	return b
 }
 
-func checkErrResp(resp *logd.Response) error {
-	if resp.Status == logd.RespErr {
+func checkErrResp(resp *protocol.Response) error {
+	if resp.Status == protocol.RespErr {
 		return cli.NewExitError("Server error", 2)
 	}
-	if resp.Status == logd.RespErrClient {
+	if resp.Status == protocol.RespErrClient {
 		return cli.NewExitError("Client error", 3)
 	}
 	return nil
 }
 
-func formatResp(resp *logd.Response, args []string) string {
+func formatResp(resp *protocol.Response, args []string) string {
 	var out bytes.Buffer
 	respBytes := resp.Bytes()
 	isOk := bytes.HasPrefix(respBytes, []byte("OK "))
@@ -60,32 +63,32 @@ func formatResp(resp *logd.Response, args []string) string {
 	return out.String()
 }
 
-func cmdAction(config *logd.Config, cmd logd.CmdType) func(c *cli.Context) error {
-	return func(c *cli.Context) error {
-		client, err := logd.DialConfig(config.Hostport, config)
+func cmdAction(conf *config.Config, cmd protocol.CmdType) func(c *cli.Context) error {
+	return func(cliCtx *cli.Context) error {
+		c, err := client.DialConfig(conf.Hostport, conf)
 		if err != nil {
 			return cli.NewExitError(err, 1)
 		}
-		defer client.Close()
+		defer c.Close()
 
-		if len(c.Args()) > 0 {
-			resp, err := client.Do(logd.NewCommand(config, cmd, toBytes(c.Args())...))
+		if len(cliCtx.Args()) > 0 {
+			resp, err := c.Do(protocol.NewCommand(conf, cmd, toBytes(cliCtx.Args())...))
 			if err != nil {
 				return cli.NewExitError(err, 1)
 			}
-			fmt.Println(formatResp(resp, c.Args()))
+			fmt.Println(formatResp(resp, cliCtx.Args()))
 			if err := checkErrResp(resp); err != nil {
 				return err
 			}
-		} else if cmd != logd.CmdMessage {
-			resp, err := client.Do(logd.NewCommand(config, cmd))
+		} else if cmd != protocol.CmdMessage {
+			resp, err := c.Do(protocol.NewCommand(conf, cmd))
 			if err != nil {
-				if err == io.EOF && cmd == logd.CmdShutdown {
+				if err == io.EOF && cmd == protocol.CmdShutdown {
 					return nil
 				}
 				return cli.NewExitError(err, 1)
 			}
-			fmt.Println(formatResp(resp, c.Args()))
+			fmt.Println(formatResp(resp, cliCtx.Args()))
 			if err := checkErrResp(resp); err != nil {
 				return err
 			}
@@ -99,10 +102,10 @@ func cmdAction(config *logd.Config, cmd logd.CmdType) func(c *cli.Context) error
 
 		scanner := bufio.NewScanner(os.Stdin)
 		scanner.Split(bufio.ScanLines)
-		var lastResp *logd.Response
+		var lastResp *protocol.Response
 		for scanner.Scan() {
 			b := scanner.Bytes()
-			resp, err := client.Do(logd.NewCommand(config, cmd, b))
+			resp, err := c.Do(protocol.NewCommand(conf, cmd, b))
 			lastResp = resp
 			if err == io.EOF {
 				return nil
@@ -110,7 +113,7 @@ func cmdAction(config *logd.Config, cmd logd.CmdType) func(c *cli.Context) error
 			if err != nil {
 				panic(err)
 			}
-			if cmd != logd.CmdMessage {
+			if cmd != protocol.CmdMessage {
 				fmt.Println(formatResp(resp, nil))
 			}
 			if err := checkErrResp(resp); err != nil {
@@ -118,30 +121,30 @@ func cmdAction(config *logd.Config, cmd logd.CmdType) func(c *cli.Context) error
 			}
 		}
 
-		if cmd == logd.CmdMessage {
+		if cmd == protocol.CmdMessage {
 			fmt.Println(formatResp(lastResp, nil))
 		}
 		return nil
 	}
 }
 
-func doReadCmdAction(config *logd.Config) func(c *cli.Context) error {
-	return func(c *cli.Context) error {
-		start := config.StartID
-		limit := int(config.ReadLimit)
+func doReadCmdAction(conf *config.Config) func(c *cli.Context) error {
+	return func(cliCtx *cli.Context) error {
+		start := conf.StartID
+		limit := int(conf.ReadLimit)
 
-		client, err := logd.DialConfig(config.Hostport, config)
+		c, err := client.DialConfig(conf.Hostport, conf)
 		if err != nil {
 			log.Printf("%+v", err)
 			return cli.NewExitError(err, 1)
 		}
-		defer client.Close()
+		defer c.Close()
 
 		sigc := make(chan os.Signal, 1)
 		signal.Notify(sigc, os.Interrupt, syscall.SIGTERM)
 
-		if start == 0 && !config.ReadForever {
-			resp, headErr := client.Do(logd.NewCommand(config, logd.CmdHead))
+		if start == 0 && !conf.ReadForever {
+			resp, headErr := c.Do(protocol.NewCommand(conf, protocol.CmdHead))
 			if err != nil {
 				log.Printf("%+v", err)
 				return cli.NewExitError(headErr, 2)
@@ -157,12 +160,12 @@ func doReadCmdAction(config *logd.Config) func(c *cli.Context) error {
 			// limit--
 		}
 
-		if config.ReadForever {
+		if conf.ReadForever {
 			limit = 0
 		}
 
 		// fmt.Printf("Reading %d messages from id %d\n", limit, start)
-		scanner, err := client.DoRead(start, limit)
+		scanner, err := c.DoRead(start, limit)
 		if err != nil {
 			log.Printf("%+v", err)
 			return cli.NewExitError(err, 2)
@@ -180,7 +183,7 @@ func doReadCmdAction(config *logd.Config) func(c *cli.Context) error {
 			}
 		}
 
-		if config.ReadForever {
+		if conf.ReadForever {
 			for {
 				select {
 				case <-sigc:
@@ -188,11 +191,11 @@ func doReadCmdAction(config *logd.Config) func(c *cli.Context) error {
 				case <-time.After(200 * time.Millisecond):
 				}
 
-				client.SetDeadline(time.Now().Add(200 * time.Millisecond))
+				c.SetDeadline(time.Now().Add(200 * time.Millisecond))
 				for scanner.Scan() {
 					msg := scanner.Message()
 					fmt.Printf("%d %s\n", msg.ID, msg.Body)
-					client.SetDeadline(time.Now().Add(200 * time.Millisecond))
+					c.SetDeadline(time.Now().Add(200 * time.Millisecond))
 				}
 
 				if err := scanner.Error(); err != nil && err != io.EOF {
@@ -210,8 +213,8 @@ func doReadCmdAction(config *logd.Config) func(c *cli.Context) error {
 }
 
 func runApp(args []string) {
-	config := &logd.Config{}
-	*config = *logd.DefaultConfig
+	conf := &config.Config{}
+	*conf = *config.DefaultConfig
 
 	cli.VersionFlag = cli.BoolFlag{
 		Name:  "version",
@@ -235,21 +238,21 @@ func runApp(args []string) {
 			Name:        "verbose, v",
 			Usage:       "print debug output",
 			EnvVar:      "LOGD_VERBOSE",
-			Destination: &config.Verbose,
+			Destination: &conf.Verbose,
 		}),
 		altsrc.NewStringFlag(cli.StringFlag{
 			Name:        "host",
 			Usage:       "A `HOST:PORT` combination to connect to",
 			EnvVar:      "LOGD_HOST",
 			Value:       "127.0.0.1:1774",
-			Destination: &config.Hostport,
+			Destination: &conf.Hostport,
 		}),
 		altsrc.NewUintFlag(cli.UintFlag{
 			Name:        "timeout",
 			Usage:       "`MILLISECONDS` to wait for a response",
 			EnvVar:      "LOGD_TIMEOUT",
 			Value:       500,
-			Destination: &config.ClientTimeout,
+			Destination: &conf.ClientTimeout,
 		}),
 	}
 
@@ -261,22 +264,22 @@ func runApp(args []string) {
 		{
 			Name:   "ping",
 			Usage:  "ping a host for availability",
-			Action: cmdAction(config, logd.CmdPing),
+			Action: cmdAction(conf, protocol.CmdPing),
 		},
 		{
 			Name:   "sleep",
 			Usage:  "pause the current transaction",
-			Action: cmdAction(config, logd.CmdSleep),
+			Action: cmdAction(conf, protocol.CmdSleep),
 		},
 		{
 			Name:   "head",
 			Usage:  "get the log's current ID",
-			Action: cmdAction(config, logd.CmdHead),
+			Action: cmdAction(conf, protocol.CmdHead),
 		},
 		{
 			Name:   "write",
 			Usage:  "write a message to the log",
-			Action: cmdAction(config, logd.CmdMessage),
+			Action: cmdAction(conf, protocol.CmdMessage),
 		},
 		{
 			Name:  "read",
@@ -286,31 +289,31 @@ func runApp(args []string) {
 					Name:        "start, s",
 					Usage:       "Starting `ID`",
 					Value:       0,
-					Destination: &config.StartID,
+					Destination: &conf.StartID,
 				},
 				cli.Uint64Flag{
 					Name:        "limit, n",
 					Usage:       "`NUMBER` of message to read",
 					Value:       15,
-					Destination: &config.ReadLimit,
+					Destination: &conf.ReadLimit,
 				},
 				cli.BoolFlag{
 					Name:        "forever, f",
 					Usage:       "read forever",
-					Destination: &config.ReadForever,
+					Destination: &conf.ReadForever,
 				},
 			}, flags...),
-			Action: doReadCmdAction(config),
+			Action: doReadCmdAction(conf),
 		},
 		{
 			Name:   "stats",
 			Usage:  "get running server stats",
-			Action: cmdAction(config, logd.CmdStats),
+			Action: cmdAction(conf, protocol.CmdStats),
 		},
 		{
 			Name:   "shutdown",
 			Usage:  "shutdown the server (debug only)",
-			Action: cmdAction(config, logd.CmdShutdown),
+			Action: cmdAction(conf, protocol.CmdShutdown),
 		},
 	}
 

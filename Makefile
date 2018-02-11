@@ -1,5 +1,6 @@
 
 PKGS ?= $(shell go list ./...)
+SHORT_PKGS ?= $(shell go list -f '{{.Name}}' ./...)
 
 GENERATED_FILES ?= __log* testdata/*.actual.golden logd.test log-cli.test *.pprof
 
@@ -40,7 +41,7 @@ deps.dep:
 
 .PHONY: build
 build:
-	go install ./...
+	go install -x -v ./...
 
 .PHONY: build.container
 build.container:
@@ -59,7 +60,7 @@ test.cover:
 
 .PHONY: test.coverprofile
 test.coverprofile:
-	go test -coverprofile=integration_test/out/unit.cov.out -covermode=count
+	$(foreach pkg,$(SHORT_PKGS),go test -coverprofile=integration_test/out/unit.$(pkg).cov.out -covermode=count ./$(pkg);)
 
 .PHONY: test.golden
 test.golden:
@@ -89,8 +90,8 @@ BENCH ?= .
 bench:
 	mkdir -p report
 	# go test -run="^$$" -bench=. -benchmem -cpuprofile=cpu.pprof -memprofile=mem.pprof -mutexprofile=mutex.pprof -outputdir=report | tee report/bench.out
-	# $(foreach pkg,$(PKGS),go test -bench=$(BENCH) -cpuprofile=cpu.pprof -memprofile=mem.pprof -mutexprofile=mutex.pprof -outputdir=report/ -benchmem -run="^$$" $(pkg);)
-	./script/benchmark.sh
+	# ./script/benchmark.sh
+	$(foreach pkg,$(SHORT_PKGS),go test -bench=$(BENCH) -cpuprofile=$(pkg).cpu.pprof -memprofile=$(pkg).mem.pprof -mutexprofile=$(pkg).mutex.pprof -outputdir=../report -benchmem -run="^$$" ./$(pkg) | tee -a report/$(pkg).bench.out;)
 
 .PHONY: benchcmp
 benchcmp:
@@ -105,8 +106,8 @@ ci: clean deps lint.install test.coverprofile test.race test.integration.compile
 
 .PHONY: test.integration.compile
 test.integration.compile:
-	go test -c -o logd.test -covermode=count -coverpkg . ./cmd/logd
-	go test -c -o log-cli.test -covermode=count -coverpkg . ./cmd/log-cli
+	go test -c -o logd.test -covermode=count -coverpkg ./... ./cmd/logd
+	go test -c -o log-cli.test -covermode=count -coverpkg ./... ./cmd/log-cli
 
 .PHONY: test.integration
 test.integration:
