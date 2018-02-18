@@ -293,7 +293,11 @@ func (s *SocketServer) handleConnection(conn *Conn) {
 
 		// push to event queue and wait for a result
 		resp, err := s.q.PushCommand(cmd)
+
+		// TODO this allows a race condition. need to put a lock around this.
+		// Or better yet keep each connection to one goroutine instead of two.
 		conn.readerC = resp.ReaderC
+
 		s.q.Stats.Incr("total_commands")
 		if cerr := handleConnErr(s.config, err, conn); cerr != nil {
 			s.q.Stats.Incr("command_errors")
