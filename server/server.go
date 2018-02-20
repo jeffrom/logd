@@ -294,10 +294,6 @@ func (s *SocketServer) handleConnection(conn *Conn) {
 		// push to event queue and wait for a result
 		resp, err := s.q.PushCommand(cmd)
 
-		// TODO this allows a race condition. need to put a lock around this.
-		// Or better yet keep each connection to one goroutine instead of two.
-		conn.readerC = resp.ReaderC
-
 		s.q.Stats.Incr("total_commands")
 		if cerr := handleConnErr(s.config, err, conn); cerr != nil {
 			s.q.Stats.Incr("command_errors")
@@ -321,7 +317,15 @@ func (s *SocketServer) handleConnection(conn *Conn) {
 		}
 
 		respBytes := resp.Bytes()
-		n, err := conn.write(respBytes)
+
+		n, err := s.readPending(conn, resp)
+		s.q.Stats.Add("total_bytes_written", int64(n))
+		if err != nil {
+			log.Printf("%s: error reading pending buffers: %+v", conn.RemoteAddr(), err)
+			return
+		}
+
+		n, err = conn.write(respBytes)
 		s.q.Stats.Add("total_bytes_written", int64(n))
 
 		if handleConnErr(s.config, err, conn) != nil {
@@ -395,6 +399,9 @@ func (s *SocketServer) handleSubscriber(conn *Conn, cmd *protocol.Command, resp 
 	s.q.Stats.Incr("total_subscriptions")
 	defer func() {
 		s.q.Stats.Decr("subscriptions")
+		if _, err := s.readPending(conn, resp); err != nil {
+			log.Printf("%s: error reading pending buffers: %+v", conn.RemoteAddr(), err)
+		}
 		conn.close()
 	}()
 
@@ -409,9 +416,11 @@ func (s *SocketServer) handleSubscriber(conn *Conn, cmd *protocol.Command, resp 
 
 		case <-cmd.Done:
 			internal.Debugf(s.config, "%s: received <-done", conn.RemoteAddr())
+			conn.mu.Lock()
 			if err := conn.Flush(); err != nil {
 				log.Printf("error flushing connection while closing: %+v", err)
 			}
+			conn.mu.Unlock()
 			return
 		}
 	}
@@ -439,4 +448,34 @@ func (s *SocketServer) sendReader(r io.Reader, conn *Conn) error {
 		}
 	}
 	return nil
+}
+
+func (s *SocketServer) readPending(c *Conn, resp *protocol.Response) (int64, error) {
+	// prevState := c.getState()
+	// c.setState(connStateReading)
+	// defer c.setState(prevState)
+	var read int64
+	numRead := 0
+Loop:
+	for {
+		select {
+		case r := <-resp.ReaderC:
+			n, rerr := c.readFrom(r)
+			numRead++
+			read += n
+
+			if closer, ok := r.(io.Closer); ok {
+				if err := closer.Close(); err != nil {
+					log.Printf("error closing %s: %+v", c.RemoteAddr(), err)
+				}
+			}
+			if rerr != nil {
+				return read, rerr
+			}
+		default:
+			break Loop
+		}
+	}
+	internal.Debugf(c.config, "%s: read %d pending readers", c.RemoteAddr(), numRead)
+	return read, nil
 }

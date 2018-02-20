@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"sync"
 	"time"
@@ -66,10 +65,6 @@ type Conn struct {
 
 	state connState
 
-	// shared with Response. used to flush any pending data before a
-	// synchronous write.
-	readerC chan io.Reader
-
 	done chan struct{}
 	mu   sync.Mutex
 
@@ -107,20 +102,16 @@ func newUUID() string {
 }
 
 // sync write. needs to write any pending data on the channel first.
-func (c *Conn) write(bufs ...[]byte) (int, error) {
+func (c *Conn) write(bufs ...[]byte) (int64, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if _, err := c.readPending(); err != nil {
-		return 0, err
-	}
-
 	internal.Debugf(c.config, "->%s: %q", c.RemoteAddr(), internal.Prettybuf(bufs...))
 
-	var n int
+	var n int64
 	for _, buf := range bufs {
 		wrote, err := c.bw.Write(buf)
-		n += wrote
+		n += int64(wrote)
 		c.written += wrote
 		if err != nil {
 			return n, err
@@ -134,36 +125,6 @@ func (c *Conn) write(bufs ...[]byte) (int, error) {
 func (c *Conn) Flush() error {
 	internal.Debugf(c.config, "%s: flush()", c.RemoteAddr())
 	return c.bw.Flush()
-}
-
-func (c *Conn) readPending() (int64, error) {
-	// prevState := c.getState()
-	// c.setState(connStateReading)
-	// defer c.setState(prevState)
-	var read int64
-	numRead := 0
-Loop:
-	for {
-		select {
-		case r := <-c.readerC:
-			n, rerr := c.readFrom(r)
-			numRead++
-			read += n
-
-			if closer, ok := r.(io.Closer); ok {
-				if err := closer.Close(); err != nil {
-					log.Printf("error closing %s: %+v", c.RemoteAddr(), err)
-				}
-			}
-			if rerr != nil {
-				return read, rerr
-			}
-		default:
-			break Loop
-		}
-	}
-	internal.Debugf(c.config, "%s: read %d pending readers", c.RemoteAddr(), numRead)
-	return read, nil
 }
 
 func (c *Conn) readFrom(r io.Reader) (int64, error) {
@@ -190,7 +151,6 @@ func (c *Conn) isActive() bool {
 }
 
 func (c *Conn) close() error {
-	c.readPending()
 	c.setState(connStateClosed)
 	err := c.Conn.Close()
 	// we only care about the channel if we're gracefully shutting down
