@@ -121,7 +121,7 @@ func TestMsgServer(t *testing.T) {
 }
 
 func TestReadServer(t *testing.T) {
-	t.SkipNow()
+	// t.SkipNow()
 	config := testhelper.TestConfig(testing.Verbose())
 	srv := newTestServer(config)
 	defer closeTestServer(t, srv)
