@@ -3,10 +3,10 @@
 # TODO
 
 * [ ] correctly read when partition 0 has been deleted
-  * reads/writes after startup should work
-  * should return a not found error
-  * client should exit with not found error by default
-  * should have a client flag to read from the end in this case
+  * [ ] reads/writes after startup should work
+  * [X] should return a not found error
+  * [X] client should exit with not found error by default
+  * [ ] should have a client flag to read from the end in this case
 * [ ] read from the beginning of the log
 * [X] ensure subscription connection is closed when _not_ reading forever
 * [ ] audit all panics: we should only panic when there's a fatal error.
