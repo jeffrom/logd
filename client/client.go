@@ -97,16 +97,11 @@ func (c *Client) DoRead(id uint64, limit int) (*protocol.ProtocolScanner, error)
 	if err := c.WriteCommand(cmd); c.handleErr(err) != nil {
 		return nil, err
 	}
-
-	deadline := time.Time{}
-	if limit > 0 {
-		deadline = time.Now().Add(c.readTimeout)
-	}
-	if err := c.conn.SetReadDeadline(deadline); err != nil {
+	if err := c.Flush(); c.handleErr(err) != nil {
 		return nil, err
 	}
 
-	return c.readScanResponse()
+	return c.readScanResponse(limit == 0)
 }
 
 func (c *Client) Write(p []byte) (int, error) {
@@ -176,10 +171,22 @@ func (c *Client) readResponse() (*protocol.Response, error) {
 	return resp, nil
 }
 
-func (c *Client) readScanResponse() (*protocol.ProtocolScanner, error) {
+func (c *Client) readScanResponse(forever bool) (*protocol.ProtocolScanner, error) {
+	deadline := time.Time{}
+	if !forever {
+		deadline = time.Now().Add(c.readTimeout)
+	}
+	if err := c.conn.SetReadDeadline(deadline); err != nil {
+		return nil, err
+	}
+
 	resp, err := c.pr.ReadResponse(c.conn)
 	if c.handleErr(err) != nil {
 		return nil, err
+	}
+
+	if resp.Failed() {
+		return nil, fmt.Errorf("%s %s", resp.Status, resp.Body)
 	}
 
 	internal.Debugf(c.config, "initial scan response: %s", resp.Status)

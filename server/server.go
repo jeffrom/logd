@@ -47,7 +47,7 @@ type SocketServer struct {
 
 // NewServer will return a new instance of a log server
 func NewServer(addr string, config *config.Config) *SocketServer {
-	internal.Debugf(config, "starting options: %s", config)
+	log.Printf("starting options: %s", config)
 	q := events.NewEventQ(config)
 	if err := q.Start(); err != nil {
 		panic(err)
@@ -59,7 +59,7 @@ func NewServer(addr string, config *config.Config) *SocketServer {
 		addr:         addr,
 		readyC:       make(chan struct{}),
 		conns:        make(map[*Conn]bool),
-		connIn:       make(chan *Conn, 0),
+		connIn:       make(chan *Conn, 1000),
 		readTimeout:  timeout,
 		writeTimeout: timeout,
 		stopC:        make(chan struct{}),
@@ -266,7 +266,9 @@ func (s *SocketServer) handleConnection(conn *Conn) {
 		s.q.Stats.Decr("connections")
 
 		s.removeConn(conn)
-		conn.close()
+		if err := conn.close(); err != nil {
+			log.Printf("error closing connection: %+v", err)
+		}
 	}()
 
 	for {
@@ -309,14 +311,14 @@ func (s *SocketServer) handleConnection(conn *Conn) {
 			return
 		}
 
+		respBytes := resp.Bytes()
+
 		// send a response
 		if werr := conn.setWriteDeadline(); werr != nil {
 			s.q.Stats.Incr("connection_errors")
 			log.Printf("error setting %s write deadline: %+v", conn.RemoteAddr(), werr)
 			return
 		}
-
-		respBytes := resp.Bytes()
 
 		n, err := s.readPending(conn, resp)
 		s.q.Stats.Add("total_bytes_written", int64(n))
@@ -339,7 +341,9 @@ func (s *SocketServer) handleConnection(conn *Conn) {
 		}
 
 		// handle a single read or go into subscriber state
-		s.handleRead(conn, cmd, resp)
+		if !resp.Failed() {
+			s.handleRead(conn, cmd, resp)
+		}
 
 		// clean up the request in preparation for the next, or go into
 		// subscriber mode
@@ -371,7 +375,6 @@ func (s *SocketServer) handleRead(conn *Conn, cmd *protocol.Command, resp *proto
 	cmd.SignalReady()
 	internal.Debugf(s.config, "reading log messages to %s", conn.RemoteAddr())
 	conn.setState(connStateReading)
-	// continue the loop to accept additional commands
 
 	if err := conn.SetWriteDeadline(time.Time{}); err != nil {
 		log.Printf("error setting write deadline to %s: %+v", conn.RemoteAddr(), err)
@@ -402,7 +405,9 @@ func (s *SocketServer) handleSubscriber(conn *Conn, cmd *protocol.Command, resp 
 		if _, err := s.readPending(conn, resp); err != nil {
 			log.Printf("%s: error reading pending buffers: %+v", conn.RemoteAddr(), err)
 		}
-		conn.close()
+		if err := conn.close(); err != nil {
+			log.Printf("error closing subscriber connection: %+v", err)
+		}
 	}()
 
 	for {
@@ -418,7 +423,7 @@ func (s *SocketServer) handleSubscriber(conn *Conn, cmd *protocol.Command, resp 
 			internal.Debugf(s.config, "%s: received <-done", conn.RemoteAddr())
 			conn.mu.Lock()
 			if err := conn.Flush(); err != nil {
-				log.Printf("error flushing connection while closing: %+v", err)
+				log.Printf("failed to flush connection while closing (connection was probably closed by the client): %+v", err)
 			}
 			conn.mu.Unlock()
 			return

@@ -18,9 +18,8 @@ import (
 
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/internal"
+	"github.com/jeffrom/logd/protocol"
 )
-
-var errNotFound = errors.New("id not found")
 
 type filePartitions struct {
 	config       *config.Config
@@ -153,7 +152,7 @@ func (p *filePartitions) setReadHandle(n uint64) error {
 	r, err := os.Open(path)
 	if err != nil {
 		internal.Debugf(p.config, "failed to open log for reading: %+v", err)
-		return errors.Wrap(errNotFound, "failed to open log for reading")
+		return errors.Wrap(protocol.ErrNotFound, "failed to open log for reading")
 	}
 	p.r = newLogFile(r)
 	return nil

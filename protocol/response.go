@@ -6,6 +6,7 @@ import (
 
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/internal"
+	"github.com/pkg/errors"
 )
 
 // RespType is the response status return type
@@ -33,10 +34,17 @@ const (
 )
 
 var (
+	// ErrNotFound is returned when the log id is above the logs head or has been
+	// deleted.
+	ErrNotFound = errors.New("id not found")
+)
+
+var (
 	// ErrRespInvalid are the error response bytes sent for invalid requests
 	ErrRespInvalid      = []byte("invalid request")
 	ErrRespEmptyMessage = []byte("empty message not allowed")
 	ErrRespNoArguments  = []byte("must supply an argument")
+	ErrRespNotFound     = []byte("not found")
 )
 
 func (resp RespType) String() string {
@@ -66,7 +74,11 @@ type Response struct {
 
 // NewResponse returns a new instance of a Response
 func NewResponse(conf *config.Config, status RespType) *Response {
-	r := &Response{config: conf, Status: status}
+	r := &Response{
+		config:  conf,
+		Status:  status,
+		ReaderC: make(chan io.Reader, 1000),
+	}
 	return r
 }
 
@@ -103,6 +115,10 @@ func (r *Response) String() string {
 // 	r.ReaderC <- reader
 // 	r.ReaderC <- io.LimitReader(f, buflen)
 // }
+
+func (r *Response) Failed() bool {
+	return r.Status != RespOK && r.Status != RespEOF
+}
 
 func (r *Response) SendBytes(b []byte) {
 	internal.Debugf(r.config, "<-ReaderC %q", b)

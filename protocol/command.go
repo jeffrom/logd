@@ -21,12 +21,6 @@ const (
 	// CmdMessage is a message command type.
 	CmdMessage
 
-	// CmdRawMessage is a message command type. Used for replication.
-	CmdRawMessage
-
-	// CmdReplicate initiates a replication session on the connection.
-	CmdReplicate
-
 	// CmdRead is a read command type.
 	CmdRead
 
@@ -53,10 +47,6 @@ func (cmd *CmdType) String() string {
 	switch *cmd {
 	case CmdMessage:
 		return "MSG"
-	case CmdReplicate:
-		return "REPLICATE"
-	case CmdRawMessage:
-		return "RAWMSG"
 	case CmdRead:
 		return "READ"
 	case CmdHead:
@@ -79,9 +69,6 @@ func cmdNamefromBytes(b []byte) CmdType {
 	if bytes.Equal(b, []byte("MSG")) {
 		return CmdMessage
 	}
-	if bytes.Equal(b, []byte("RAWMSG")) {
-		return CmdMessage
-	}
 	if bytes.Equal(b, []byte("READ")) {
 		return CmdRead
 	}
@@ -97,11 +84,11 @@ func cmdNamefromBytes(b []byte) CmdType {
 	if bytes.Equal(b, []byte("CLOSE")) {
 		return CmdClose
 	}
-	if bytes.Equal(b, []byte("SHUTDOWN")) {
-		return CmdShutdown
-	}
 	if bytes.Equal(b, []byte("SLEEP")) {
 		return CmdSleep
+	}
+	if bytes.Equal(b, []byte("SHUTDOWN")) {
+		return CmdShutdown
 	}
 	return 0
 }
@@ -125,8 +112,8 @@ func NewCommand(conf *config.Config, name CmdType, args ...[]byte) *Command {
 		config: conf,
 		Name:   name,
 		Args:   args,
-		RespC:  make(chan *Response),
-		ready:  make(chan struct{}),
+		RespC:  make(chan *Response, 1),
+		ready:  make(chan struct{}, 1),
 		Done:   make(chan struct{}),
 		Wake:   make(chan struct{}),
 	}
@@ -165,7 +152,7 @@ func (cmd *Command) Respond(resp *Response) {
 	}
 
 	close(cmd.RespC)
-	cmd.RespC = nil
+	// cmd.RespC = nil
 }
 
 func (cmd *Command) Finish() {

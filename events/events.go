@@ -2,11 +2,12 @@ package events
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"log"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/internal"
@@ -22,6 +23,10 @@ import (
 
 // TODO use an array of send close <- struct{}{} functions to run on shutdown
 // instead of doing each one manually
+
+//
+// abstract error types
+//
 
 // EventQ manages the receiving, processing, and responding to events.
 type EventQ struct {
@@ -76,15 +81,6 @@ func (q *EventQ) loop() {
 			switch cmd.Name {
 			case protocol.CmdMessage:
 				q.handleMsg(cmd)
-			case protocol.CmdReplicate:
-				q.handleReplicate(cmd)
-			// TODO maybe remove rawmessage and change replicate? It would be
-			// best if both readers and replicas got the same optimizations.
-			// For example, stream messages as they come in, but if partitions
-			// are being written fast enough, wait until a partition has been
-			// written and then just sendfile it.
-			case protocol.CmdRawMessage:
-				q.handleRawMsg(cmd)
 			case protocol.CmdRead:
 				q.handleRead(cmd)
 			case protocol.CmdHead:
@@ -174,32 +170,6 @@ func (q *EventQ) publishMessages(cmd *protocol.Command, msgs [][]byte) {
 	}
 }
 
-// handleReplicate basically does the same thing as handleRead now.
-func (q *EventQ) handleReplicate(cmd *protocol.Command) {
-	startID, err := q.parseReplicate(cmd)
-	if err != nil {
-		internal.Debugf(q.config, "invalid: %v", err)
-		cmd.Respond(protocol.NewResponse(q.config, protocol.RespErr))
-		return
-	}
-
-	q.doRead(cmd, startID, 0)
-}
-
-func (q *EventQ) parseReplicate(cmd *protocol.Command) (uint64, error) {
-	if len(cmd.Args) != 1 {
-		return 0, errInvalidFormat
-	}
-	return protocol.ParseNumber(cmd.Args[0])
-}
-
-// handleRawMsg receives a chunk of data from a master and writes it to the log
-func (q *EventQ) handleRawMsg(cmd *protocol.Command) {
-
-	resp := protocol.NewResponse(q.config, protocol.RespOK)
-	cmd.Respond(resp)
-}
-
 func (q *EventQ) handleRead(cmd *protocol.Command) {
 	startID, limit, err := q.parseRead(cmd)
 	if err != nil {
@@ -208,45 +178,55 @@ func (q *EventQ) handleRead(cmd *protocol.Command) {
 		return
 	}
 
+	head, err := q.log.Head()
+	internal.PanicOnError(err)
+
+	if startID > head {
+		cmd.Respond(protocol.NewClientErrResponse(q.config, protocol.ErrRespNotFound))
+		return
+	}
+
+	end := startID + limit
+	if limit == 0 {
+		end = head
+	}
+
+	iterator, err := q.log.Range(startID, end)
+	if err != nil {
+		if errors.Cause(err) == protocol.ErrNotFound {
+			cmd.Respond(protocol.NewErrResponse(q.config, protocol.ErrRespNotFound))
+			internal.Debugf(q.config, "id %d not found", startID)
+		} else {
+			cmd.Respond(protocol.NewErrResponse(q.config, []byte("")))
+			log.Printf("failed to handle read command: %+v", err)
+		}
+		return
+	}
+
 	q.Stats.Incr("total_reads")
-	q.doRead(cmd, startID, limit)
+	q.doRead(cmd, iterator, limit == 0)
 }
 
-func (q *EventQ) doRead(cmd *protocol.Command, startID uint64, limit uint64) {
+func (q *EventQ) doRead(cmd *protocol.Command, iterator logger.LogRangeIterator, forever bool) {
 	resp := protocol.NewResponse(q.config, protocol.RespOK)
-	resp.ReaderC = make(chan io.Reader, 1000)
 
 	cmd.Respond(resp)
 	cmd.WaitForReady()
 
-	end := startID + limit
-	if limit == 0 {
-		head, err := q.log.Head()
-		internal.PanicOnError(err)
-		end = head
-	}
-
 	internal.Debugf(q.config, "adding subscription for %s", cmd.ConnID)
 	q.subscriptions[cmd.ConnID] = newSubscription(q.config, resp.ReaderC, cmd.Done)
-
-	iterator, err := q.log.Range(startID, end)
-	if err != nil {
-		log.Printf("failed to handle read command: %+v", err)
-		resp.SendEOF()
-		cmd.Finish()
-		return
-	}
 
 	for iterator.Next() {
 		if err := iterator.Error(); err != nil {
 			log.Printf("failed to read log range iterator: %+v", err)
 			resp.SendEOF()
 			cmd.Finish()
+			return
 		}
 		q.sendChunk(iterator.LogFile(), resp.ReaderC)
 	}
 
-	if limit != 0 { // not reading forever
+	if !forever {
 		resp.SendEOF()
 		cmd.Finish()
 	}

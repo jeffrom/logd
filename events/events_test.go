@@ -364,32 +364,6 @@ func TestEventQHeadErr(t *testing.T) {
 	}
 }
 
-func TestEventQReplicate(t *testing.T) {
-	t.SkipNow()
-	config := testhelper.DefaultTestConfig(testing.Verbose())
-	q := startQ(t, logger.NewMemLogger())
-	defer stopQ(t, q)
-
-	expectedMsg := []byte("Hello, log!")
-
-	resp, err := q.PushCommand(protocol.NewCommand(config, protocol.CmdMessage, expectedMsg))
-	checkNoErrAndSuccess(t, resp, err)
-
-	cmd := protocol.NewCommand(config, protocol.CmdReplicate, []byte("1"))
-	tailResp, err := q.PushCommand(cmd)
-	checkNoErrAndSuccess(t, tailResp, err)
-	checkMessageReceived(t, tailResp, 1, expectedMsg)
-
-	resp, err = q.PushCommand(protocol.NewCommand(config, protocol.CmdMessage, expectedMsg))
-	checkNoErrAndSuccess(t, resp, err)
-
-	checkMessageReceived(t, tailResp, 2, expectedMsg)
-
-	closeCmd := protocol.NewCloseCommand(config, cmd.RespC)
-	closeResp, err := q.PushCommand(closeCmd)
-	checkNoErrAndSuccess(t, closeResp, err)
-}
-
 func TestEventQRead(t *testing.T) {
 	t.SkipNow()
 	config := testhelper.DefaultTestConfig(testing.Verbose())

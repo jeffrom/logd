@@ -141,7 +141,12 @@ func BenchmarkServerTail(b *testing.B) {
 	writerClient := newTestClient(config, srv)
 	defer writerClient.Close()
 
-	scanner, _ := client.DoRead(1, 0)
+	writerClient.Do(protocol.NewCommand(config, protocol.CmdMessage, someMessage))
+
+	scanner, err := client.DoRead(1, 0)
+	if err != nil {
+		panic(err)
+	}
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
@@ -160,6 +165,8 @@ func BenchmarkServerTailTen(b *testing.B) {
 
 	writerClient := newTestClient(config, srv)
 	defer writerClient.Close()
+
+	writerClient.Do(protocol.NewCommand(config, protocol.CmdMessage, someMessage))
 
 	var scanners []*protocol.ProtocolScanner
 	for i := 0; i < total; i++ {
@@ -197,6 +204,8 @@ func BenchmarkServerLoadTest(b *testing.B) {
 		defer writerClient.Close()
 		writers = append(writers, writerClient)
 	}
+
+	writers[0].Do(protocol.NewCommand(config, protocol.CmdMessage, someMessage))
 
 	var scanners []*protocol.ProtocolScanner
 	for i := 0; i < total; i++ {

@@ -6,6 +6,7 @@ import (
 	"log"
 	"runtime/debug"
 	"testing"
+	"time"
 
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/logger"
@@ -125,6 +126,8 @@ func BenchmarkEventQReadFromHeadOne(b *testing.B) {
 	defer shutdown()
 	defer stopQ(b, q)
 
+	q.PushCommand(protocol.NewCommand(config, protocol.CmdMessage, []byte("hey i'm a message")))
+
 	msg := []byte("hey i'm a message")
 	cmd := protocol.NewCommand(config, protocol.CmdRead, []byte("1"), []byte("0"))
 	resp, _ := q.PushCommand(cmd)
@@ -145,6 +148,8 @@ func BenchmarkEventQReadFromHeadTen(b *testing.B) {
 	defer shutdown()
 	defer stopQ(b, q)
 	msg := []byte("hey i'm a message")
+
+	q.PushCommand(protocol.NewCommand(config, protocol.CmdMessage, []byte("hey i'm a message")))
 
 	var subs []*protocol.Response
 	for i := 0; i < 10; i++ {
@@ -169,8 +174,8 @@ func drainReaderChan(readerC chan io.Reader) {
 		select {
 		case <-readerC:
 			n++
-			// case <-time.After(time.Millisecond * 200):
-			// 	panic("timed out waiting for messages on readerC")
+		case <-time.After(time.Millisecond * 200):
+			panic("timed out waiting for messages on readerC")
 		default:
 			if n > 0 {
 				return
