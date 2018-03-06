@@ -104,7 +104,7 @@ func (ps *ProtocolScanner) Scan() bool {
 		}
 	}
 
-	n, msg, err := ps.readMessage()
+	n, msg, err := ps.ReadMessage()
 	ps.LastChunkPos = int64(n)
 	ps.ChunkPos += int64(n)
 	if ps.chunkEnd > 0 && ps.ChunkPos >= ps.chunkEnd {
@@ -118,7 +118,7 @@ func (ps *ProtocolScanner) Scan() bool {
 	return err == nil
 }
 
-func (ps *ProtocolScanner) readMessage() (int, *Message, error) {
+func (ps *ProtocolScanner) ReadMessage() (int, *Message, error) {
 	var id uint64
 	var body []byte
 	var bodylen int64
@@ -128,13 +128,13 @@ func (ps *ProtocolScanner) readMessage() (int, *Message, error) {
 
 	// fmt.Println("reading line")
 	line, err := ReadLine(ps.Br)
-	// fmt.Printf("read: %q (%v)\n", line, err)
+	// fmt.Printf("read: %q (length: %d) (err: %v)\n", line, len(line)+2, err)
 	read += len(line)
+	read += 2 // \r\n
 	if err != nil {
 		ps.err = err
 		return read, nil, err
 	}
-	read += 2 // \r\n
 
 	if bytes.Equal(line, []byte("+EOF")) {
 		return read, nil, io.EOF
@@ -142,6 +142,7 @@ func (ps *ProtocolScanner) readMessage() (int, *Message, error) {
 
 	parts := bytes.SplitN(line, []byte(" "), 4)
 	if len(parts) != 4 {
+		// fmt.Printf("%q\n", parts)
 		return read, nil, errInvalidProtocolLine
 	}
 
@@ -158,6 +159,7 @@ func (ps *ProtocolScanner) readMessage() (int, *Message, error) {
 	}
 
 	body = parts[3]
+	// fmt.Printf("%q\n", body)
 	if int(bodylen) != len(body) {
 		return read, nil, errInvalidBodyLength
 	}
@@ -277,6 +279,7 @@ func (pw *ProtocolWriter) writeResponse(r *Response) []byte {
 
 func (pw *ProtocolWriter) WriteLogLine(m *Message) []byte {
 	checksum := crc32.Checksum(m.Body, crcTable)
+	// fmt.Printf("write log: %d %d %d %q\n", m.ID, len(m.Body), checksum, m.Body)
 	return []byte(fmt.Sprintf("%d %d %d %s\r\n", m.ID, len(m.Body), checksum, m.Body))
 }
 
@@ -342,6 +345,7 @@ func (pr *ProtocolReader) ReadCommand(r io.Reader) (*Command, error) {
 	return NewCommand(pr.config, name, args...), nil
 }
 
+// ReadResponse reads a READ command response from an io.Reader
 func (pr *ProtocolReader) ReadResponse(r io.Reader) (*Response, error) {
 	pr.Br.Reset(r)
 	line, err := ReadLine(pr.Br)

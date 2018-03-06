@@ -18,6 +18,7 @@ type Message struct {
 
 // NewMessage returns a new instance of a Message.
 func NewMessage(id uint64, body []byte) *Message {
+	// fmt.Printf("NewMessage: %d -> %q\n", id, body)
 	return &Message{ID: id, Body: body}
 }
 
@@ -60,7 +61,13 @@ func (m *Message) String() string {
 
 func MsgFromBytes(b []byte) (*Message, error) {
 	ps := NewProtocolScanner(config.DefaultConfig, bytes.NewReader(b))
-	_, msg, err := ps.readMessage()
+	_, msg, err := ps.ReadMessage()
+	return msg, err
+}
+
+func MsgFromReader(r io.Reader) (*Message, error) {
+	ps := NewProtocolScanner(config.DefaultConfig, r)
+	_, msg, err := ps.ReadMessage()
 	return msg, err
 }
 

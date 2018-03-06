@@ -61,8 +61,8 @@ func BenchmarkServerConnect(b *testing.B) {
 	b.StopTimer()
 	conf := serverBenchConfig(b)
 	// fmt.Printf("config: %s\n", conf)
-	srv := newTestServer(conf)
-	defer closeTestServer(b, srv)
+	srv := NewTestServer(conf)
+	defer CloseTestServer(b, srv)
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
@@ -74,8 +74,8 @@ func BenchmarkServerConnect(b *testing.B) {
 func BenchmarkServerPing(b *testing.B) {
 	b.StopTimer()
 	config := serverBenchConfig(b)
-	srv := newTestServer(config)
-	defer closeTestServer(b, srv)
+	srv := NewTestServer(config)
+	defer CloseTestServer(b, srv)
 
 	c := newTestClient(config, srv)
 	defer c.Close()
@@ -89,8 +89,8 @@ func BenchmarkServerPing(b *testing.B) {
 func BenchmarkServerMsg(b *testing.B) {
 	b.StopTimer()
 	config := serverBenchConfig(b)
-	srv := newTestServer(config)
-	defer closeTestServer(b, srv)
+	srv := NewTestServer(config)
+	defer CloseTestServer(b, srv)
 
 	c := newTestClient(config, srv)
 	defer c.Close()
@@ -106,8 +106,8 @@ func BenchmarkServerMsg(b *testing.B) {
 func BenchmarkServerRead(b *testing.B) {
 	b.StopTimer()
 	config := serverBenchConfig(b)
-	srv := newTestServer(config)
-	defer closeTestServer(b, srv)
+	srv := NewTestServer(config)
+	defer CloseTestServer(b, srv)
 
 	client := newTestClient(config, srv)
 	client.Do(protocol.NewCommand(config, protocol.CmdMessage, someMessage))
@@ -132,8 +132,8 @@ func BenchmarkServerRead(b *testing.B) {
 func BenchmarkServerTail(b *testing.B) {
 	b.StopTimer()
 	config := serverBenchConfig(b)
-	srv := newTestServer(config)
-	defer closeTestServer(b, srv)
+	srv := NewTestServer(config)
+	defer CloseTestServer(b, srv)
 
 	client := newTestClient(config, srv)
 	defer client.Close()
@@ -160,8 +160,8 @@ func BenchmarkServerTailTen(b *testing.B) {
 	total := 10
 	b.StopTimer()
 	config := serverBenchConfig(b)
-	srv := newTestServer(config)
-	defer closeTestServer(b, srv)
+	srv := NewTestServer(config)
+	defer CloseTestServer(b, srv)
 
 	writerClient := newTestClient(config, srv)
 	defer writerClient.Close()
@@ -192,8 +192,8 @@ func BenchmarkServerLoadTest(b *testing.B) {
 	total := 25
 	b.StopTimer()
 	config := serverBenchConfig(b)
-	srv := newTestServer(config)
-	defer closeTestServer(b, srv)
+	srv := NewTestServer(config)
+	defer CloseTestServer(b, srv)
 
 	c := newTestClient(config, srv)
 	defer c.Close()

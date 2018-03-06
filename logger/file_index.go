@@ -110,7 +110,7 @@ func (idx *fileIndex) Append(id uint64, part uint64, offset uint64) (int, error)
 	idx.data = append(idx.data, newFileIndexCursor(id, part, offset))
 
 	if ferr := idx.bw.Flush(); ferr != nil {
-		return n, errors.Wrap(ferr, "failed to flush index to disk on shutdown")
+		return n, errors.Wrap(ferr, "failed to flush index to disk")
 	}
 	return n, err
 }

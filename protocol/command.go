@@ -156,9 +156,12 @@ func (cmd *Command) Respond(resp *Response) {
 }
 
 func (cmd *Command) Finish() {
+	if cmd.Done == nil {
+		return
+	}
 	select {
 	case cmd.Done <- struct{}{}:
-		internal.Debugf(cmd.config, "cmd <-Done")
+		internal.Debugf(cmd.config, "cmd %s <-Done", cmd)
 	default:
 		internal.Debugf(cmd.config, "tried but failed to finish command %s", cmd)
 	}

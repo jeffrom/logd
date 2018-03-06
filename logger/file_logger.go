@@ -187,11 +187,16 @@ func (l *FileLogger) getPartOffset(id uint64, inclusive bool) (uint64, int64, er
 	part, offset := l.index.Get(id)
 
 	if err := l.parts.setReadHandle(part); err != nil {
-		return part, 0, errors.Wrap(err, "failed setting read handle")
-	}
-
-	if _, err := l.parts.r.Seek(int64(offset), io.SeekStart); err != nil {
-		return part, 0, errors.Wrap(err, "failed seeking in partition")
+		// the matching message may be on the next partition
+		part++
+		if nperr := l.parts.setReadHandle(part); nperr != nil {
+			return part, 0, errors.Wrap(nperr, "failed setting read handle")
+		}
+		offset = 0
+	} else {
+		if _, err := l.parts.r.Seek(int64(offset), io.SeekStart); err != nil {
+			return part, 0, errors.Wrap(err, "failed seeking in partition")
+		}
 	}
 
 	if id <= 1 {
@@ -220,10 +225,13 @@ Loop:
 				if oerr := l.parts.setReadHandle(l.parts.currReadPart + 1); oerr != nil {
 					return part, 0, errors.Wrap(oerr, "failed to set read handle")
 				}
+
+				offset = 0
 				part++
 				continue
 			} else {
 				break
+				// return part, 0, io.EOF
 				// return part, 0, errors.Wrap(err, "failed scanning")
 			}
 		} else if err != nil {
@@ -236,6 +244,7 @@ Loop:
 	if !inclusive {
 		off -= int64(scanner.LastChunkPos)
 	}
+	// fmt.Println(offset, scanner.ChunkPos, scanner.LastChunkPos)
 	internal.Debugf(l.config, "looked up id %d: partition: %d, offset: %d", id, part, off)
 	return part, off, nil
 }
@@ -280,7 +289,7 @@ func (l *FileLogger) Range(start, end uint64) (LogRangeIterator, error) {
 
 	lcopy := NewFileLogger(l.config)
 	defer lcopy.Shutdown()
-	endpart, endoff, pcerr := lcopy.getPartOffset(end, true)
+	endpart, endoff, pcerr := lcopy.getPartOffset(end, false)
 	if pcerr != nil {
 		return nil, errors.Wrap(pcerr, "failed to get range upper bound")
 	}
@@ -434,6 +443,9 @@ func CheckIndex(config *config.Config) error {
 		scanner := protocol.NewProtocolScanner(logger.config, logger.parts.r)
 		scanner.Scan()
 		if err := scanner.Error(); err != nil {
+			if err == io.EOF {
+				continue
+			}
 			log.Printf("Failed to scan. id: %d, partition: %d, offset: %d", c.id, c.part, c.offset)
 			return err
 		}

@@ -241,10 +241,11 @@ func (q *EventQ) sendChunk(lf logger.LogReadableFile, readerC chan io.Reader) {
 	// buflen does not take seek position into account
 
 	f := lf.AsFile()
-	internal.Debugf(q.config, "<-%s: %d bytes", f.Name(), buflen)
 	reader := bytes.NewReader([]byte(fmt.Sprintf("+%d\r\n", buflen)))
 	readerC <- reader
 	readerC <- io.LimitReader(f, buflen)
+
+	internal.Debugf(q.config, "readerC <-%s: %d bytes", f.Name(), buflen)
 }
 
 var errInvalidFormat = errors.New("Invalid command format")

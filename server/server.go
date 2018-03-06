@@ -73,6 +73,11 @@ func (s *SocketServer) ListenAndServe() error {
 	return s.listenAndServe(false)
 }
 
+// ListenAddress returns the listen address of the server.
+func (s *SocketServer) ListenAddress() net.Addr {
+	return s.ln.Addr()
+}
+
 func (s *SocketServer) listenAndServe(wait bool) error {
 	var outerErr error
 
@@ -157,7 +162,8 @@ func (s *SocketServer) accept() {
 	}
 }
 
-func (s *SocketServer) goServe() {
+// GoServe starts a server without blocking the current goroutine
+func (s *SocketServer) GoServe() {
 	go func() {
 		if err := s.listenAndServe(true); err != nil {
 			log.Printf("error serving: %v", err)
@@ -205,6 +211,20 @@ func (s *SocketServer) shutdown() error {
 	return err
 }
 
+// Conns returns a list of current connections. For debugging.
+func (s *SocketServer) Conns() []*Conn {
+	s.connMu.Lock()
+	defer s.connMu.Unlock()
+
+	conns := make([]*Conn, len(s.conns))
+	i := 0
+	for conn := range s.conns {
+		conns[i] = conn
+		i++
+	}
+	return conns
+}
+
 func (s *SocketServer) logConns() {
 	s.connMu.Lock()
 	defer s.connMu.Unlock()
@@ -219,7 +239,7 @@ func (s *SocketServer) logConns() {
 }
 
 // Stop can be called to shut down the server
-func (s *SocketServer) Stop() {
+func (s *SocketServer) Stop() error {
 	select {
 	case s.stopC <- struct{}{}:
 	}
@@ -227,6 +247,8 @@ func (s *SocketServer) Stop() {
 	select {
 	case <-s.shutdownC:
 	}
+
+	return nil
 }
 
 func (s *SocketServer) addConn(conn *Conn) {
@@ -267,12 +289,13 @@ func (s *SocketServer) handleConnection(conn *Conn) {
 
 		s.removeConn(conn)
 		if err := conn.close(); err != nil {
-			log.Printf("error closing connection: %+v", err)
+			internal.Debugf(s.config, "error closing connection: %+v", err)
 		}
 	}()
 
 	for {
 		if s.isShuttingDown() {
+			internal.Debugf(s.config, "closing connection to %s due to shutdown", conn.RemoteAddr())
 			break
 		}
 
@@ -290,6 +313,7 @@ func (s *SocketServer) handleConnection(conn *Conn) {
 
 		// just waited for io, so check if we're in shutdown
 		if s.isShuttingDown() {
+			internal.Debugf(s.config, "closing connection to %s due to shutdown", conn.RemoteAddr())
 			break
 		}
 
@@ -304,10 +328,12 @@ func (s *SocketServer) handleConnection(conn *Conn) {
 
 		// now we've waited to hear back from the event queue, so check if we're in shutdown again
 		if s.isShuttingDown() {
+			internal.Debugf(s.config, "closing connection to %s due to shutdown", conn.RemoteAddr())
 			break
 		}
 
 		if s.handleShutdownRequest(conn, cmd, resp) {
+			internal.Debugf(s.config, "shutdown request from %s", conn.RemoteAddr())
 			return
 		}
 
@@ -335,6 +361,14 @@ func (s *SocketServer) handleConnection(conn *Conn) {
 			log.Printf("error writing to %s: %+v", conn.RemoteAddr(), err)
 			return
 		}
+
+		// after sending some more io, check for shutdown again
+		if s.isShuttingDown() {
+			internal.Debugf(s.config, "closing connection to %s due to shutdown", conn.RemoteAddr())
+			break
+		}
+
+		// finish the loop if the command was CLOSE/0
 		if s.handleClose(conn, cmd, resp) {
 			internal.Debugf(s.config, "closing %s", conn.RemoteAddr())
 			break
@@ -391,7 +425,10 @@ func (s *SocketServer) handleClose(conn *Conn, cmd *protocol.Command, resp *prot
 func (s *SocketServer) handleShutdownRequest(conn *Conn, cmd *protocol.Command, resp *protocol.Response) bool {
 	if cmd.Name == protocol.CmdShutdown && resp.Status == protocol.RespOK {
 		s.removeConn(conn)
-		s.Stop()
+		if err := s.Stop(); err != nil {
+			log.Print(err)
+			return false
+		}
 		return true
 	}
 	return false
@@ -406,7 +443,7 @@ func (s *SocketServer) handleSubscriber(conn *Conn, cmd *protocol.Command, resp 
 			log.Printf("%s: error reading pending buffers: %+v", conn.RemoteAddr(), err)
 		}
 		if err := conn.close(); err != nil {
-			log.Printf("error closing subscriber connection: %+v", err)
+			internal.Debugf(s.config, "error closing subscriber connection: %+v", err)
 		}
 	}()
 
@@ -420,7 +457,10 @@ func (s *SocketServer) handleSubscriber(conn *Conn, cmd *protocol.Command, resp 
 			}
 
 		case <-cmd.Done:
-			internal.Debugf(s.config, "%s: received <-done", conn.RemoteAddr())
+			close(cmd.Done)
+			cmd.Done = nil
+
+			internal.Debugf(s.config, "%s: received <-Done", conn.RemoteAddr())
 			conn.mu.Lock()
 			if err := conn.Flush(); err != nil {
 				log.Printf("failed to flush connection while closing (connection was probably closed by the client): %+v", err)
@@ -439,6 +479,11 @@ func (s *SocketServer) sendReader(r io.Reader, conn *Conn) error {
 		return err
 	}
 
+	// err = conn.Flush()
+	// if err != nil {
+	// 	log.Printf("%s error: %+v", conn.RemoteAddr(), err)
+	// }
+
 	// unwrap the os.file, same as go stdlib sendfile optimization logic
 	lr, ok := r.(*io.LimitedReader)
 	if ok {
@@ -447,11 +492,12 @@ func (s *SocketServer) sendReader(r io.Reader, conn *Conn) error {
 	f, ok := r.(*os.File)
 	if ok {
 		internal.Debugf(s.config, "%s: closing %s", conn.RemoteAddr(), f.Name())
-		if err := f.Close(); err != nil {
-			log.Printf("error closing reader to %s: %+v", conn.RemoteAddr(), err)
-			return err
+		if cerr := f.Close(); err != nil {
+			log.Printf("error closing reader to %s: %+v", conn.RemoteAddr(), cerr)
+			return cerr
 		}
 	}
+	// return err
 	return nil
 }
 

@@ -15,7 +15,10 @@ clean:
 	$(foreach pkg,$(PKG_DIRS),rm -f $(pkg)/testdata/*.actual.golden;)
 	$(foreach pkg,$(SHORT_PKGS),rm -f $(pkg).test;)
 	rm -rf integration_test/out/* report/*
-	rm -rf /tmp/__logd-testdata__*
+	rm -rf /tmp/logd-testdata*
+	rm -rf /tmp/logd-artifacts.log*
+	rm -rf /tmp/user/$(shell id -u)/logd-testdata*
+	rm -rf /tmp/user/$(shell id -u)/logd-artifacts.log*
 
 .PHONY: clean.docker
 clean.docker:

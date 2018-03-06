@@ -128,7 +128,7 @@ func (c *Conn) Flush() error {
 }
 
 func (c *Conn) readFrom(r io.Reader) (int64, error) {
-	internal.Debugf(c.config, "%s: Conn.readFrom()", c.RemoteAddr())
+	internal.Debugf(c.config, "%s: Conn.readFrom(%+v)", c.RemoteAddr(), r)
 	n, err := c.Conn.(*net.TCPConn).ReadFrom(r)
 	return n, err
 }

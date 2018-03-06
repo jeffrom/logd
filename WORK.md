@@ -20,6 +20,7 @@
 * [ ] make synchronization idiomatic w/ stuff like https://udhos.github.io/golang-concurrency-tricks/
 * [ ] backpressure in the form of max concurrent connections
 * [ ] clear index entries that have been deleted
+* [ ] test concurrent writes -> correct number of messages in the log
 
 # later
 

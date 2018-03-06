@@ -72,8 +72,8 @@ func TestConnProtocolWriter(t *testing.T) {
 func TestClientWriteFails(t *testing.T) {
 	config := testhelper.DefaultTestConfig(testing.Verbose())
 
-	srv := newTestServer(testhelper.TestConfig(testing.Verbose()))
-	defer closeTestServer(t, srv)
+	srv := NewTestServer(testhelper.TestConfig(testing.Verbose()))
+	defer CloseTestServer(t, srv)
 	client, mockConn := newMockClient(config, srv)
 	defer client.Close()
 
