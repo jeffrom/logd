@@ -337,7 +337,10 @@ func (s *SocketServer) handleConnection(conn *Conn) {
 			return
 		}
 
-		respBytes := resp.Bytes()
+		respBytes, err := resp.SprintBytes()
+		if err != nil {
+			log.Printf("error formatting response bytes: %+v", err)
+		}
 
 		// send a response
 		if werr := conn.setWriteDeadline(); werr != nil {

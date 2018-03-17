@@ -2,6 +2,7 @@ package internal
 
 import (
 	"bytes"
+	"log"
 	"sort"
 	"strconv"
 	"sync"
@@ -91,19 +92,19 @@ func (s *Stats) Bytes() []byte {
 	for _, k := range keys {
 		v := s.counts[k]
 
-		writeStringOrPanic(buf, k)
-		writeStringOrPanic(buf, ": ")
+		writeStringOrLog(buf, k)
+		writeStringOrLog(buf, ": ")
 
-		writeStringOrPanic(buf, strconv.FormatInt(v, 10))
-		writeStringOrPanic(buf, "\r\n")
+		writeStringOrLog(buf, strconv.FormatInt(v, 10))
+		writeStringOrLog(buf, "\r\n")
 	}
 
 	// fmt.Printf("%q\n", buf.Bytes())
 	return buf.Bytes()
 }
 
-func writeStringOrPanic(buf *bytes.Buffer, s string) {
+func writeStringOrLog(buf *bytes.Buffer, s string) {
 	if _, err := buf.WriteString(s); err != nil {
-		panic(err)
+		log.Printf("error formatting stats: %+v", err)
 	}
 }

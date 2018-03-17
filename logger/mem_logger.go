@@ -159,8 +159,8 @@ func (mf *memFile) SetLimit(limit int64) {
 
 }
 
-func (mf *memFile) SizeLimit() (int64, int64) {
-	return 0, 0
+func (mf *memFile) SizeLimit() (int64, int64, error) {
+	return 0, 0, nil
 }
 
 func (mf *memFile) Close() error {

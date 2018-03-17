@@ -5,7 +5,6 @@
 * [ ] read from the beginning of the log
 * [ ] should have a client flag to read from the beginning in case where
   requested id not found
-* [ ] audit all panics: we should only panic when there's a fatal error.
   * mostly return all the way up to main
 * [ ] put delete hooks in a queue, keep track of running delete hooks, make
       part of graceful shutdown
@@ -66,6 +65,7 @@
 
 # COMPLETED
 
+* [X] audit all panics: we should only panic when there's a fatal error.
 * [X] correctly read when partition 0 has been deleted
   * [X] reads/writes after startup should work
   * [X] should return a not found error

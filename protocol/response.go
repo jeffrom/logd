@@ -3,6 +3,7 @@ package protocol
 import (
 	"bytes"
 	"io"
+	"log"
 
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/internal"
@@ -45,6 +46,7 @@ var (
 	ErrRespEmptyMessage = []byte("empty message not allowed")
 	ErrRespNoArguments  = []byte("must supply an argument")
 	ErrRespNotFound     = []byte("not found")
+	ErrRespServer       = []byte("internal error")
 )
 
 func (resp RespType) String() string {
@@ -92,17 +94,19 @@ func NewClientErrResponse(conf *config.Config, body []byte) *Response {
 	return &Response{config: conf, Status: RespErrClient, Body: body}
 }
 
-// Bytes returns a byte representation of the response
-func (r *Response) Bytes() []byte {
-	return NewProtocolWriter().writeResponse(r)
+// SprintBytes returns a byte representation of the response
+func (r *Response) SprintBytes() ([]byte, error) {
+	w := NewProtocolWriter()
+	return w.writeResponse(r)
 }
 
 func (r *Response) String() string {
-	return string(r.Bytes())
+	b, _ := r.SprintBytes()
+	return string(b)
 }
 
 // func (r *Response) sendChunk(lf logger.LogReadableFile) {
-// 	size, limit := lf.SizeLimit()
+// 	size, limit, err := lf.SizeLimit()
 // 	buflen := size
 // 	if limit > 0 {
 // 		buflen = limit
@@ -127,7 +131,13 @@ func (r *Response) SendBytes(b []byte) {
 }
 
 func (r *Response) SendEOF() {
-	b := NewProtocolWriter().writeResponse(NewResponse(r.config, RespEOF))
+	w := NewProtocolWriter()
+	b, err := w.writeResponse(NewResponse(r.config, RespEOF))
+	if err != nil {
+		// NOTE shouldn't ever happen, just being pedantic
+		log.Printf("error writing protocol response: %+v", err)
+		return
+	}
 	internal.Debugf(r.config, "<-ReaderC %q (with flush)", b)
 	reader := newFlushReader(bytes.NewReader(b))
 	r.ReaderC <- reader

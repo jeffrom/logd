@@ -179,7 +179,11 @@ func (q *EventQ) handleRead(cmd *protocol.Command) {
 	}
 
 	head, err := q.log.Head()
-	internal.PanicOnError(err)
+	if err != nil {
+		log.Printf("error getting log head: %+v", err)
+		cmd.Respond(protocol.NewErrResponse(q.config, protocol.ErrRespServer))
+		return
+	}
 
 	if startID > head {
 		cmd.Respond(protocol.NewClientErrResponse(q.config, protocol.ErrRespNotFound))
@@ -233,7 +237,11 @@ func (q *EventQ) doRead(cmd *protocol.Command, iterator logger.LogRangeIterator,
 }
 
 func (q *EventQ) sendChunk(lf logger.LogReadableFile, readerC chan io.Reader) {
-	size, limit := lf.SizeLimit()
+	size, limit, err := lf.SizeLimit()
+	if err != nil {
+		log.Printf("failed to get log size/limit: %+v", err)
+		return
+	}
 	buflen := size
 	if limit > 0 {
 		buflen = limit

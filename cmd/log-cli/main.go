@@ -18,6 +18,7 @@ import (
 
 	"github.com/jeffrom/logd/client"
 	"github.com/jeffrom/logd/config"
+	"github.com/jeffrom/logd/internal"
 	"github.com/jeffrom/logd/protocol"
 )
 
@@ -42,7 +43,9 @@ func checkErrResp(resp *protocol.Response) error {
 
 func formatResp(resp *protocol.Response, args []string) string {
 	var out bytes.Buffer
-	respBytes := resp.Bytes()
+	respBytes, err := resp.SprintBytes()
+	internal.PanicOnError(err)
+
 	isOk := bytes.HasPrefix(respBytes, []byte("OK "))
 	respBytes = bytes.TrimLeft(respBytes, "OK ")
 

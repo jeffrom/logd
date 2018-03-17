@@ -247,9 +247,9 @@ func (pw *ProtocolWriter) writeChunkEnvelope(b []byte) []byte {
 	return buf.Bytes()
 }
 
-func (pw *ProtocolWriter) writeResponse(r *Response) []byte {
+func (pw *ProtocolWriter) writeResponse(r *Response) ([]byte, error) {
 	if r.Status == RespEOF {
-		return []byte("+EOF\r\n")
+		return []byte("+EOF\r\n"), nil
 	}
 
 	buf := pw.buf
@@ -257,7 +257,7 @@ func (pw *ProtocolWriter) writeResponse(r *Response) []byte {
 	buf.WriteString(r.Status.String())
 
 	if r.ID > 0 && r.Body != nil {
-		panic("response id and body both set")
+		return nil, errors.New("invalid response: id and body both set")
 	}
 
 	if r.ID != 0 {
@@ -274,7 +274,7 @@ func (pw *ProtocolWriter) writeResponse(r *Response) []byte {
 	}
 
 	buf.WriteString("\r\n")
-	return buf.Bytes()
+	return buf.Bytes(), nil
 }
 
 func (pw *ProtocolWriter) WriteLogLine(m *Message) []byte {

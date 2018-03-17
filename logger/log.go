@@ -4,7 +4,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/jeffrom/logd/internal"
 	"github.com/jeffrom/logd/protocol"
 )
 
@@ -50,7 +49,7 @@ type LogReadableFile interface {
 	io.ReadSeeker
 	io.Closer
 	SetLimit(limit int64)
-	SizeLimit() (int64, int64)
+	SizeLimit() (int64, int64, error)
 	AsFile() *os.File
 }
 
@@ -96,13 +95,15 @@ func (lf *logFile) SetLimit(limit int64) {
 	lf.limit = limit
 }
 
-func (lf *logFile) SizeLimit() (size int64, limit int64) {
+func (lf *logFile) SizeLimit() (int64, int64, error) {
 	if lf.limit > 0 {
-		return 0, lf.limit
+		return 0, lf.limit, nil
 	}
 	stat, err := lf.Stat()
-	internal.PanicOnError(err)
-	return stat.Size(), 0
+	if err != nil {
+		return -1, -1, err
+	}
+	return stat.Size(), 0, nil
 }
 
 func (lf *logFile) AsFile() *os.File {

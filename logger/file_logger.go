@@ -57,7 +57,8 @@ func (l *FileLogger) Setup() error {
 			return err
 		}
 
-		log.Printf("Starting at log id %d, partition %d, offset %d", l.currID, l.parts.head(), l.written)
+		head, _ := l.parts.head()
+		log.Printf("Starting at log id %d, partition %d, offset %d", l.currID, head, l.written)
 	}
 	return nil
 }
@@ -80,6 +81,11 @@ func (l *FileLogger) Shutdown() error {
 func (l *FileLogger) Write(b []byte) (int, error) {
 	internal.Debugf(l.config, "LOG <- %s (%d)", internal.Prettybuf(bytes.Trim(b, "\n")), len(b))
 
+	head, err := l.parts.head()
+	if err != nil {
+		return 0, err
+	}
+
 	written := l.written + len(b)
 	madeNewPartition := false
 	if written > l.config.PartitionSize {
@@ -87,7 +93,7 @@ func (l *FileLogger) Write(b []byte) (int, error) {
 			return 0, err
 		}
 
-		internal.Debugf(l.config, "Moved to partition %d", l.parts.head())
+		internal.Debugf(l.config, "Moved to partition %d", head)
 		l.written = 0
 		madeNewPartition = true
 	}
@@ -101,8 +107,13 @@ func (l *FileLogger) Write(b []byte) (int, error) {
 	}
 
 	if l.currID > 0 && l.currID%l.config.IndexCursorSize == 0 {
+		head, err = l.parts.head()
+		if err != nil {
+			return 0, err
+		}
+
 		id := l.currID
-		part := uint64(l.parts.head())
+		part := uint64(head)
 		offset := uint64(written - n)
 
 		internal.Debugf(l.config, "Writing to index, id: %d, partition: %d, offset: %d", id, part, offset)
@@ -142,7 +153,12 @@ func (l *FileLogger) Read(b []byte) (int, error) {
 			return read, nil
 		}
 		if err == io.EOF {
-			if l.parts.currReadPart < l.parts.head() {
+			head, herr := l.parts.head()
+			if herr != nil {
+				return read, herr
+			}
+
+			if l.parts.currReadPart < head {
 				if oerr := l.parts.setReadHandle(l.parts.currReadPart + 1); oerr != nil {
 					return read, oerr
 				}
@@ -221,7 +237,11 @@ Loop:
 		}
 
 		if err := scanner.Error(); err == io.EOF {
-			if l.parts.currReadPart < l.parts.head() {
+			head, herr := l.parts.head()
+			if herr != nil {
+				return part, 0, errors.Wrap(herr, "failed to find head")
+			}
+			if l.parts.currReadPart < head {
 				if oerr := l.parts.setReadHandle(l.parts.currReadPart + 1); oerr != nil {
 					return part, 0, errors.Wrap(oerr, "failed to set read handle")
 				}
@@ -231,11 +251,9 @@ Loop:
 				continue
 			} else {
 				break
-				// return part, 0, io.EOF
-				// return part, 0, errors.Wrap(err, "failed scanning")
 			}
 		} else if err != nil {
-			panic(err)
+			return part, 0, errors.Wrap(err, "failed to scan log")
 		}
 
 	}
@@ -251,7 +269,10 @@ Loop:
 
 // Head returns the current latest ID
 func (l *FileLogger) Head() (uint64, error) {
-	curr := l.parts.head()
+	curr, herr := l.parts.head()
+	if herr != nil {
+		return 0, herr
+	}
 	if err := l.parts.setReadHandle(curr); err != nil {
 		return 0, err
 	}
@@ -316,7 +337,11 @@ func (l *FileLogger) Range(start, end uint64) (LogRangeIterator, error) {
 	fn := func() (LogReadableFile, error) {
 		if lf != nil {
 			currpart++
-			if currpart > endpart || currpart > l.parts.head() {
+			head, herr := l.parts.head()
+			if herr != nil {
+				return nil, errors.Wrap(herr, "failed to get log head")
+			}
+			if currpart > endpart || currpart > head {
 				return nil, io.EOF
 			}
 			curroff = 0
@@ -335,7 +360,9 @@ func (l *FileLogger) Range(start, end uint64) (LogRangeIterator, error) {
 			lf.SetLimit(endoff - curroff)
 		} else {
 			stat, err := lf.AsFile().Stat()
-			internal.PanicOnError(err)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to stat file")
+			}
 			lf.SetLimit(stat.Size() - curroff)
 		}
 
@@ -458,10 +485,4 @@ func CheckIndex(config *config.Config) error {
 		}
 	}
 	return nil
-}
-
-func currSize(r io.Reader) int64 {
-	info, err := r.(*os.File).Stat()
-	internal.PanicOnError(err)
-	return info.Size()
 }

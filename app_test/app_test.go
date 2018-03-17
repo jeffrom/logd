@@ -71,13 +71,15 @@ func expectNoConnections(srv *server.SocketServer) error {
 
 func expectRespOK(t testing.TB, resp *protocol.Response) {
 	if resp.Status != protocol.RespOK {
-		t.Fatal(logWithStack("response was not OK: %q", resp.Bytes()))
+		b, _ := resp.SprintBytes()
+		t.Fatal(logWithStack("response was not OK: %q", b))
 	}
 }
 
 func expectRespOKID(t testing.TB, resp *protocol.Response, id uint64) {
 	if resp.Status != protocol.RespOK || resp.ID != id {
-		t.Fatal(logWithStack("Response was not OK: %q", resp.Bytes()))
+		b, _ := resp.SprintBytes()
+		t.Fatal(logWithStack("Response was not OK: %q", b))
 	}
 }
 

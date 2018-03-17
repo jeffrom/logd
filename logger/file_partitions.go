@@ -69,7 +69,10 @@ func (p *filePartitions) shutdown() error {
 }
 
 func (p *filePartitions) setCurrentFileHandles(create bool) error {
-	curr := p.head()
+	curr, err := p.head()
+	if err != nil {
+		return err
+	}
 	if create {
 		curr++
 	}
@@ -77,7 +80,10 @@ func (p *filePartitions) setCurrentFileHandles(create bool) error {
 		return err
 	}
 
-	parts := p.partitions()
+	parts, err := p.partitions()
+	if err != nil {
+		return err
+	}
 	maxParts := p.config.MaxPartitions
 	if maxParts > 0 && len(parts) > maxParts {
 
@@ -162,9 +168,13 @@ func (p *filePartitions) logFilePath(part uint64) string {
 	return fmt.Sprintf("%s.%d", p.config.LogFile, part)
 }
 
-func (p *filePartitions) head() uint64 {
-	n := maxUint64(p.partitions()...)
-	return n
+func (p *filePartitions) head() (uint64, error) {
+	parts, err := p.partitions()
+	if err != nil {
+		return 0, nil
+	}
+	n := maxUint64(parts...)
+	return n, nil
 }
 
 func maxUint64(args ...uint64) uint64 {
@@ -177,16 +187,15 @@ func maxUint64(args ...uint64) uint64 {
 	return highest
 }
 
-func (p *filePartitions) matches() []string {
-	matches, err := filepath.Glob(p.config.LogFile + ".[0-9]*")
-	if err != nil {
-		panic(err)
-	}
-	return matches
+func (p *filePartitions) matches() ([]string, error) {
+	return filepath.Glob(p.config.LogFile + ".[0-9]*")
 }
 
-func (p *filePartitions) partitions() []uint64 {
-	matches := p.matches()
+func (p *filePartitions) partitions() ([]uint64, error) {
+	matches, err := p.matches()
+	if err != nil {
+		return nil, err
+	}
 	var res []uint64
 
 	for _, m := range matches {
@@ -198,5 +207,5 @@ func (p *filePartitions) partitions() []uint64 {
 	}
 
 	sort.Slice(res, func(i, j int) bool { return res[i] < res[j] })
-	return res
+	return res, nil
 }

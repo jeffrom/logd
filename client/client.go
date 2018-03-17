@@ -167,7 +167,8 @@ func (c *Client) readResponse() (*protocol.Response, error) {
 		return nil, err
 	}
 
-	internal.Debugf(c.config, "%s<-%s: %q", c.Conn.LocalAddr(), c.Conn.RemoteAddr(), resp.Bytes())
+	b, _ := resp.SprintBytes()
+	internal.Debugf(c.config, "%s<-%s: %q", c.Conn.LocalAddr(), c.Conn.RemoteAddr(), b)
 	return resp, nil
 }
 
