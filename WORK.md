@@ -2,13 +2,9 @@
 
 # TODO
 
-* [ ] correctly read when partition 0 has been deleted
-  * [ ] reads/writes after startup should work
-  * [X] should return a not found error
-  * [X] client should exit with not found error by default
-  * [ ] should have a client flag to read from the end in this case
 * [ ] read from the beginning of the log
-* [X] ensure subscription connection is closed when _not_ reading forever
+* [ ] should have a client flag to read from the beginning in case where
+  requested id not found
 * [ ] audit all panics: we should only panic when there's a fatal error.
   * mostly return all the way up to main
 * [ ] put delete hooks in a queue, keep track of running delete hooks, make
@@ -24,6 +20,7 @@
 
 # later
 
+* [ ] graceful shutdown: clients connections should close cleanly if possible
 * [ ] `REFUSE`, `ACCEPT` commands.
 * [ ] log file compression
   * probably want to be able to have the server close a connection and tell the
@@ -68,6 +65,12 @@
 * [ ] record READ misses
 
 # COMPLETED
+
+* [X] correctly read when partition 0 has been deleted
+  * [X] reads/writes after startup should work
+  * [X] should return a not found error
+  * [X] client should exit with not found error by default
+* [X] ensure subscription connection is closed when _not_ reading forever
 
 ## DEC 2017
 

@@ -143,7 +143,7 @@ func doReadCmdAction(conf *config.Config) func(c *cli.Context) error {
 		sigc := make(chan os.Signal, 1)
 		signal.Notify(sigc, os.Interrupt, syscall.SIGTERM)
 
-		if start == 0 && !conf.ReadForever {
+		if start == 0 {
 			resp, headErr := c.Do(protocol.NewCommand(conf, protocol.CmdHead))
 			if err != nil {
 				log.Printf("%+v", err)

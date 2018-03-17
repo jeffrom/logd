@@ -408,6 +408,7 @@ func (l *FileLogger) loadState() error {
 			lastMsg = msg
 		}
 	}
+
 	if err := scanner.Error(); err != nil && err != io.EOF {
 		return err
 	}
