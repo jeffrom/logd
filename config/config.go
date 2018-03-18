@@ -20,9 +20,10 @@ type Config struct {
 	IndexCursorSize     uint64 `json:"index_cursor_size"`
 
 	// client configs
-	StartID     uint64 `json:"start"`
-	ReadLimit   uint64 `json:"limit"`
-	ReadForever bool   `json:"forever"`
+	StartID      uint64 `json:"start"`
+	ReadLimit    uint64 `json:"limit"`
+	ReadForever  bool   `json:"forever"`
+	ReadFromTail bool   `json:"from_tail"`
 }
 
 // NewConfig returns a new configuration object
@@ -55,6 +56,7 @@ func init() {
 	DefaultConfig.IndexCursorSize = 10
 
 	DefaultConfig.ReadLimit = 15
+	DefaultConfig.ReadFromTail = false
 
 	// XXX just for dev
 	DefaultConfig.CanShutdown = true

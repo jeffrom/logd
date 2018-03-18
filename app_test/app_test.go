@@ -186,7 +186,10 @@ func TestApp(t *testing.T) {
 		runTest(t, "client can ping", testServerPing, conf)
 		runTest(t, "client can write a message", testServerMsg, conf)
 		runTest(t, "client can read a message", testServerRead, conf)
-		runTest(t, "client can tail from other clients", testServerTail, conf)
+		runTest(t, "client can read from other writes", testServerReadNewWrite, conf)
+		runTest(t, "client can use tail command", testServerTail, conf)
+		runTest(t, "client can tail other writes", testServerTailNewWrite, conf)
+		runTest(t, "client can tail from first available id", testServerTailFromTail, conf)
 		runTest(t, "invalid requests", testServerInvalidRequests, conf)
 		runTest(t, "writes partitions", testServerWritePartition, conf)
 	}
@@ -255,7 +258,7 @@ func testServerRead(t *testing.T, conf *config.Config) {
 	expectLineMatch(t, scanner, msg)
 }
 
-func testServerTail(t *testing.T, conf *config.Config) {
+func testServerReadNewWrite(t *testing.T, conf *config.Config) {
 	srv := newTestServer(conf)
 	defer stopServer(t, srv)
 
@@ -277,6 +280,81 @@ func testServerTail(t *testing.T, conf *config.Config) {
 	resp, err = c.Do(protocol.NewCommand(conf, protocol.CmdMessage, msg))
 	testhelper.CheckError(err)
 	expectRespOKID(t, resp, 2)
+
+	expectLineMatch(t, scanner, msg)
+}
+
+func testServerTail(t *testing.T, conf *config.Config) {
+	srv := newTestServer(conf)
+	defer stopServer(t, srv)
+
+	c := newTestClient(conf, srv)
+	defer c.Close()
+
+	msg := []byte("cool message")
+	resp, err := c.Do(protocol.NewCommand(conf, protocol.CmdMessage, msg))
+	testhelper.CheckError(err)
+	expectRespOKID(t, resp, 1)
+
+	old := conf.ReadFromTail
+	conf.ReadFromTail = true
+	scanner, err := c.DoRead(1, 1)
+	testhelper.CheckError(err)
+	conf.ReadFromTail = old
+
+	expectLineMatch(t, scanner, msg)
+}
+
+func testServerTailNewWrite(t *testing.T, conf *config.Config) {
+	srv := newTestServer(conf)
+	defer stopServer(t, srv)
+
+	c := newTestClient(conf, srv)
+	defer c.Close()
+
+	readClient := newTestClient(conf, srv)
+	defer readClient.Close()
+
+	msg := []byte("cool message")
+	resp, err := c.Do(protocol.NewCommand(conf, protocol.CmdMessage, msg))
+	testhelper.CheckError(err)
+	expectRespOKID(t, resp, 1)
+
+	old := conf.ReadFromTail
+	conf.ReadFromTail = true
+	scanner, err := readClient.DoRead(1, 0)
+	testhelper.CheckError(err)
+	expectLineMatch(t, scanner, msg)
+	conf.ReadFromTail = old
+
+	resp, err = c.Do(protocol.NewCommand(conf, protocol.CmdMessage, msg))
+	testhelper.CheckError(err)
+	expectRespOKID(t, resp, 2)
+
+	expectLineMatch(t, scanner, msg)
+}
+
+func testServerTailFromTail(t *testing.T, conf *config.Config) {
+	old := conf.LogFile
+	conf.LogFile = "testdata/workofart"
+
+	defer func() {
+		conf.LogFile = old
+	}()
+
+	srv := newTestServer(conf)
+	defer stopServer(t, srv)
+
+	c := newTestClient(conf, srv)
+	defer c.Close()
+
+	msg := []byte("Painting simply is in no position to present an object for simultaneous collective experience, as it was possible for architecture at all times, for the epic poem in the past, and for the movie today. Although this circumstance in itself should not lead one to conclusions about the social role of painting, it does constitute a serious threat as soon as painting, under special conditions and, as it were, against its nature, is confronted directly by the masses. In the churches and monasteries of the Middle Ages and at the princely courts up to the end of the eighteenth century, a collective reception of paintings did not occur simultaneously, but by graduated and hierarchized mediation. The change that has come about is an expression of the particular conflict in which painting was implicated by the mechanical reproducibility of paintings. Although paintings began to be publicly exhibited in galleries and salons, there was no way for the masses to organize and control themselves in their reception. Thus the same public which responds in a progressive manner toward a grotesque film is bound to respond in a reactionary manner to surrealism.")
+
+	oldTail := conf.ReadFromTail
+	conf.ReadFromTail = true
+	scanner, err := c.DoRead(1, 1)
+	testhelper.CheckError(err)
+	conf.ReadFromTail = oldTail
 
 	expectLineMatch(t, scanner, msg)
 }

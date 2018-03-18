@@ -305,6 +305,11 @@ func runApp(args []string) {
 					Usage:       "read forever",
 					Destination: &conf.ReadForever,
 				},
+				cli.BoolFlag{
+					Name:        "from-tail, t",
+					Usage:       "read from log tail if the queried id can't be found",
+					Destination: &conf.ReadFromTail,
+				},
 			}, flags...),
 			Action: doReadCmdAction(conf),
 		},

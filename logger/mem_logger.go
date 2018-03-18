@@ -91,6 +91,14 @@ func (l *MemLogger) Head() (uint64, error) {
 	return uint64(len(l.Messages)), nil
 }
 
+func (l *MemLogger) Tail() (uint64, error) {
+	// if l.HeadReturnErr != nil {
+	// 	return 0, l.HeadReturnErr
+	// }
+
+	return 0, nil
+}
+
 // Copy implements logger.Logger
 func (l *MemLogger) Copy() Logger {
 	ml := NewMemLogger()

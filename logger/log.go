@@ -28,6 +28,7 @@ type LogReader interface {
 	io.Reader
 	SeekToID(id uint64) error
 	Head() (uint64, error)
+	Tail() (uint64, error)
 	Copy() Logger
 	Range(start, end uint64) (LogRangeIterator, error)
 }

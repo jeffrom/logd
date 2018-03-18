@@ -83,6 +83,8 @@ func (q *EventQ) loop() {
 				q.handleMsg(cmd)
 			case protocol.CmdRead:
 				q.handleRead(cmd)
+			case protocol.CmdTail:
+				q.handleTail(cmd)
 			case protocol.CmdHead:
 				q.handleHead(cmd)
 			case protocol.CmdStats:
@@ -200,6 +202,66 @@ func (q *EventQ) handleRead(cmd *protocol.Command) {
 		if errors.Cause(err) == protocol.ErrNotFound {
 			cmd.Respond(protocol.NewErrResponse(q.config, protocol.ErrRespNotFound))
 			internal.Debugf(q.config, "id %d not found", startID)
+		} else {
+			cmd.Respond(protocol.NewErrResponse(q.config, []byte("")))
+			log.Printf("failed to handle read command: %+v", err)
+		}
+		return
+	}
+
+	q.Stats.Incr("total_reads")
+	q.doRead(cmd, iterator, limit == 0)
+}
+
+func (q *EventQ) handleTail(cmd *protocol.Command) {
+	startID, limit, err := q.parseRead(cmd)
+	if err != nil {
+		internal.Debugf(q.config, "invalid: %v", err)
+		cmd.Respond(protocol.NewClientErrResponse(q.config, protocol.ErrRespInvalid))
+		return
+	}
+
+	head, err := q.log.Head()
+	if err != nil {
+		log.Printf("error getting log head: %+v", err)
+		cmd.Respond(protocol.NewErrResponse(q.config, protocol.ErrRespServer))
+		return
+	}
+
+	if startID > head {
+		cmd.Respond(protocol.NewClientErrResponse(q.config, protocol.ErrRespNotFound))
+		return
+	}
+
+	end := startID + limit
+	if limit == 0 {
+		end = head
+	}
+
+	iterator, err := q.log.Range(startID, end)
+	if err != nil {
+		if errors.Cause(err) == protocol.ErrNotFound {
+			internal.Debugf(q.config, "id not found, reading from tail")
+
+			tailID, terr := q.log.Tail()
+			if terr != nil {
+				log.Printf("failed to get log tail id: %+v", terr)
+				cmd.Respond(protocol.NewErrResponse(q.config, protocol.ErrRespServer))
+				return
+			}
+
+			if limit != 0 {
+				end = tailID + limit
+			}
+			iterator, err = q.log.Range(tailID, end)
+			if err != nil {
+				log.Printf("failed to read range from tail: %+v", err)
+				cmd.Respond(protocol.NewErrResponse(q.config, protocol.ErrRespServer))
+				return
+			}
+
+			q.Stats.Incr("total_reads")
+			q.doRead(cmd, iterator, limit == 0)
 		} else {
 			cmd.Respond(protocol.NewErrResponse(q.config, []byte("")))
 			log.Printf("failed to handle read command: %+v", err)

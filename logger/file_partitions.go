@@ -177,6 +177,15 @@ func (p *filePartitions) head() (uint64, error) {
 	return n, nil
 }
 
+func (p *filePartitions) tail() (uint64, error) {
+	parts, err := p.partitions()
+	if err != nil {
+		return 0, nil
+	}
+	n := minUint64(parts...)
+	return n, nil
+}
+
 func maxUint64(args ...uint64) uint64 {
 	var highest uint64
 	for _, arg := range args {
@@ -185,6 +194,24 @@ func maxUint64(args ...uint64) uint64 {
 		}
 	}
 	return highest
+}
+
+func minUint64(args ...uint64) uint64 {
+	var lowest uint64
+	var checked bool
+
+	for _, arg := range args {
+		if arg < lowest {
+			lowest = arg
+		}
+		if !checked {
+			lowest = arg
+			checked = true
+		}
+
+	}
+
+	return lowest
 }
 
 func (p *filePartitions) matches() ([]string, error) {

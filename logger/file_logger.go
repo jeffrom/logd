@@ -298,6 +298,39 @@ func (l *FileLogger) Head() (uint64, error) {
 	return msg.ID, err
 }
 
+func (l *FileLogger) Tail() (uint64, error) {
+	part, herr := l.parts.tail()
+	if herr != nil {
+		return 0, herr
+	}
+
+	if err := l.parts.setReadHandle(part); err != nil {
+		return 0, err
+	}
+	if _, err := l.parts.r.Seek(0, 0); err != nil {
+		return 0, err
+	}
+
+	var msg *protocol.Message
+	scanner := protocol.NewProtocolScanner(l.config, l)
+	for scanner.Scan() {
+		if scanned := scanner.Message(); scanned != nil {
+			msg = scanned
+		}
+		break
+	}
+
+	err := scanner.Error()
+	if err == io.EOF {
+		err = nil
+	}
+
+	if msg == nil {
+		return 0, err
+	}
+	return msg.ID, err
+}
+
 // Copy returns a copy of the current logger. the copy needs to be set up again
 // to load current log state.
 func (l *FileLogger) Copy() Logger {

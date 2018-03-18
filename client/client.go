@@ -90,7 +90,12 @@ func (c *Client) Do(cmds ...*protocol.Command) (*protocol.Response, error) {
 // bufio.Scanner
 func (c *Client) DoRead(id uint64, limit int) (*protocol.ProtocolScanner, error) {
 	internal.Debugf(c.config, "DoRead(%d, %d)", id, limit)
-	cmd := protocol.NewCommand(c.config, protocol.CmdRead,
+	cmdType := protocol.CmdRead
+	if c.config.ReadFromTail {
+		cmdType = protocol.CmdTail
+	}
+
+	cmd := protocol.NewCommand(c.config, cmdType,
 		[]byte(fmt.Sprintf("%d", id)),
 		[]byte(fmt.Sprintf("%d", limit)),
 	)

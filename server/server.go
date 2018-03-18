@@ -397,7 +397,7 @@ func (s *SocketServer) readCommand(conn *Conn) (*protocol.Command, error) {
 }
 
 func (s *SocketServer) finishCommand(conn *Conn, cmd *protocol.Command, resp *protocol.Response) {
-	if cmd.Name == protocol.CmdRead {
+	if cmd.Name == protocol.CmdRead || cmd.Name == protocol.CmdHead {
 		return
 	}
 
@@ -405,7 +405,7 @@ func (s *SocketServer) finishCommand(conn *Conn, cmd *protocol.Command, resp *pr
 }
 
 func (s *SocketServer) handleRead(conn *Conn, cmd *protocol.Command, resp *protocol.Response) {
-	if cmd.Name != protocol.CmdRead {
+	if cmd.Name != protocol.CmdRead && cmd.Name != protocol.CmdTail {
 		return
 	}
 

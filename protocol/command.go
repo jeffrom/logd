@@ -24,6 +24,11 @@ const (
 	// CmdRead is a read command type.
 	CmdRead
 
+	// CmdTail is a read command type. While similiar to Read, in the case
+	// where the caller supplies an id lower than the tail of the log, Tail
+	// starts from the beginning of the log.
+	CmdTail
+
 	// CmdHead is a head command type.
 	CmdHead
 
@@ -49,6 +54,8 @@ func (cmd *CmdType) String() string {
 		return "MSG"
 	case CmdRead:
 		return "READ"
+	case CmdTail:
+		return "TAIL"
 	case CmdHead:
 		return "HEAD"
 	case CmdStats:
@@ -71,6 +78,9 @@ func cmdNamefromBytes(b []byte) CmdType {
 	}
 	if bytes.Equal(b, []byte("READ")) {
 		return CmdRead
+	}
+	if bytes.Equal(b, []byte("TAIL")) {
+		return CmdTail
 	}
 	if bytes.Equal(b, []byte("HEAD")) {
 		return CmdHead

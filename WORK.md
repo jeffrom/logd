@@ -2,10 +2,6 @@
 
 # TODO
 
-* [ ] read from the beginning of the log
-* [ ] should have a client flag to read from the beginning in case where
-  requested id not found
-  * mostly return all the way up to main
 * [ ] put delete hooks in a queue, keep track of running delete hooks, make
       part of graceful shutdown
       * continue on startup when there are still pending delete hooks
@@ -65,6 +61,9 @@
 
 # COMPLETED
 
+* [X] read from the beginning of the log
+* [X] should have a client flag to read from the beginning in case where
+  requested id not found
 * [X] audit all panics: we should only panic when there's a fatal error.
 * [X] correctly read when partition 0 has been deleted
   * [X] reads/writes after startup should work
