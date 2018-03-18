@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime/debug"
+	"sync"
 	"testing"
 	"time"
 
@@ -23,10 +24,8 @@ import (
 
 func runTest(t *testing.T, name string, f func(t *testing.T, c *config.Config), conf *config.Config) {
 
-	conf.LogFile = testhelper.TmpLog()
-
 	t.Run(name, func(t *testing.T) {
-		// t.Logf("config: %s", conf)
+		conf.LogFile = testhelper.TmpLog()
 		f(t, conf)
 	})
 
@@ -163,6 +162,106 @@ func logWithStack(format string, args ...interface{}) string {
 	return fmt.Sprintf(format+"\n\n%s", append(newArgs, parts[len(parts)-1])...)
 }
 
+func expectPartitionReads(t testing.TB, conf *config.Config, c *client.Client) {
+	partitions := testhelper.ListPartitions(conf)
+	t.Logf("%d partitions at %s", len(partitions), filepath.Dir(conf.LogFile))
+	for _, part := range partitions {
+		t.Logf("checking partition at %s", part)
+
+		first := readFirstFromFile(conf, part)
+		if first != nil {
+			// panic(fmt.Sprintf("%+v", first))
+			scanner, err := c.DoRead(first.ID, 1)
+			if err != nil {
+				panic(err)
+			}
+			expectLineMatchID(t, scanner, first.Body, first.ID)
+			expectAllScanned(t, conf, scanner)
+		}
+	}
+
+}
+
+func expectAllScanned(t testing.TB, conf *config.Config, scanner *protocol.ProtocolScanner) {
+	var firstMsg *protocol.Message
+	var lastMsg *protocol.Message
+	for scanner.Scan() {
+		if firstMsg == nil {
+			firstMsg = scanner.Message()
+		}
+		lastMsg = scanner.Message()
+	}
+
+	if firstMsg != nil {
+		t.Logf("unexpected additional message: %+v", firstMsg)
+	}
+	if firstMsg != lastMsg {
+		t.Logf("unexpected final additional message: %+v", lastMsg)
+	}
+
+	if firstMsg != nil {
+		t.Fatal("unexpected messages in scanner")
+	}
+}
+
+func readFirstFromFile(conf *config.Config, fname string) *protocol.Message {
+	f, err := os.Open(fname)
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+
+	if _, err = f.Seek(0, io.SeekStart); err != nil {
+		if err == io.EOF {
+			return nil
+		}
+		panic(err)
+	}
+	msg, err := protocol.MsgFromReader(f)
+	if err != nil {
+		if err == io.EOF {
+			return nil
+		}
+		panic(err)
+	}
+	return msg
+}
+
+// XXX not yet using this
+func readLastFromBytes(conf *config.Config, fname string) *protocol.Message {
+	f, err := os.Open(fname)
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+
+	if _, err = f.Seek(0, io.SeekStart); err != nil {
+		if err == io.EOF {
+			return nil
+		}
+		panic(err)
+	}
+	info, err := f.Stat()
+	if err != nil {
+		panic(err)
+	}
+	filelen := info.Size()
+
+	var msg *protocol.Message
+	ps := protocol.NewProtocolScanner(conf, f)
+	for read := int64(0); read < filelen; {
+		n, m, err := ps.ReadMessage()
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			panic(err)
+		}
+		read += int64(n)
+		msg = m
+	}
+	return msg
+}
 func TestApp(t *testing.T) {
 	configs := []*config.Config{
 		config.DefaultConfig,
@@ -192,6 +291,7 @@ func TestApp(t *testing.T) {
 		runTest(t, "client can tail from first available id", testServerTailFromTail, conf)
 		runTest(t, "invalid requests", testServerInvalidRequests, conf)
 		runTest(t, "writes partitions", testServerWritePartition, conf)
+		runTest(t, "concurrent writes", testConcurrentWrites, conf)
 	}
 }
 
@@ -480,103 +580,47 @@ func testServerWritePartition(t *testing.T, conf *config.Config) {
 	}
 }
 
-func expectPartitionReads(t testing.TB, conf *config.Config, c *client.Client) {
-	partitions := testhelper.ListPartitions(conf)
-	t.Logf("%d partitions at %s", len(partitions), filepath.Dir(conf.LogFile))
-	for _, part := range partitions {
-		t.Logf("checking partition at %s", part)
-
-		first := readFirstFromFile(conf, part)
-		if first != nil {
-			// panic(fmt.Sprintf("%+v", first))
-			scanner, err := c.DoRead(first.ID, 1)
-			if err != nil {
-				panic(err)
-			}
-			expectLineMatchID(t, scanner, first.Body, first.ID)
-			expectAllScanned(t, conf, scanner)
-		}
+func testConcurrentWrites(t *testing.T, conf *config.Config) {
+	len := conf.PartitionSize / 20
+	if len <= 0 {
+		len = 20
+	}
+	if len > conf.MaxPartitions*conf.PartitionSize {
+		t.Skip("skipping test as partition config is too small")
 	}
 
-}
+	var wg sync.WaitGroup
+	srv := newTestServer(conf)
+	defer stopServer(t, srv)
+	nwriters := 20
+	msgper := 10
+	total := nwriters * msgper
 
-func expectAllScanned(t testing.TB, conf *config.Config, scanner *protocol.ProtocolScanner) {
-	var firstMsg *protocol.Message
-	var lastMsg *protocol.Message
+	for i := 0; i < nwriters; i++ {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			cmds := createMessageCommands(conf, msgper, len)
+			c := newTestClient(conf, srv)
+			writeMessages(t, conf, c, cmds)
+			c.Close()
+		}()
+	}
+
+	wg.Wait()
+
+	c := newTestClient(conf, srv)
+	scanner, err := c.DoRead(1, total)
+	testhelper.CheckError(err)
+
+	nread := 0
 	for scanner.Scan() {
-		if firstMsg == nil {
-			firstMsg = scanner.Message()
-		}
-		lastMsg = scanner.Message()
+		nread++
 	}
 
-	if firstMsg != nil {
-		t.Logf("unexpected additional message: %+v", firstMsg)
+	if nread != total {
+		t.Fatalf("expected to read %d message but only read %d", total, nread)
 	}
-	if firstMsg != lastMsg {
-		t.Logf("unexpected final additional message: %+v", lastMsg)
-	}
-
-	if firstMsg != nil {
-		t.Fatal("unexpected messages in scanner")
-	}
-}
-
-func readFirstFromFile(conf *config.Config, fname string) *protocol.Message {
-	f, err := os.Open(fname)
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
-
-	if _, err = f.Seek(0, io.SeekStart); err != nil {
-		if err == io.EOF {
-			return nil
-		}
-		panic(err)
-	}
-	msg, err := protocol.MsgFromReader(f)
-	if err != nil {
-		if err == io.EOF {
-			return nil
-		}
-		panic(err)
-	}
-	return msg
-}
-
-// XXX not yet using this
-func readLastFromBytes(conf *config.Config, fname string) *protocol.Message {
-	f, err := os.Open(fname)
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
-
-	if _, err = f.Seek(0, io.SeekStart); err != nil {
-		if err == io.EOF {
-			return nil
-		}
-		panic(err)
-	}
-	info, err := f.Stat()
-	if err != nil {
-		panic(err)
-	}
-	filelen := info.Size()
-
-	var msg *protocol.Message
-	ps := protocol.NewProtocolScanner(conf, f)
-	for read := int64(0); read < filelen; {
-		n, m, err := ps.ReadMessage()
-		if err != nil {
-			if err == io.EOF {
-				return nil
-			}
-			panic(err)
-		}
-		read += int64(n)
-		msg = m
-	}
-	return msg
 }

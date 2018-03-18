@@ -195,6 +195,8 @@ func (q *EventQ) handleRead(cmd *protocol.Command) {
 	end := startID + limit
 	if limit == 0 {
 		end = head
+	} else if end > 1 {
+		end--
 	}
 
 	iterator, err := q.log.Range(startID, end)

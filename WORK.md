@@ -6,15 +6,13 @@
       part of graceful shutdown
       * continue on startup when there are still pending delete hooks
       * log delete hook output to logd stdout
-* [ ] need to check the return value of Close(). May contain errors from
-      previous delayed io.
 * [ ] make synchronization idiomatic w/ stuff like https://udhos.github.io/golang-concurrency-tricks/
-* [ ] backpressure in the form of max concurrent connections
-* [ ] clear index entries that have been deleted
-* [ ] test concurrent writes -> correct number of messages in the log
 
 # later
 
+* [ ] Store head/tail id in index
+* [ ] clear index entries that have been deleted
+* [ ] backpressure in the form of max concurrent connections
 * [ ] graceful shutdown: clients connections should close cleanly if possible
 * [ ] `REFUSE`, `ACCEPT` commands.
 * [ ] log file compression
@@ -61,6 +59,9 @@
 
 # COMPLETED
 
+* [X] test concurrent writes -> correct number of messages in the log
+* [X] need to check the return value of Close(). May contain errors from
+      previous delayed io.
 * [X] read from the beginning of the log
 * [X] should have a client flag to read from the beginning in case where
   requested id not found

@@ -215,7 +215,7 @@ func (l *FileLogger) getPartOffset(id uint64, inclusive bool) (uint64, int64, er
 		}
 	}
 
-	if id <= 1 {
+	if id == 1 && !inclusive {
 		return 0, 0, nil
 	}
 
@@ -343,7 +343,7 @@ func (l *FileLogger) Range(start, end uint64) (LogRangeIterator, error) {
 
 	lcopy := NewFileLogger(l.config)
 	defer lcopy.Shutdown()
-	endpart, endoff, pcerr := lcopy.getPartOffset(end, false)
+	endpart, endoff, pcerr := lcopy.getPartOffset(end, true)
 	if pcerr != nil {
 		return nil, errors.Wrap(pcerr, "failed to get range upper bound")
 	}
@@ -365,6 +365,8 @@ func (l *FileLogger) Range(start, end uint64) (LogRangeIterator, error) {
 	if err := l.parts.setReadHandle(l.parts.currReadPart); err != nil {
 		return nil, errors.Wrap(err, "failed to make new read handle after range")
 	}
+
+	internal.Debugf(l.config, "Range: start %d:%d end %d:%d", currpart, curroff, endpart, endoff)
 
 	var lf LogReadableFile
 	fn := func() (LogReadableFile, error) {
@@ -389,15 +391,19 @@ func (l *FileLogger) Range(start, end uint64) (LogRangeIterator, error) {
 		}
 		lf = r
 
+		limit := endoff - curroff
 		if currpart == endpart {
-			lf.SetLimit(endoff - curroff)
+			lf.SetLimit(limit)
 		} else {
 			stat, err := lf.AsFile().Stat()
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to stat file")
 			}
-			lf.SetLimit(stat.Size() - curroff)
+			limit = stat.Size() - curroff
+			lf.SetLimit(limit)
 		}
+
+		internal.Debugf(l.config, "Range part %d: start %d end %d limit %d", currpart, curroff, endoff, limit)
 
 		// use the current partition, which is seeked to `start`
 		return lf, nil
