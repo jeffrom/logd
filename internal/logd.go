@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"runtime"
@@ -84,4 +85,23 @@ func Prettybuf(bufs ...[]byte) []byte {
 		return final
 	}
 	return flat
+}
+
+// CloseAll closes all supplied closers, returns the first error, and logs all
+// errors.
+func CloseAll(c []io.Closer) error {
+	var firstErr error
+
+	for _, cl := range c {
+		if cl == nil {
+			continue
+		}
+		if err := cl.Close(); err != nil {
+			log.Printf("error closing %v: %+v", cl, err)
+			if firstErr != nil {
+				firstErr = err
+			}
+		}
+	}
+	return firstErr
 }

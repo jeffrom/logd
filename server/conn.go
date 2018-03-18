@@ -153,6 +153,7 @@ func (c *Conn) isActive() bool {
 func (c *Conn) close() error {
 	c.setState(connStateClosed)
 	err := c.Conn.Close()
+
 	// we only care about the channel if we're gracefully shutting down
 	select {
 	case c.done <- struct{}{}:

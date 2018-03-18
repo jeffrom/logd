@@ -8,6 +8,7 @@ package logger
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -59,13 +60,7 @@ func (p *filePartitions) shutdown() error {
 	// 	}
 	// }
 
-	if p.w != nil {
-		p.w.Close()
-	}
-	if p.r != nil {
-		p.r.Close()
-	}
-	return nil
+	return internal.CloseAll([]io.Closer{p.w, p.r})
 }
 
 func (p *filePartitions) setCurrentFileHandles(create bool) error {

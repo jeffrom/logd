@@ -63,21 +63,23 @@ type fileIndex struct {
 
 	data []*fileIndexCursor
 
-	buf *bytes.Buffer
-	r   io.ReadCloser
-	w   io.WriteCloser
-	br  *bufio.Reader
-	bw  *bufio.Writer
+	buf       *bytes.Buffer
+	r         io.ReadCloser
+	w         io.WriteCloser
+	br        *bufio.Reader
+	bw        *bufio.Writer
+	headerBuf []byte
 }
 
 func newFileIndex(conf *config.Config, w io.WriteCloser, r io.ReadCloser) *fileIndex {
 	idx := &fileIndex{
-		config: conf,
-		buf:    &bytes.Buffer{},
-		r:      r,
-		w:      w,
-		br:     bufio.NewReader(r),
-		bw:     bufio.NewWriter(w),
+		config:    conf,
+		buf:       &bytes.Buffer{},
+		r:         r,
+		w:         w,
+		br:        bufio.NewReader(r),
+		bw:        bufio.NewWriter(w),
+		headerBuf: make([]byte, 16),
 	}
 
 	return idx
@@ -87,13 +89,8 @@ func (idx *fileIndex) shutdown() error {
 	if err := idx.bw.Flush(); err != nil {
 		return errors.Wrap(err, "failed to flush index to disk on shutdown")
 	}
-	if idx.r != nil {
-		idx.r.Close()
-	}
-	if idx.w != nil {
-		idx.w.Close()
-	}
-	return nil
+
+	return internal.CloseAll([]io.Closer{idx.r, idx.w})
 }
 
 func (idx *fileIndex) Append(id uint64, part uint64, offset uint64) (int, error) {
@@ -110,7 +107,7 @@ func (idx *fileIndex) Append(id uint64, part uint64, offset uint64) (int, error)
 	idx.data = append(idx.data, newFileIndexCursor(id, part, offset))
 
 	if ferr := idx.bw.Flush(); ferr != nil {
-		return n, errors.Wrap(ferr, "failed to flush index to disk")
+		return n, errors.Wrap(ferr, "failed to flush index to disk on shutdown")
 	}
 	return n, err
 }

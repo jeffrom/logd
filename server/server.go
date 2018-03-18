@@ -259,7 +259,10 @@ func (s *SocketServer) addConn(conn *Conn) {
 }
 
 func (s *SocketServer) removeConn(conn *Conn) {
-	conn.Close()
+	if err := conn.Close(); err != nil {
+		log.Printf("error removing connection: %+v", err)
+	}
+
 	s.connMu.Lock()
 	delete(s.conns, conn)
 	s.connMu.Unlock()
