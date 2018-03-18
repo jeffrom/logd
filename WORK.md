@@ -2,10 +2,6 @@
 
 # TODO
 
-* [ ] put delete hooks in a queue, keep track of running delete hooks, make
-      part of graceful shutdown
-      * continue on startup when there are still pending delete hooks
-      * log delete hook output to logd stdout
 * [ ] make synchronization idiomatic w/ stuff like https://udhos.github.io/golang-concurrency-tricks/
 
 # later
@@ -13,11 +9,12 @@
 * [ ] Store head/tail id in index
 * [ ] clear index entries that have been deleted
 * [ ] backpressure in the form of max concurrent connections
-* [ ] graceful shutdown: clients connections should close cleanly if possible
-* [ ] `REFUSE`, `ACCEPT` commands.
-* [ ] log file compression
+* [ ] refuse/accept functionality
+  * `refuse(_at)` / `accept(_at)` should be able to synchronize switching at
+    partition boundaries, as well as ids.
   * probably want to be able to have the server close a connection and tell the
     client where they should try to reconnect?
+* [ ] log file compression
 * [ ] `STATS` is a lot simpler after refactoring response logic. there
       shouldn't be cmd.respC AND resp.readerC. all server response bytes should go
       through one channel.
@@ -25,20 +22,16 @@
       changing master
 * [ ] figure out linting
 * [ ] benchmarking suite
-  * server/client startup/shutdown
-  * all commands
-  * error handling cases
-* [ ] seeking/reading the log when we don't need to (calling Setup, probably)
+  * [X] server/client startup/shutdown
+  * [ ] all commands
+  * [ ] error handling cases
 * [ ] minimize IO abstractions as much as possible. io.Copy is ideal, probably.
   * would syscall.Fdatasync instead of Flush help? seems likely.
-* [ ] evaluate async logic.
 * [ ] track / limit / reuse concurrent fds in use
 * [ ] optimize. shoot for 0 allocations and do as little work as possible.
   * where we can use a mutex instead of channels?
   * using preallocated buffer + end position pointer so the buffer doesn't
     need to be cleared
-* [ ] test suite that runs the same set of tests with different configurations,
-      but also supports expected failures in some cases
 * [ ] make consistency guarantees configurable. fast by default but also force
       disk flush before returning success if that's desired.
   * most strict can use `creat(O_SYNC)`, or maybe just flush before
@@ -49,15 +42,15 @@
     just putting a flush command into the queue at an interval.
 * [ ] some tests that spin up containers to replicate, switch masters, etc
       while under load
-* [ ] refuse/accept functionality
-  * `refuse(_at)` / `accept(_at)` should be able to synchronize switching at
-    partition boundaries, as well as ids.
-* [ ] Read from end of log
-  * `MIN` command? since we can delete old partitions
-  * `READ -1 0` maybe to read from the tail?
 * [ ] record READ misses
+* [ ] put delete hooks in a queue, keep track of running delete hooks, make
+      part of graceful shutdown
+      * continue on startup when there are still pending delete hooks
+      * log delete hook output to logd stdout
 
 # COMPLETED
+
+## Jan-March 2018
 
 * [X] test concurrent writes -> correct number of messages in the log
 * [X] need to check the return value of Close(). May contain errors from
@@ -71,6 +64,9 @@
   * [X] should return a not found error
   * [X] client should exit with not found error by default
 * [X] ensure subscription connection is closed when _not_ reading forever
+* [X] test suite that runs the same set of tests with different configurations,
+      but also supports expected failures in some cases
+* [X] graceful shutdown: clients connections should close cleanly if possible
 
 ## DEC 2017
 
