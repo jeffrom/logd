@@ -118,7 +118,7 @@ func checkMessageReceived(t *testing.T, resp *protocol.Response, expectedID uint
 	// 	t.Fatal("Expected to read message but got none")
 	// }
 
-	fmt.Printf("recv: %q\n", msgb)
+	// fmt.Printf("recv: %q\n", msgb)
 	msg, err := protocol.MsgFromBytes(msgb)
 	if err != nil {
 		t.Fatalf("Unexpected error: %s", err)

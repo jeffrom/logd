@@ -105,21 +105,6 @@ func (r *Response) String() string {
 	return string(b)
 }
 
-// func (r *Response) sendChunk(lf logger.LogReadableFile) {
-// 	size, limit, err := lf.SizeLimit()
-// 	buflen := size
-// 	if limit > 0 {
-// 		buflen = limit
-// 	}
-// 	// buflen does not take seek position into account
-
-// 	f := lf.AsFile()
-// 	internal.Debugf(r.config, "<-%s: %d bytes", f.Name(), buflen)
-// 	reader := bytes.NewReader([]byte(fmt.Sprintf("+%d\r\n", buflen)))
-// 	r.ReaderC <- reader
-// 	r.ReaderC <- io.LimitReader(f, buflen)
-// }
-
 func (r *Response) Failed() bool {
 	return r.Status != RespOK && r.Status != RespEOF
 }

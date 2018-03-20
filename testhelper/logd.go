@@ -57,7 +57,7 @@ func CheckGoldenFile(filename string, b []byte, golden bool) {
 	CheckError(err)
 	if !bytes.Equal(b, expected) {
 		ioutil.WriteFile(goldenActual, b, 0644)
-		log.Fatalf("Golden files didn't match: wrote output to %s", goldenActual)
+		log.Panicf("Golden files didn't match: wrote output to %s", goldenActual)
 	}
 }
 

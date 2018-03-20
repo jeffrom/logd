@@ -42,24 +42,6 @@ func (p *filePartitions) Write(b []byte) (int, error) {
 }
 
 func (p *filePartitions) shutdown() error {
-	// var firstErr error
-
-	// if err := p.w.Close(); err != nil {
-	// 	err = errors.Wrap(err, "failed closing writeable file during shutdown")
-	// 	log.Printf("%+v", err)
-	// 	if firstErr == nil {
-	// 		firstErr = err
-	// 	}
-	// }
-
-	// if err := p.r.Close(); err != nil {
-	// 	err = errors.Wrap(err, "failed closing readable file during shutdown")
-	// 	log.Printf("%+v", err)
-	// 	if firstErr == nil {
-	// 		firstErr = err
-	// 	}
-	// }
-
 	return internal.CloseAll([]io.Closer{p.w, p.r})
 }
 
@@ -71,38 +53,25 @@ func (p *filePartitions) setCurrentFileHandles(create bool) error {
 	if create {
 		curr++
 	}
-	if err := p.setWriteHandle(curr); err != nil {
-		return err
-	}
-
-	parts, err := p.partitions()
-	if err != nil {
-		return err
-	}
-	maxParts := p.config.MaxPartitions
-	if maxParts > 0 && len(parts) > maxParts {
-
-		go func() {
-			if derr := p.delete(parts[:len(parts)-maxParts]); derr != nil {
-				log.Printf("failed to delete partitions: %+v", derr)
-			}
-		}()
+	if serr := p.setWriteHandle(curr); serr != nil {
+		return serr
 	}
 
 	return p.setReadHandle(curr)
 }
 
-func (p *filePartitions) delete(parts []uint64) error {
+func (p *filePartitions) remove(parts []uint64) error {
 	log.Printf("Deleting %d partitions: %v", len(parts), parts)
 	for _, part := range parts {
-		if err := p.deleteOne(part); err != nil {
+		if err := p.removeOne(part); err != nil {
+			log.Printf("failed to delete partitions: %+v", err)
 			return err
 		}
 	}
 	return nil
 }
 
-func (p *filePartitions) deleteOne(part uint64) error {
+func (p *filePartitions) removeOne(part uint64) error {
 	log.Printf("Deleting partition #%d", part)
 	if err := p.runDeleteHook(part); err != nil {
 		return err
@@ -179,6 +148,22 @@ func (p *filePartitions) tail() (uint64, error) {
 	}
 	n := minUint64(parts...)
 	return n, nil
+}
+
+func (p *filePartitions) firstMessage(part uint64) (*protocol.Message, error) {
+	f, err := os.Open(p.logFilePath(part))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to open partition for reading")
+	}
+	defer f.Close()
+
+	scanner := protocol.NewProtocolScanner(p.config, newLogFile(f))
+	scanner.Scan()
+	err = scanner.Error()
+	if err != nil && err != io.EOF {
+		return nil, errors.Wrap(err, "failed to scan partition")
+	}
+	return scanner.Message(), err
 }
 
 func maxUint64(args ...uint64) uint64 {

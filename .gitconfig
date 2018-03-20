@@ -1,0 +1,4 @@
+[diff "logd-index"]
+    textconv = xxd -c 24
+    cachetextconv = true
+

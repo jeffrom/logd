@@ -1,0 +1,2 @@
+*.index diff=logd-index
+*.index.golden diff=logd-index

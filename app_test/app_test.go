@@ -104,9 +104,9 @@ func expectLineMatch(t testing.TB, scanner *protocol.ProtocolScanner, msg []byte
 
 	if respMsg := scanner.Message(); respMsg == nil || !reflect.DeepEqual(respMsg.Body, msg) {
 		if respMsg == nil {
-			t.Fatal(logWithStack("Expected %q response but got nil message", msg))
+			t.Fatal(logWithStack("Expected\n\n\t%q\n\nbut got\n\n\tnil", msg))
 		} else {
-			t.Fatal(logWithStack("Expected %q response but got %q", msg, respMsg.Body))
+			t.Fatal(logWithStack("Expected\n\n\t%q\n\nbut got\n\n\t%q", msg, respMsg.Body))
 		}
 	}
 }

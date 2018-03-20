@@ -147,7 +147,9 @@ func TestFilePartitionDeleteOldOnes(t *testing.T) {
 
 	msg := []byte(testhelper.Repeat("A", 500))
 	for i := 0; i < 10; i++ {
-		l.Write(msg)
+		if _, err := l.Write(msg); err != nil {
+			t.Fatalf("error writing to log: %+v", err)
+		}
 	}
 	l.Flush()
 

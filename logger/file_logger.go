@@ -26,9 +26,11 @@ type flusher interface {
 	Flush() error
 }
 
+// NewFileLogger returns a new instance of file logger
 func NewFileLogger(conf *config.Config) *FileLogger {
 	l := &FileLogger{
 		config: conf,
+		index:  newFileIndex(conf),
 		parts:  newFilePartitions(conf),
 	}
 
@@ -37,29 +39,35 @@ func NewFileLogger(conf *config.Config) *FileLogger {
 
 // Setup loads to current state from disk
 func (l *FileLogger) Setup() error {
-	if l.config.LogFile != "" {
-		err := l.parts.setCurrentFileHandles(false)
-		if err != nil {
-			return errors.Wrap(err, "failed to get file handles")
-		}
-
-		l.getNewIndex()
-		if _, err := l.index.loadFromReader(); err != nil {
-			return errors.Wrap(err, "failed to load index file")
-		}
-		// if l.config.Verbose {
-		// 	internal.Debugf(l.config, "Current index")
-		// 	l.index.dump()
-		// }
-
-		if err := l.loadState(); err != nil {
-			log.Printf("error loading state: %+v\n", err)
-			return err
-		}
-
-		head, _ := l.parts.head()
-		log.Printf("Starting at log id %d, partition %d, offset %d", l.currID, head, l.written)
+	if l.config.LogFile == "" {
+		panic("config: LogFile not set")
 	}
+
+	err := l.parts.setCurrentFileHandles(false)
+	if err != nil {
+		return errors.Wrap(err, "failed to get file handles")
+	}
+
+	if err := l.index.setup(); err != nil {
+		return err
+	}
+	// fmt.Printf("%+v\n", l.index)
+
+	if l.config.Verbose {
+		internal.Debugf(l.config, "Current index")
+		l.index.dump()
+	}
+
+	// TODO on startup we need to make sure index head is the latest id
+
+	if err := l.loadState(); err != nil {
+		log.Printf("error loading state: %+v\n", err)
+		return err
+	}
+
+	head, _ := l.parts.head()
+	log.Printf("Starting at log id %d, partition %d, offset %d", l.currID, head, l.written)
+
 	return nil
 }
 
@@ -89,8 +97,32 @@ func (l *FileLogger) Write(b []byte) (int, error) {
 	written := l.written + len(b)
 	madeNewPartition := false
 	if written > l.config.PartitionSize {
-		if err := l.parts.setCurrentFileHandles(true); err != nil {
-			return 0, err
+		fherr := l.parts.setCurrentFileHandles(true)
+		if fherr != nil {
+			return 0, fherr
+		}
+
+		parts, perr := l.parts.partitions()
+		if perr != nil {
+			return 0, perr
+		}
+
+		maxParts := l.config.MaxPartitions
+		if maxParts > 0 && len(parts) > maxParts {
+			tailPart := parts[1]
+			msg, merr := l.parts.firstMessage(tailPart)
+			if merr != nil && merr != io.EOF {
+				return 0, merr
+			}
+
+			if msg != nil && msg.ID > 0 {
+				l.index.tail = msg.ID
+			}
+
+			// TODO move the file synchronously first, then any hook acts on the
+			// moved file
+			extraParts := parts[:len(parts)-maxParts]
+			go l.parts.remove(extraParts)
 		}
 
 		internal.Debugf(l.config, "Moved to partition %d", head)
@@ -104,6 +136,14 @@ func (l *FileLogger) Write(b []byte) (int, error) {
 	}
 	if madeNewPartition {
 		written = n
+	}
+
+	l.index.head = l.currID
+	if l.index.tail == 0 {
+		l.index.tail = 1
+	}
+	if _, herr := l.index.writeHeader(); herr != nil {
+		return written, errors.Wrap(herr, "failed to write index header")
 	}
 
 	if l.currID > 0 && l.currID%l.config.IndexCursorSize == 0 {
@@ -190,11 +230,8 @@ func (l *FileLogger) SeekToID(id uint64) error {
 }
 
 func (l *FileLogger) getPartOffset(id uint64, inclusive bool) (uint64, int64, error) {
-	if l.index == nil {
-		if err := l.getNewIndex(); err != nil {
-			return 0, 0, errors.Wrap(err, "failed to create index")
-		}
-	}
+	// fmt.Printf("\ngetPartOffset: %+v\n", l.index)
+
 	// catch up any new indexes written
 	if _, err := l.index.loadFromReader(); err != nil {
 		return 0, 0, errors.Wrap(err, "failed to initialize index")
@@ -269,36 +306,13 @@ Loop:
 
 // Head returns the current latest ID
 func (l *FileLogger) Head() (uint64, error) {
-	curr, herr := l.parts.head()
-	if herr != nil {
-		return 0, herr
-	}
-	if err := l.parts.setReadHandle(curr); err != nil {
-		return 0, err
-	}
-	if _, err := l.parts.r.Seek(0, 0); err != nil {
-		return 0, err
-	}
-
-	var msg *protocol.Message
-	scanner := protocol.NewProtocolScanner(l.config, l)
-	for scanner.Scan() {
-		if scanned := scanner.Message(); scanned != nil {
-			msg = scanned
-		}
-	}
-	err := scanner.Error()
-	if err == io.EOF {
-		err = nil
-	}
-
-	if msg == nil {
-		return 0, err
-	}
-	return msg.ID, err
+	return l.index.head, nil
 }
 
+// Tail returns the lowest id in the log
 func (l *FileLogger) Tail() (uint64, error) {
+	// return l.index.tail, nil
+
 	part, herr := l.parts.tail()
 	if herr != nil {
 		return 0, herr
@@ -307,7 +321,7 @@ func (l *FileLogger) Tail() (uint64, error) {
 	if err := l.parts.setReadHandle(part); err != nil {
 		return 0, err
 	}
-	if _, err := l.parts.r.Seek(0, 0); err != nil {
+	if _, err := l.parts.r.Seek(0, io.SeekStart); err != nil {
 		return 0, err
 	}
 
@@ -342,7 +356,11 @@ func (l *FileLogger) Range(start, end uint64) (LogRangeIterator, error) {
 	internal.Debugf(l.config, "Range(%d, %d)", start, end)
 
 	lcopy := NewFileLogger(l.config)
+	if err := lcopy.Setup(); err != nil {
+		return nil, err
+	}
 	defer lcopy.Shutdown()
+
 	endpart, endoff, pcerr := lcopy.getPartOffset(end, true)
 	if pcerr != nil {
 		return nil, errors.Wrap(pcerr, "failed to get range upper bound")
@@ -411,16 +429,20 @@ func (l *FileLogger) Range(start, end uint64) (LogRangeIterator, error) {
 	return PartitionIteratorFunc(fn), nil
 }
 
+// PartitionIterator scans log entries
 type PartitionIterator struct {
 	next func() (LogReadableFile, error)
 	err  error
 	lf   LogReadableFile
 }
 
+// PartitionIteratorFunc is an adapter to allow the use of a function as a
+// PartitionIterator
 func PartitionIteratorFunc(next func() (LogReadableFile, error)) *PartitionIterator {
 	return &PartitionIterator{next: next}
 }
 
+// Next returns the next message from a PartitionIterator
 func (pi *PartitionIterator) Next() bool {
 	lf, err := pi.next()
 	pi.lf = lf
@@ -435,41 +457,20 @@ func (pi *PartitionIterator) Error() error {
 	return pi.err
 }
 
+// LogFile returns the LogReadableFile for a partition
 func (pi *PartitionIterator) LogFile() LogReadableFile {
 	return pi.lf
-}
-
-func closeAll(closers []func() error) error {
-	var firstErr error
-	for _, closer := range closers {
-		if err := closer(); err != nil {
-			firstErr = err
-		}
-	}
-	return firstErr
-}
-
-func (l *FileLogger) getNewIndex() error {
-	idxFileName := l.config.IndexFileName()
-	w, err := os.OpenFile(idxFileName, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.FileMode(l.config.LogFileMode))
-	if err != nil {
-		return errors.Wrap(err, "failed to open log index for writing")
-	}
-
-	rs, err := os.Open(idxFileName)
-	if err != nil {
-		return errors.Wrap(err, "failed to open log index for reading")
-	}
-
-	l.index = newFileIndex(l.config, w, rs)
-	return err
 }
 
 func (l *FileLogger) loadState() error {
 	scanner := protocol.NewProtocolScanner(l.config, l)
 	var lastMsg *protocol.Message
+	var firstMsg *protocol.Message
 	for scanner.Scan() {
 		msg := scanner.Message()
+		if firstMsg == nil && msg != nil {
+			firstMsg = msg
+		}
 		if msg != nil {
 			lastMsg = msg
 		}
@@ -485,19 +486,28 @@ func (l *FileLogger) loadState() error {
 		l.currID = lastMsg.ID + 1
 	}
 
+	if lastMsg != nil && l.index.head == 0 {
+		l.index.head = lastMsg.ID
+	}
+	if firstMsg != nil && l.index.tail == 0 {
+		l.index.tail = firstMsg.ID
+	}
+
 	return nil
 }
 
 // CheckIndex verifies the index against the log file
-func CheckIndex(config *config.Config) error {
-	logger := NewFileLogger(config)
+func CheckIndex(conf *config.Config) error {
+	logger := NewFileLogger(conf)
 	defer logger.Shutdown()
 	if err := logger.Setup(); err != nil {
 		return err
 	}
 
+	internal.Debugf(conf, "head: %d, tail: %d", logger.index.head, logger.index.tail)
+
 	for _, c := range logger.index.data {
-		internal.Debugf(config, "checking id %d, partition %d, offset %d", c.id, c.part, c.offset)
+		internal.Debugf(conf, "checking id %d, partition %d, offset %d", c.id, c.part, c.offset)
 		if err := logger.parts.setHandles(c.part); err != nil {
 			log.Printf("Failed to set partition. id: %d, partition: %d, offset: %d", c.id, c.part, c.offset)
 			return err
