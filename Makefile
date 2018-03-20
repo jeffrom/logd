@@ -108,7 +108,8 @@ bench.ci:
 	./script/compare_benchmarks.sh
 
 .PHONY: ci
-ci: clean deps lint.install test.coverprofile test.race test.integration.compile test.integration test.report lint test.report.summary
+# ci: clean deps lint.install test.coverprofile test.race test.integration.compile test.integration test.report lint test.report.summary
+ci: clean deps lint.install test.coverprofile test.race test.integration.compile test.integration test.report test.report.summary
 
 .PHONY: test.integration.compile
 test.integration.compile:
