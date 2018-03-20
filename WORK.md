@@ -7,6 +7,8 @@
 # later
 
 * [ ] Store head/tail id in index
+  * [X] head
+  * [ ] tail
 * [ ] clear index entries that have been deleted
 * [ ] backpressure in the form of max concurrent connections
 * [ ] refuse/accept functionality
