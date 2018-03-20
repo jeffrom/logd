@@ -292,9 +292,18 @@ func (idx *fileIndex) dump() {
 	}
 
 	sl := idx.data
+	for _, c := range sl[:5] {
+		fmt.Println(c)
+	}
+
+	sl = sl[5:]
+
 	if len(idx.data) > 10 {
 		fmt.Println("...")
-		sl = idx.data[len(idx.data)-10:]
+	}
+
+	if len(sl) > 5 {
+		sl = sl[len(sl)-5:]
 	}
 
 	for _, c := range sl {
