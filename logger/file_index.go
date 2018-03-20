@@ -78,22 +78,6 @@ type fileIndex struct {
 	tail      uint64
 }
 
-// func newFileIndex(conf *config.Config, w io.WriteCloser, r io.ReadCloser) *fileIndex {
-// 	hbuf := make([]byte, fileIndexHeaderSize)
-
-// 	idx := &fileIndex{
-// 		config:    conf,
-// 		buf:       bytes.NewBuffer(hbuf),
-// 		r:         r,
-// 		w:         w,
-// 		br:        bufio.NewReader(r),
-// 		bw:        bufio.NewWriter(w),
-// 		headerBuf: hbuf,
-// 	}
-
-// 	return idx
-// }
-
 func zeroBuffer(b []byte) {
 	for i := range b {
 		b[i] = 0
