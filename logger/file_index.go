@@ -59,6 +59,7 @@ func (c *fileIndexCursor) String() string {
 	return fmt.Sprintf("%d\t%d\t%d", c.id, c.part, c.offset)
 }
 
+// TODO update this to 24 for easier human diffing
 const fileIndexHeaderSize = 16
 
 type fileIndex struct {
