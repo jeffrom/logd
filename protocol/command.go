@@ -24,9 +24,9 @@ const (
 	// CmdRead is a read command type.
 	CmdRead
 
-	// CmdTail is a read command type. While similiar to Read, in the case
-	// where the caller supplies an id lower than the tail of the log, Tail
-	// starts from the beginning of the log.
+	// CmdTail is a read command type. While similar to Read, in the case where
+	// the caller supplies an id lower than the tail of the log, Tail starts
+	// from the beginning of the log.
 	CmdTail
 
 	// CmdHead is a head command type.

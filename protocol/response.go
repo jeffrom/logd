@@ -89,7 +89,7 @@ func NewErrResponse(conf *config.Config, body []byte) *Response {
 	return &Response{config: conf, Status: RespErr, Body: body}
 }
 
-// NewClientErrResponse returns a new validation error reponse
+// NewClientErrResponse returns a new validation error response
 func NewClientErrResponse(conf *config.Config, body []byte) *Response {
 	return &Response{config: conf, Status: RespErrClient, Body: body}
 }

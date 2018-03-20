@@ -78,7 +78,7 @@ test.golden:
 
 .PHONY: lint
 lint:
-	gometalinter --aggregate --vendored-linters --vendor --enable-all $(PKGS)
+	gometalinter --aggregate --vendored-linters --vendor --enable-all $(SHORT_PKGS)
 	# ./script/lint.sh
 
 .PHONY: lint.install
