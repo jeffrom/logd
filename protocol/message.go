@@ -31,34 +31,6 @@ func (m *Message) String() string {
 	return string(m.logBytes())
 }
 
-// func msgFromBytes(b []byte) (*Message, error) {
-// 	var id uint64
-// 	var length uint64
-// 	var body []byte
-// 	parts := bytes.SplitN(b, []byte(" "), 3)
-
-// 	if len(parts) < 3 {
-// 		return nil, errors.New("invalid message format")
-// 	}
-
-// 	_, err := fmt.Sscanf(string(parts[0]), "%d", &id)
-// 	if err != nil {
-// 		return nil, errors.Wrap(err, "invalid id bytes")
-// 	}
-// 	_, err = fmt.Sscanf(string(parts[1]), "%d", &length)
-// 	if err != nil {
-// 		return nil, errors.Wrap(err, "invalid length bytes")
-// 	}
-// 	body = bytes.TrimRight(parts[2], "\r\n")
-
-// 	if uint64(len(body)) < length {
-// 		return nil, errors.New("invalid body length")
-// 	}
-
-// 	// TODO slicing here is unsafe, we need a crc or something
-// 	return NewMessage(id, body[:length]), nil
-// }
-
 func MsgFromBytes(b []byte) (*Message, error) {
 	ps := NewProtocolScanner(config.DefaultConfig, bytes.NewReader(b))
 	_, msg, err := ps.ReadMessage()
