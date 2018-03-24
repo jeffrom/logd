@@ -47,18 +47,15 @@ func NewServer(addr string, config *config.Config) *SocketServer {
 		panic(err)
 	}
 
-	timeout := time.Duration(config.ServerTimeout) * time.Millisecond
 	return &SocketServer{
-		config:       config,
-		addr:         addr,
-		readyC:       make(chan struct{}),
-		conns:        make(map[*Conn]bool),
-		connIn:       make(chan *Conn, 1000),
-		readTimeout:  timeout,
-		writeTimeout: timeout,
-		stopC:        make(chan struct{}),
-		shutdownC:    make(chan struct{}),
-		q:            q,
+		config:    config,
+		addr:      addr,
+		readyC:    make(chan struct{}),
+		conns:     make(map[*Conn]bool),
+		connIn:    make(chan *Conn, 1000),
+		stopC:     make(chan struct{}),
+		shutdownC: make(chan struct{}),
+		q:         q,
 	}
 }
 
