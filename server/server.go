@@ -16,12 +16,6 @@ import (
 	"github.com/jeffrom/logd/protocol"
 )
 
-// Server is an interface for interaction with clients
-type Server interface {
-	Respond(cmd *protocol.Command, resp *protocol.Response) error
-	Send(sub *events.Subscription, msg *protocol.Message) error
-}
-
 // SocketServer handles socket connections
 type SocketServer struct {
 	config *config.Config
