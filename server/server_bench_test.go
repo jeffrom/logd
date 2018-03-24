@@ -20,8 +20,8 @@ func serverBenchConfig(t testing.TB) *config.Config {
 
 func serverBenchConfigWithOpts(t testing.TB, discard bool) *config.Config {
 	conf := config.NewConfig()
-	conf.ServerTimeout = 500
-	conf.ClientTimeout = 500
+	conf.ServerTimeout = 1000
+	conf.ClientTimeout = 1000
 	conf.MaxChunkSize = 1024 * 10
 	// conf.PartitionSize = 1024 * 1024 * 500
 	// conf.IndexCursorSize = 1000
@@ -141,7 +141,32 @@ func BenchmarkServerTail(b *testing.B) {
 	writerClient := newTestClient(config, srv)
 	defer writerClient.Close()
 
-	writerClient.Do(protocol.NewCommand(config, protocol.CmdMessage, someMessage))
+	if resp, err := writerClient.Do(protocol.NewCommand(config, protocol.CmdMessage, someMessage)); err != nil {
+		panic(err)
+	} else if resp.Status != protocol.RespOK {
+		log.Panicf("expected ok response but got %s", resp)
+	}
+
+	done := make(chan struct{})
+	defer func() {
+		done <- struct{}{}
+	}()
+
+	go func() {
+		for {
+			if resp, err := writerClient.Do(protocol.NewCommand(config, protocol.CmdMessage, someMessage)); err != nil {
+				panic(err)
+			} else if resp.Status != protocol.RespOK {
+				log.Panicf("expected ok response but got %s", resp)
+			}
+
+			select {
+			case <-done:
+				return
+			default:
+			}
+		}
+	}()
 
 	scanner, err := client.DoRead(1, 0)
 	if err != nil {
@@ -150,10 +175,12 @@ func BenchmarkServerTail(b *testing.B) {
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		writerClient.Do(protocol.NewCommand(config, protocol.CmdMessage, someMessage))
-		for scanner.Scan() {
+		scanner.Scan()
+		if err := scanner.Error(); err != nil {
+			panic(err)
 		}
 	}
+	b.StopTimer()
 }
 
 func BenchmarkServerTailTen(b *testing.B) {
@@ -166,7 +193,32 @@ func BenchmarkServerTailTen(b *testing.B) {
 	writerClient := newTestClient(config, srv)
 	defer writerClient.Close()
 
-	writerClient.Do(protocol.NewCommand(config, protocol.CmdMessage, someMessage))
+	if resp, err := writerClient.Do(protocol.NewCommand(config, protocol.CmdMessage, someMessage)); err != nil {
+		panic(err)
+	} else if resp.Status != protocol.RespOK {
+		log.Panicf("expected ok response but got %s", resp)
+	}
+
+	done := make(chan struct{})
+	defer func() {
+		done <- struct{}{}
+	}()
+
+	go func() {
+		for {
+			if resp, err := writerClient.Do(protocol.NewCommand(config, protocol.CmdMessage, someMessage)); err != nil {
+				panic(err)
+			} else if resp.Status != protocol.RespOK {
+				log.Panicf("expected ok response but got %s", resp)
+			}
+
+			select {
+			case <-done:
+				return
+			default:
+			}
+		}
+	}()
 
 	var scanners []*protocol.ProtocolScanner
 	for i := 0; i < total; i++ {
@@ -179,12 +231,14 @@ func BenchmarkServerTailTen(b *testing.B) {
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		writerClient.Do(protocol.NewCommand(config, protocol.CmdMessage, someMessage))
 		for _, scanner := range scanners {
-			for scanner.Scan() {
+			scanner.Scan()
+			if err := scanner.Error(); err != nil {
+				panic(err)
 			}
 		}
 	}
+	b.StopTimer()
 }
 
 func BenchmarkServerLoadTest(b *testing.B) {

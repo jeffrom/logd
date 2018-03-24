@@ -2,6 +2,7 @@ package events
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -167,16 +168,6 @@ func checkClientErrResp(t *testing.T, resp *protocol.Response) {
 	}
 }
 
-// use this to help debug deadlocks, more helpful probably to just use:
-// kill -ABRT <pid>
-func finishCommand(cmd *protocol.Command) {
-	select {
-	case <-cmd.Done:
-	case <-time.After(500 * time.Millisecond):
-		panic("failed to finish command")
-	}
-}
-
 func TestEventQStartStop(t *testing.T) {
 	q := startQ(t, logger.NewMemLogger())
 	stopQ(t, q)
@@ -187,7 +178,7 @@ func TestEventQAdd(t *testing.T) {
 	q := startQ(t, logger.NewMemLogger())
 	defer stopQ(t, q)
 
-	resp, err := q.PushCommand(protocol.NewCommand(config, protocol.CmdPing))
+	resp, err := q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdPing))
 	checkNoErrAndSuccess(t, resp, err)
 }
 
@@ -196,7 +187,7 @@ func TestEventQWrite(t *testing.T) {
 	q := startQ(t, logger.NewMemLogger())
 	defer stopQ(t, q)
 
-	resp, err := q.PushCommand(protocol.NewCommand(config, protocol.CmdMessage, []byte("Hello, log!")))
+	resp, err := q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdMessage, []byte("Hello, log!")))
 	checkNoErrAndSuccess(t, resp, err)
 	if resp.ID != 1 {
 		t.Fatalf("Expected response with id 1 but got %d", resp.ID)
@@ -210,7 +201,7 @@ func TestEventQWriteErr(t *testing.T) {
 	q := startQ(t, memLogger)
 	defer stopQ(t, q)
 
-	resp, _ := q.PushCommand(protocol.NewCommand(config, protocol.CmdMessage, []byte("Hello, log!")))
+	resp, _ := q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdMessage, []byte("Hello, log!")))
 	checkErrResp(t, resp)
 }
 
@@ -228,7 +219,7 @@ func TestEventQWriteFilePartitions(t *testing.T) {
 	msg := []byte(testhelper.Repeat("A", 50))
 	for i := 0; i < 10; i++ {
 		truncated := msg[:len(msg)-(10%(i+1))]
-		resp, err := q.PushCommand(protocol.NewCommand(config, protocol.CmdMessage, truncated))
+		resp, err := q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdMessage, truncated))
 		checkNoErrAndSuccess(t, resp, err)
 	}
 
@@ -259,7 +250,7 @@ func TestEventQWriteAfterRestart(t *testing.T) {
 	// defer stopQ(t, q)
 
 	for _, line := range testhelper.SomeLines[:2] {
-		resp, err := q.PushCommand(protocol.NewCommand(config, protocol.CmdMessage, line))
+		resp, err := q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdMessage, line))
 		checkNoErrAndSuccess(t, resp, err)
 	}
 
@@ -272,7 +263,7 @@ func TestEventQWriteAfterRestart(t *testing.T) {
 	defer stopQ(t, q)
 
 	for _, line := range testhelper.SomeLines {
-		resp, err := q.PushCommand(protocol.NewCommand(config, protocol.CmdMessage, line))
+		resp, err := q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdMessage, line))
 		checkNoErrAndSuccess(t, resp, err)
 	}
 
@@ -314,7 +305,7 @@ func TestEventQReadFilePartitions(t *testing.T) {
 
 		idStr := fmt.Sprintf("%d", id)
 		cmd := protocol.NewCommand(config, protocol.CmdRead, []byte(idStr), []byte("1"))
-		resp, err := q.PushCommand(cmd)
+		resp, err := q.PushCommand(context.Background(), cmd)
 		cmd.SignalReady()
 
 		checkNoErrAndSuccess(t, resp, err)
@@ -328,19 +319,19 @@ func TestEventQHead(t *testing.T) {
 	q := startQ(t, logger.NewMemLogger())
 	defer stopQ(t, q)
 
-	resp, err := q.PushCommand(protocol.NewCommand(config, protocol.CmdHead))
+	resp, err := q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdHead))
 	checkNoErrAndSuccess(t, resp, err)
 	if resp.ID != 0 {
 		t.Fatalf("Expected response with id 0 but got %d", resp.ID)
 	}
 
-	resp, err = q.PushCommand(protocol.NewCommand(config, protocol.CmdMessage, []byte("Hello, log!")))
+	resp, err = q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdMessage, []byte("Hello, log!")))
 	checkNoErrAndSuccess(t, resp, err)
 	if resp.ID != 1 {
 		t.Fatalf("Expected response with id 1 but got %d", resp.ID)
 	}
 
-	resp, err = q.PushCommand(protocol.NewCommand(config, protocol.CmdHead))
+	resp, err = q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdHead))
 	checkNoErrAndSuccess(t, resp, err)
 	if resp.ID != 1 {
 		t.Fatalf("Expected response with id 1 but got %d", resp.ID)
@@ -354,7 +345,7 @@ func TestEventQHeadErr(t *testing.T) {
 	defer stopQ(t, q)
 
 	memLogger.HeadReturnErr = errors.New("cool error")
-	resp, _ := q.PushCommand(protocol.NewCommand(config, protocol.CmdHead))
+	resp, _ := q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdHead))
 	checkErrResp(t, resp)
 
 	anotherQ := NewEventQ(config)
@@ -372,27 +363,27 @@ func TestEventQRead(t *testing.T) {
 
 	expectedMsg := []byte("Hello, log!")
 
-	resp, err := q.PushCommand(protocol.NewCommand(config, protocol.CmdMessage, expectedMsg))
+	resp, err := q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdMessage, expectedMsg))
 	checkNoErrAndSuccess(t, resp, err)
 
 	cmd := protocol.NewCommand(config, protocol.CmdRead, []byte("1"), []byte("1"))
-	tailResp, err := q.PushCommand(cmd)
+	tailResp, err := q.PushCommand(context.Background(), cmd)
 	checkNoErrAndSuccess(t, tailResp, err)
 	checkMessageReceived(t, tailResp, 1, expectedMsg)
 	checkEOF(t, tailResp)
 
 	cmd = protocol.NewCommand(config, protocol.CmdRead, []byte("1"), []byte("0"))
-	tailResp, err = q.PushCommand(cmd)
+	tailResp, err = q.PushCommand(context.Background(), cmd)
 	checkNoErrAndSuccess(t, tailResp, err)
 	checkMessageReceived(t, tailResp, 1, expectedMsg)
 
-	resp, err = q.PushCommand(protocol.NewCommand(config, protocol.CmdMessage, expectedMsg))
+	resp, err = q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdMessage, expectedMsg))
 	checkNoErrAndSuccess(t, resp, err)
 
 	checkMessageReceived(t, tailResp, 2, expectedMsg)
 
 	closeCmd := protocol.NewCloseCommand(config, cmd.RespC)
-	closeResp, err := q.PushCommand(closeCmd)
+	closeResp, err := q.PushCommand(context.Background(), closeCmd)
 	checkNoErrAndSuccess(t, closeResp, err)
 
 }
@@ -405,10 +396,10 @@ func TestEventQReadFromEmpty(t *testing.T) {
 
 	expectedMsg := []byte("Hello, log!")
 
-	tailResp, err := q.PushCommand(protocol.NewCommand(config, protocol.CmdRead, []byte("1"), []byte("0")))
+	tailResp, err := q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdRead, []byte("1"), []byte("0")))
 	checkNoErrAndSuccess(t, tailResp, err)
 
-	resp, err := q.PushCommand(protocol.NewCommand(config, protocol.CmdMessage, expectedMsg))
+	resp, err := q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdMessage, expectedMsg))
 	checkNoErrAndSuccess(t, resp, err)
 
 	checkMessageReceived(t, tailResp, 1, expectedMsg)
@@ -421,7 +412,7 @@ func TestEventQReadErr(t *testing.T) {
 	q := startQ(t, memLogger)
 	defer stopQ(t, q)
 
-	resp, _ := q.PushCommand(protocol.NewCommand(config, protocol.CmdRead))
+	resp, _ := q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdRead))
 	checkClientErrResp(t, resp)
 }
 
@@ -433,19 +424,19 @@ func TestEventQReadClose(t *testing.T) {
 
 	expectedMsg := []byte("Hello, log!")
 
-	resp, err := q.PushCommand(protocol.NewCommand(config, protocol.CmdMessage, expectedMsg))
+	resp, err := q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdMessage, expectedMsg))
 	checkNoErrAndSuccess(t, resp, err)
 
 	readCmd := protocol.NewCommand(config, protocol.CmdRead, []byte("1"), []byte("0"))
-	tailResp, err := q.PushCommand(readCmd)
+	tailResp, err := q.PushCommand(context.Background(), readCmd)
 	checkNoErrAndSuccess(t, tailResp, err)
 	checkMessageReceived(t, tailResp, 1, expectedMsg)
 
 	closeCmd := protocol.NewCloseCommand(config, readCmd.RespC)
-	closeResp, err := q.PushCommand(closeCmd)
+	closeResp, err := q.PushCommand(context.Background(), closeCmd)
 	checkNoErrAndSuccess(t, closeResp, err)
 
-	resp, err = q.PushCommand(protocol.NewCommand(config, protocol.CmdMessage, expectedMsg))
+	resp, err = q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdMessage, expectedMsg))
 	checkNoErrAndSuccess(t, resp, err)
 
 	if len(q.subscriptions) > 0 {
@@ -458,13 +449,13 @@ func TestEventQReadInvalidParams(t *testing.T) {
 	q := startQ(t, logger.NewMemLogger())
 	defer stopQ(t, q)
 
-	resp, _ := q.PushCommand(protocol.NewCommand(config, protocol.CmdRead, []byte("asdf"), []byte("1")))
+	resp, _ := q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdRead, []byte("asdf"), []byte("1")))
 	checkClientErrResp(t, resp)
 
-	resp, _ = q.PushCommand(protocol.NewCommand(config, protocol.CmdRead, []byte("1"), []byte("asdf")))
+	resp, _ = q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdRead, []byte("1"), []byte("asdf")))
 	checkClientErrResp(t, resp)
 
-	resp, _ = q.PushCommand(protocol.NewCommand(config, protocol.CmdRead, []byte("1")))
+	resp, _ = q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdRead, []byte("1")))
 	checkClientErrResp(t, resp)
 }
 
@@ -473,7 +464,7 @@ func TestEventQUnknownCommand(t *testing.T) {
 	q := startQ(t, logger.NewMemLogger())
 	defer stopQ(t, q)
 
-	resp, _ := q.PushCommand(protocol.NewCommand(config, 100))
+	resp, _ := q.PushCommand(context.Background(), protocol.NewCommand(config, 100))
 	checkErrResp(t, resp)
 }
 
@@ -482,17 +473,17 @@ func TestEventQSleep(t *testing.T) {
 	q := startQ(t, logger.NewMemLogger())
 	defer stopQ(t, q)
 
-	resp, err := q.PushCommand(protocol.NewCommand(config, protocol.CmdSleep, []byte("0")))
+	resp, err := q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdSleep, []byte("0")))
 	checkNoErrAndSuccess(t, resp, err)
 
-	resp, err = q.PushCommand(protocol.NewCommand(config, protocol.CmdSleep, []byte("1")))
+	resp, err = q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdSleep, []byte("1")))
 	checkNoErrAndSuccess(t, resp, err)
 
 	done := make(chan struct{})
 	sleepCmd := protocol.NewCommand(config, protocol.CmdSleep, []byte("100"))
 
 	go func() {
-		resp, err = q.PushCommand(sleepCmd)
+		resp, err = q.PushCommand(context.Background(), sleepCmd)
 		checkNoErrAndSuccess(t, resp, err)
 		done <- struct{}{}
 	}()

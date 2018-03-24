@@ -44,8 +44,8 @@ var DefaultConfig *Config
 
 func init() {
 	DefaultConfig = NewConfig()
-	DefaultConfig.ServerTimeout = 500
-	DefaultConfig.ClientTimeout = 500
+	DefaultConfig.ServerTimeout = 1000
+	DefaultConfig.ClientTimeout = 1000
 	DefaultConfig.LogFile = "__log"
 	DefaultConfig.LogFileMode = 0644
 	DefaultConfig.MaxChunkSize = 1024 * 1024 * 2

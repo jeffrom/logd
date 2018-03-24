@@ -168,12 +168,17 @@ func doReadCmdAction(conf *config.Config) func(c *cli.Context) error {
 		}
 
 		// fmt.Printf("Reading %d messages from id %d\n", limit, start)
+
 		scanner, err := c.DoRead(start, limit)
 		if err != nil {
 			log.Printf("%+v", err)
 			return cli.NewExitError(err, 2)
 		}
 
+		timeout := time.Duration(conf.ClientTimeout) * time.Millisecond
+		if srerr := c.SetReadDeadline(time.Now().Add(timeout)); srerr != nil {
+			panic(srerr)
+		}
 		for scanner.Scan() {
 			msg := scanner.Message()
 			fmt.Printf("%d %s\n", msg.ID, msg.Body)
@@ -188,6 +193,8 @@ func doReadCmdAction(conf *config.Config) func(c *cli.Context) error {
 
 		if conf.ReadForever {
 			for {
+				// fmt.Printf("waiting for more log entries\n")
+
 				select {
 				case <-sigc:
 					return nil

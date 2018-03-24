@@ -112,7 +112,6 @@ type Command struct {
 	RespC  chan *Response
 
 	ready chan struct{}
-	Done  chan struct{}
 	Wake  chan struct{}
 }
 
@@ -124,7 +123,6 @@ func NewCommand(conf *config.Config, name CmdType, args ...[]byte) *Command {
 		Args:   args,
 		RespC:  make(chan *Response, 1),
 		ready:  make(chan struct{}, 1),
-		Done:   make(chan struct{}),
 		Wake:   make(chan struct{}),
 	}
 	return c
@@ -165,18 +163,6 @@ func (cmd *Command) Respond(resp *Response) {
 	// cmd.RespC = nil
 }
 
-func (cmd *Command) Finish() {
-	if cmd.Done == nil {
-		return
-	}
-	select {
-	case cmd.Done <- struct{}{}:
-		internal.Debugf(cmd.config, "cmd %s <-Done", cmd)
-	default:
-		internal.Debugf(cmd.config, "tried but failed to finish command %s", cmd)
-	}
-}
-
 func (cmd *Command) SignalReady() {
 	internal.Debugf(cmd.config, "signalling command %s readiness", cmd)
 	cmd.ready <- struct{}{}
@@ -190,11 +176,15 @@ func (cmd *Command) WaitForReady() {
 		// 	log.Printf("timed out waiting for read command to be ready")
 		// 	return
 	}
-
+	internal.Debugf(cmd.config, "command %s ready", cmd)
 }
 
 func (cmd *Command) CancelSleep() {
 	cmd.Wake <- struct{}{}
+}
+
+func (cmd *Command) IsRead() bool {
+	return cmd.Name == CmdRead || cmd.Name == CmdTail
 }
 
 // ParseNumber parses a uint64 from bytes

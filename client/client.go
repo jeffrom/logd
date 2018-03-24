@@ -99,6 +99,10 @@ func (c *Client) DoRead(id uint64, limit int) (*protocol.ProtocolScanner, error)
 		[]byte(fmt.Sprintf("%d", id)),
 		[]byte(fmt.Sprintf("%d", limit)),
 	)
+	timeout := time.Duration(c.config.ClientTimeout) * time.Millisecond
+	if err := c.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+		return nil, err
+	}
 	if err := c.WriteCommand(cmd); c.handleErr(err) != nil {
 		return nil, err
 	}
@@ -198,8 +202,10 @@ func (c *Client) readScanResponse(forever bool) (*protocol.ProtocolScanner, erro
 
 	internal.Debugf(c.config, "initial scan response: %s", resp.Status)
 
-	if err := c.Conn.SetReadDeadline(time.Now().Add(c.readTimeout)); err != nil {
-		return nil, err
+	if !forever {
+		if err := c.Conn.SetReadDeadline(time.Now().Add(c.readTimeout)); err != nil {
+			return nil, err
+		}
 	}
 	return protocol.NewProtocolScanner(c.config, c.pr.Br), nil
 }

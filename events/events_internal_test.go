@@ -5,6 +5,7 @@ package events
 // testing an internal command that should only be used for testing
 
 import (
+	"context"
 	"testing"
 
 	"github.com/jeffrom/logd/logger"
@@ -16,7 +17,7 @@ func TestEventQShutdown(t *testing.T) {
 	t.SkipNow()
 	config := testhelper.DefaultTestConfig(testing.Verbose())
 	q := startQ(t, logger.NewMemLogger())
-	resp, err := q.PushCommand(protocol.NewCommand(config, protocol.CmdShutdown))
+	resp, err := q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdShutdown))
 	checkNoErrAndSuccess(t, resp, err)
 
 	defer func() {
@@ -25,5 +26,5 @@ func TestEventQShutdown(t *testing.T) {
 		}
 	}()
 
-	q.PushCommand(protocol.NewCommand(config, protocol.CmdPing))
+	q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdPing))
 }

@@ -1,6 +1,8 @@
 package events
 
 import (
+	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -69,7 +71,7 @@ func BenchmarkEventQPing(b *testing.B) {
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		q.PushCommand(protocol.NewCommand(config, protocol.CmdPing))
+		q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdPing))
 	}
 }
 
@@ -83,7 +85,14 @@ func BenchmarkEventQLogOne(b *testing.B) {
 	msg := []byte("hey i'm a message")
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		q.PushCommand(protocol.NewCommand(config, protocol.CmdMessage, msg))
+		resp, err := q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdMessage, msg))
+		if err != nil {
+			panic(err)
+		}
+
+		if resp.Status != protocol.RespOK {
+			log.Panicf("expected ok response but got %s", resp)
+		}
 	}
 }
 
@@ -97,23 +106,32 @@ func BenchmarkEventQLogFive(b *testing.B) {
 	msg := []byte("hey i'm a message")
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		q.PushCommand(protocol.NewCommand(config, protocol.CmdMessage, msg, msg, msg, msg, msg))
+		resp, err := q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdMessage, msg, msg, msg, msg, msg))
+		if err != nil {
+			panic(err)
+		}
+
+		if resp.Status != protocol.RespOK {
+			log.Panicf("expected ok response but got %s", resp)
+		}
 	}
 }
 
 func BenchmarkEventQReadOne(b *testing.B) {
+	b.SkipNow()
 	b.StopTimer()
 	config := eventQBenchConfig()
 	q, shutdown := startQForBench(b)
 	defer shutdown()
 	defer stopQ(b, q)
 
-	q.PushCommand(protocol.NewCommand(config, protocol.CmdMessage, []byte("hey i'm a message")))
+	q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdMessage, []byte("hey i'm a message")))
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
+		fmt.Println(i)
 		cmd := protocol.NewCommand(config, protocol.CmdRead, []byte("1"), []byte("1"))
-		resp, _ := q.PushCommand(cmd)
+		resp, _ := q.PushCommand(context.Background(), cmd)
 		cmd.SignalReady()
 		drainReaderChan(resp.ReaderC)
 	}
@@ -126,16 +144,16 @@ func BenchmarkEventQReadFromHeadOne(b *testing.B) {
 	defer shutdown()
 	defer stopQ(b, q)
 
-	q.PushCommand(protocol.NewCommand(config, protocol.CmdMessage, []byte("hey i'm a message")))
+	q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdMessage, []byte("hey i'm a message")))
 
 	msg := []byte("hey i'm a message")
 	cmd := protocol.NewCommand(config, protocol.CmdRead, []byte("1"), []byte("0"))
-	resp, _ := q.PushCommand(cmd)
+	resp, _ := q.PushCommand(context.Background(), cmd)
 	cmd.SignalReady()
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		q.PushCommand(protocol.NewCommand(config, protocol.CmdMessage, msg))
+		q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdMessage, msg))
 		drainReaderChan(resp.ReaderC)
 	}
 }
@@ -149,19 +167,19 @@ func BenchmarkEventQReadFromHeadTen(b *testing.B) {
 	defer stopQ(b, q)
 	msg := []byte("hey i'm a message")
 
-	q.PushCommand(protocol.NewCommand(config, protocol.CmdMessage, []byte("hey i'm a message")))
+	q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdMessage, []byte("hey i'm a message")))
 
 	var subs []*protocol.Response
 	for i := 0; i < 10; i++ {
 		cmd := protocol.NewCommand(config, protocol.CmdRead, []byte("1"), []byte("0"))
-		resp, _ := q.PushCommand(cmd)
+		resp, _ := q.PushCommand(context.Background(), cmd)
 		cmd.SignalReady()
 		subs = append(subs, resp)
 	}
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		q.PushCommand(protocol.NewCommand(config, protocol.CmdMessage, msg))
+		q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdMessage, msg))
 		for _, resp := range subs {
 			drainReaderChan(resp.ReaderC)
 		}

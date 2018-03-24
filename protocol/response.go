@@ -77,9 +77,8 @@ type Response struct {
 // NewResponse returns a new instance of a Response
 func NewResponse(conf *config.Config, status RespType) *Response {
 	r := &Response{
-		config:  conf,
-		Status:  status,
-		ReaderC: make(chan io.Reader, 1000),
+		config: conf,
+		Status: status,
 	}
 	return r
 }

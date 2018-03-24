@@ -129,8 +129,11 @@ func (c *Conn) Flush() error {
 
 func (c *Conn) readFrom(r io.Reader) (int64, error) {
 	internal.Debugf(c.config, "%s: Conn.readFrom(%+v)", c.RemoteAddr(), r)
+	if err := c.setWaitForReadFromDeadline(); err != nil {
+		return 0, err
+	}
 	n, err := c.Conn.(*net.TCPConn).ReadFrom(r)
-	return n, err
+	return n, handleConnErr(c.config, err, c)
 }
 
 func (c *Conn) setState(state connState) {
@@ -155,11 +158,14 @@ func (c *Conn) close() error {
 	err := c.Conn.Close()
 
 	// we only care about the channel if we're gracefully shutting down
-	select {
-	case c.done <- struct{}{}:
-	default:
-	}
+	c.done <- struct{}{}
 	return err
+}
+
+func (c *Conn) setWaitForReadFromDeadline() error {
+	timeout := time.Duration(c.config.ServerTimeout) * time.Millisecond
+	err := c.SetWriteDeadline(time.Now().Add(timeout))
+	return handleConnErr(c.config, err, c)
 }
 
 func (c *Conn) setWaitForCmdDeadline() error {

@@ -1,11 +1,13 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"os"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -27,9 +29,6 @@ type SocketServer struct {
 	conns  map[*Conn]bool
 	connMu sync.Mutex
 	connIn chan *Conn
-
-	readTimeout  time.Duration
-	writeTimeout time.Duration
 
 	readyC       chan struct{}
 	stopC        chan struct{}
@@ -146,10 +145,7 @@ func (s *SocketServer) accept() {
 		conn := newServerConn(rawConn, s.config)
 		s.addConn(conn)
 
-		select {
-		case s.connIn <- conn:
-		}
-
+		s.connIn <- conn
 	}
 }
 
@@ -266,7 +262,7 @@ func handleConnErr(config *config.Config, err error, conn *Conn) error {
 	if err == io.EOF {
 		internal.Debugf(config, "%s closed the connection", conn.RemoteAddr())
 	} else if err, ok := err.(net.Error); ok && err.Timeout() {
-		internal.Logf("%s timed out", conn.RemoteAddr())
+		internal.Logf("%s timed out: %s", conn.RemoteAddr(), debug.Stack())
 	} else if err != nil {
 		conn.setState(connStateFailed)
 
@@ -278,7 +274,15 @@ func handleConnErr(config *config.Config, err error, conn *Conn) error {
 func (s *SocketServer) handleConnection(conn *Conn) {
 	s.q.Stats.Incr("connections")
 
+	var (
+		ctx    context.Context
+		cancel context.CancelFunc
+	)
+
+	ctx, cancel = context.WithCancel(context.Background())
+
 	defer func() {
+		cancel()
 		s.q.Stats.Decr("connections")
 
 		s.removeConn(conn)
@@ -311,51 +315,9 @@ func (s *SocketServer) handleConnection(conn *Conn) {
 			break
 		}
 
-		// push to event queue and wait for a result
-		resp, err := s.q.PushCommand(cmd)
-
-		s.q.Stats.Incr("total_commands")
-		if cerr := handleConnErr(s.config, err, conn); cerr != nil {
+		resp, exerr := s.executeCommand(ctx, conn, cmd)
+		if exerr != nil {
 			s.q.Stats.Incr("command_errors")
-			return
-		}
-
-		// now we've waited to hear back from the event queue, so check if we're in shutdown again
-		if s.isShuttingDown() {
-			internal.Debugf(s.config, "closing connection to %s due to shutdown", conn.RemoteAddr())
-			break
-		}
-
-		if s.handleShutdownRequest(conn, cmd, resp) {
-			internal.Debugf(s.config, "shutdown request from %s", conn.RemoteAddr())
-			return
-		}
-
-		respBytes, err := resp.SprintBytes()
-		if err != nil {
-			log.Printf("error formatting response bytes: %+v", err)
-		}
-
-		// send a response
-		if werr := conn.setWriteDeadline(); werr != nil {
-			s.q.Stats.Incr("connection_errors")
-			log.Printf("error setting %s write deadline: %+v", conn.RemoteAddr(), werr)
-			return
-		}
-
-		n, err := s.readPending(conn, resp)
-		s.q.Stats.Add("total_bytes_written", int64(n))
-		if err != nil {
-			log.Printf("%s: error reading pending buffers: %+v", conn.RemoteAddr(), err)
-			return
-		}
-
-		n, err = conn.write(respBytes)
-		s.q.Stats.Add("total_bytes_written", int64(n))
-
-		if handleConnErr(s.config, err, conn) != nil {
-			s.q.Stats.Incr("connection_errors")
-			log.Printf("error writing to %s: %+v", conn.RemoteAddr(), err)
 			return
 		}
 
@@ -366,23 +328,24 @@ func (s *SocketServer) handleConnection(conn *Conn) {
 		}
 
 		// finish the loop if the command was CLOSE/0
-		if s.handleClose(conn, cmd, resp) {
+		if s.handleClose(ctx, conn, cmd, resp) {
 			internal.Debugf(s.config, "closing %s", conn.RemoteAddr())
 			break
 		}
 
 		// handle a single read or go into subscriber state
 		if !resp.Failed() {
-			s.handleRead(conn, cmd, resp)
+			s.handleRead(ctx, conn, cmd, resp)
 		}
 
 		// clean up the request in preparation for the next, or go into
 		// subscriber mode
-		s.finishCommand(conn, cmd, resp)
+		s.finishCommand(ctx, conn, cmd, resp)
 	}
 }
 
 func (s *SocketServer) readCommand(conn *Conn) (*protocol.Command, error) {
+	internal.Debugf(s.config, "waiting to read a new command")
 	cmd, err := conn.pr.ReadCommand(conn)
 	if cmd != nil && conn != nil {
 		cmd.ConnID = conn.id
@@ -390,16 +353,79 @@ func (s *SocketServer) readCommand(conn *Conn) (*protocol.Command, error) {
 	return cmd, err
 }
 
-func (s *SocketServer) finishCommand(conn *Conn, cmd *protocol.Command, resp *protocol.Response) {
-	if cmd.Name == protocol.CmdRead || cmd.Name == protocol.CmdHead {
+func (s *SocketServer) executeCommand(ctx context.Context, conn *Conn, cmd *protocol.Command) (*protocol.Response, error) {
+	timeout := time.Duration(s.config.ServerTimeout) * time.Millisecond
+	cmdCtx, cmdCancel := context.WithTimeout(ctx, timeout)
+	defer cmdCancel()
+
+	// push to event queue and wait for a result
+	resp, err := s.q.PushCommand(cmdCtx, cmd)
+
+	s.q.Stats.Incr("total_commands")
+	if cerr := handleConnErr(s.config, err, conn); cerr != nil {
+		s.q.Stats.Incr("command_errors")
+		return resp, cerr
+	}
+
+	// now we've waited to hear back from the event queue, so check if we're in shutdown again
+	if s.isShuttingDown() {
+		internal.Debugf(s.config, "closing connection to %s due to shutdown", conn.RemoteAddr())
+		return resp, nil
+	}
+
+	if s.handleShutdownRequest(conn, cmd, resp) {
+		internal.Debugf(s.config, "shutdown request from %s", conn.RemoteAddr())
+		return resp, nil
+	}
+
+	respBytes, err := resp.SprintBytes()
+	if err != nil {
+		log.Printf("error formatting response bytes: %+v", err)
+		return resp, err
+	}
+
+	// create a new reader channel now if we're reading. if a previous readerC
+	// was here, we don't care about it anymore
+	if cmd.IsRead() {
+		resp.ReaderC = make(chan io.Reader, 1000)
+	}
+
+	// send a response
+	if werr := conn.setWriteDeadline(); werr != nil {
+		s.q.Stats.Incr("connection_errors")
+		log.Printf("error setting %s write deadline: %+v", conn.RemoteAddr(), werr)
+		return resp, werr
+	}
+
+	n, err := s.readPending(ctx, conn, resp)
+	s.q.Stats.Add("total_bytes_written", int64(n))
+	if err != nil {
+		log.Printf("%s: error reading pending buffers: %+v", conn.RemoteAddr(), err)
+		return resp, err
+	}
+
+	n, err = conn.write(respBytes)
+	s.q.Stats.Add("total_bytes_written", int64(n))
+
+	if herr := handleConnErr(s.config, err, conn); herr != nil {
+		s.q.Stats.Incr("connection_errors")
+		log.Printf("error writing to %s: %+v", conn.RemoteAddr(), err)
+		return resp, herr
+	}
+
+	return resp, nil
+}
+
+func (s *SocketServer) finishCommand(ctx context.Context, conn *Conn, cmd *protocol.Command, resp *protocol.Response) {
+	if cmd.IsRead() {
 		return
 	}
 
 	conn.setState(connStateInactive)
 }
 
-func (s *SocketServer) handleRead(conn *Conn, cmd *protocol.Command, resp *protocol.Response) {
-	if cmd.Name != protocol.CmdRead && cmd.Name != protocol.CmdTail {
+func (s *SocketServer) handleRead(ctx context.Context, conn *Conn, cmd *protocol.Command, resp *protocol.Response) {
+	if !cmd.IsRead() {
 		return
 	}
 
@@ -412,11 +438,15 @@ func (s *SocketServer) handleRead(conn *Conn, cmd *protocol.Command, resp *proto
 		return
 	}
 
-	go s.handleSubscriber(conn, cmd, resp)
+	go s.handleSubscriber(ctx, conn, cmd, resp)
 }
 
-func (s *SocketServer) handleClose(conn *Conn, cmd *protocol.Command, resp *protocol.Response) bool {
-	return cmd.Name == protocol.CmdClose
+func (s *SocketServer) handleClose(ctx context.Context, conn *Conn, cmd *protocol.Command, resp *protocol.Response) bool {
+	if cmd.Name != protocol.CmdClose {
+		return false
+	}
+
+	return true
 }
 
 func (s *SocketServer) handleShutdownRequest(conn *Conn, cmd *protocol.Command, resp *protocol.Response) bool {
@@ -431,44 +461,49 @@ func (s *SocketServer) handleShutdownRequest(conn *Conn, cmd *protocol.Command, 
 	return false
 }
 
-func (s *SocketServer) handleSubscriber(conn *Conn, cmd *protocol.Command, resp *protocol.Response) {
+func (s *SocketServer) handleSubscriber(ctx context.Context, conn *Conn, cmd *protocol.Command, resp *protocol.Response) {
 	s.q.Stats.Incr("subscriptions")
 	s.q.Stats.Incr("total_subscriptions")
+
+	subCtx, subCancel := context.WithCancel(ctx)
+
 	defer func() {
 		s.q.Stats.Decr("subscriptions")
-		if _, err := s.readPending(conn, resp); err != nil {
+		if _, err := s.readPending(subCtx, conn, resp); err != nil {
 			log.Printf("%s: error reading pending buffers: %+v", conn.RemoteAddr(), err)
 		}
-		if err := conn.close(); err != nil {
-			internal.Debugf(s.config, "error closing subscriber connection: %+v", err)
+
+		conn.mu.Lock()
+		if err := conn.Flush(); err != nil {
+			log.Printf("failed to flush connection while closing (connection was probably closed by the client): %+v", err)
 		}
+		conn.mu.Unlock()
+
+		subCancel()
 	}()
 
 	for {
+		internal.Debugf(s.config, "%s: waiting for subscription event", conn.RemoteAddr())
+
 		select {
 		case r := <-resp.ReaderC:
 			internal.Debugf(s.config, "%s <-reader: %+v", conn.RemoteAddr(), r)
 
-			if err := s.sendReader(r, conn); err != nil {
+			if err := s.sendReader(subCtx, r, conn); err != nil {
+				log.Printf("%s: error sending reader: %+v", conn.RemoteAddr(), err)
 				return
 			}
 
-		case <-cmd.Done:
-			close(cmd.Done)
-			cmd.Done = nil
+		case <-ctx.Done():
+			internal.Debugf(s.config, "%s: subscriber context received <-Done", conn.RemoteAddr())
 
-			internal.Debugf(s.config, "%s: received <-Done", conn.RemoteAddr())
-			conn.mu.Lock()
-			if err := conn.Flush(); err != nil {
-				log.Printf("failed to flush connection while closing (connection was probably closed by the client): %+v", err)
-			}
-			conn.mu.Unlock()
+			close(resp.ReaderC)
 			return
 		}
 	}
 }
 
-func (s *SocketServer) sendReader(r io.Reader, conn *Conn) error {
+func (s *SocketServer) sendReader(ctx context.Context, r io.Reader, conn *Conn) error {
 	n, err := conn.readFrom(r)
 	s.q.Stats.Add("total_bytes_written", int64(n))
 	if err != nil {
@@ -476,16 +511,12 @@ func (s *SocketServer) sendReader(r io.Reader, conn *Conn) error {
 		return err
 	}
 
-	// err = conn.Flush()
-	// if err != nil {
-	// 	log.Printf("%s error: %+v", conn.RemoteAddr(), err)
-	// }
-
 	// unwrap the os.file, same as go stdlib sendfile optimization logic
 	lr, ok := r.(*io.LimitedReader)
 	if ok {
 		r = lr.R
 	}
+
 	f, ok := r.(*os.File)
 	if ok {
 		internal.Debugf(s.config, "%s: closing %s", conn.RemoteAddr(), f.Name())
@@ -494,11 +525,10 @@ func (s *SocketServer) sendReader(r io.Reader, conn *Conn) error {
 			return cerr
 		}
 	}
-	// return err
 	return nil
 }
 
-func (s *SocketServer) readPending(c *Conn, resp *protocol.Response) (int64, error) {
+func (s *SocketServer) readPending(ctx context.Context, c *Conn, resp *protocol.Response) (int64, error) {
 	// prevState := c.getState()
 	// c.setState(connStateReading)
 	// defer c.setState(prevState)
@@ -520,6 +550,8 @@ Loop:
 			if rerr != nil {
 				return read, rerr
 			}
+		case <-ctx.Done():
+			break Loop
 		default:
 			break Loop
 		}

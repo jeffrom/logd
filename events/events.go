@@ -2,6 +2,7 @@ package events
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -74,6 +75,8 @@ func (q *EventQ) Start() error {
 
 func (q *EventQ) loop() {
 	for {
+		internal.Debugf(q.config, "waiting for event")
+
 		select {
 		case cmd := <-q.in:
 			internal.Debugf(q.config, "event: %s(%q)", cmd, cmd.Args)
@@ -280,13 +283,12 @@ func (q *EventQ) doRead(cmd *protocol.Command, iterator logger.LogRangeIterator,
 	cmd.WaitForReady()
 
 	internal.Debugf(q.config, "adding subscription for %s", cmd.ConnID)
-	q.subscriptions[cmd.ConnID] = newSubscription(q.config, resp.ReaderC, cmd.Done)
+	q.subscriptions[cmd.ConnID] = newSubscription(q.config, resp.ReaderC)
 
 	for iterator.Next() {
 		if err := iterator.Error(); err != nil {
 			log.Printf("failed to read log range iterator: %+v", err)
 			resp.SendEOF()
-			cmd.Finish()
 			return
 		}
 		q.sendChunk(iterator.LogFile(), resp.ReaderC)
@@ -294,7 +296,6 @@ func (q *EventQ) doRead(cmd *protocol.Command, iterator logger.LogRangeIterator,
 
 	if !forever {
 		resp.SendEOF()
-		cmd.Finish()
 	}
 }
 
@@ -311,8 +312,7 @@ func (q *EventQ) sendChunk(lf logger.LogReadableFile, readerC chan io.Reader) {
 	// buflen does not take seek position into account
 
 	f := lf.AsFile()
-	reader := bytes.NewReader([]byte(fmt.Sprintf("+%d\r\n", buflen)))
-	readerC <- reader
+	readerC <- bytes.NewReader([]byte(fmt.Sprintf("+%d\r\n", buflen)))
 	readerC <- io.LimitReader(f, buflen)
 
 	internal.Debugf(q.config, "readerC <-%s: %d bytes", f.Name(), buflen)
@@ -385,9 +385,6 @@ func (q *EventQ) handleClose(cmd *protocol.Command) {
 }
 
 func (q *EventQ) removeSubscription(cmd *protocol.Command) {
-	if sub, ok := q.subscriptions[cmd.ConnID]; ok {
-		sub.finish()
-	}
 	delete(q.subscriptions, cmd.ConnID)
 }
 
@@ -423,9 +420,12 @@ func (q *EventQ) HandleShutdown(cmd *protocol.Command) error {
 	return nil
 }
 
-func (q *EventQ) PushCommand(cmd *protocol.Command) (*protocol.Response, error) {
+func (q *EventQ) PushCommand(ctx context.Context, cmd *protocol.Command) (*protocol.Response, error) {
 	select {
 	case q.in <- cmd:
+	case <-ctx.Done():
+		internal.Debugf(q.config, "command %s cancelled", cmd)
+		return nil, errors.New("command cancelled")
 	}
 
 	select {
@@ -441,27 +441,16 @@ func (q *EventQ) PushCommand(cmd *protocol.Command) (*protocol.Response, error) 
 type Subscription struct {
 	config  *config.Config
 	readerC chan io.Reader
-	done    chan struct{}
 }
 
-func newSubscription(config *config.Config, readerC chan io.Reader, done chan struct{}) *Subscription {
+func newSubscription(config *config.Config, readerC chan io.Reader) *Subscription {
 	return &Subscription{
 		config:  config,
 		readerC: readerC,
-		done:    done,
 	}
 }
 
 func (subs *Subscription) send(msg []byte) {
 	// fmt.Printf("<-bytes %q (subscription)\n", prettybuf(msg))
 	subs.readerC <- bytes.NewReader(msg)
-}
-
-func (subs *Subscription) finish() {
-	select {
-	case subs.done <- struct{}{}:
-		internal.Debugf(subs.config, "subscription <-done")
-	default:
-		internal.Debugf(subs.config, "tried but failed to close subscription")
-	}
 }

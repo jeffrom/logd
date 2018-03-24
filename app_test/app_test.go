@@ -266,8 +266,8 @@ func TestApp(t *testing.T) {
 	configs := []*config.Config{
 		config.DefaultConfig,
 		&config.Config{
-			ServerTimeout:   500,
-			ClientTimeout:   500,
+			ServerTimeout:   1000,
+			ClientTimeout:   1000,
 			LogFileMode:     0644,
 			MaxChunkSize:    1024 * 1024,
 			PartitionSize:   1024 * 1024,
@@ -398,9 +398,11 @@ func testServerTail(t *testing.T, conf *config.Config) {
 
 	old := conf.ReadFromTail
 	conf.ReadFromTail = true
+	defer func() {
+		conf.ReadFromTail = old
+	}()
 	scanner, err := c.DoRead(1, 1)
 	testhelper.CheckError(err)
-	conf.ReadFromTail = old
 
 	expectLineMatch(t, scanner, msg)
 }

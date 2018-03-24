@@ -32,8 +32,8 @@ func DefaultTestConfig(verbose bool) *config.Config {
 
 	return &config.Config{
 		Verbose:         verbose,
-		ServerTimeout:   500,
-		ClientTimeout:   500,
+		ServerTimeout:   1000,
+		ClientTimeout:   1000,
 		LogFileMode:     0644,
 		LogFile:         TmpLog(),
 		MaxChunkSize:    1024 * 1024 * 2,
