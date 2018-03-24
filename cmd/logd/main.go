@@ -125,7 +125,7 @@ func runApp(args []string) {
 			return nil
 		}
 
-		srv := server.NewServer(conf.Hostport, conf)
+		srv := server.NewSocket(conf.Hostport, conf)
 
 		stopC := make(chan os.Signal, 1)
 		signal.Notify(stopC, os.Interrupt, syscall.SIGTERM)

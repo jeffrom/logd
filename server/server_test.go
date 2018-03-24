@@ -16,7 +16,7 @@ func init() {
 	flag.Parse()
 }
 
-func newTestClient(config *config.Config, srv *SocketServer) *client.Client {
+func newTestClient(config *config.Config, srv *Socket) *client.Client {
 	if config == nil {
 		config = testhelper.DefaultTestConfig(testing.Verbose())
 	}
@@ -28,14 +28,14 @@ func newTestClient(config *config.Config, srv *SocketServer) *client.Client {
 	return conn
 }
 
-func NewTestServer(config *config.Config) *SocketServer {
-	srv := NewServer("127.0.0.1:0", config)
+func NewTestServer(config *config.Config) *Socket {
+	srv := NewSocket("127.0.0.1:0", config)
 	srv.GoServe()
 
 	return srv
 }
 
-func CloseTestServer(t testing.TB, srv *SocketServer) {
+func CloseTestServer(t testing.TB, srv *Socket) {
 	srv.Stop()
 	srv.connMu.Lock()
 	defer srv.connMu.Unlock()

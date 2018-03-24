@@ -32,13 +32,13 @@ func runTest(t *testing.T, name string, f func(t *testing.T, c *config.Config), 
 	// log.Printf("coverage: %.1f%% of statements", testing.Coverage()*100.00)
 }
 
-func newTestServer(conf *config.Config) *server.SocketServer {
-	srv := server.NewServer(conf.Hostport, conf)
+func newTestServer(conf *config.Config) *server.Socket {
+	srv := server.NewSocket(conf.Hostport, conf)
 	srv.GoServe()
 	return srv
 }
 
-func newTestClient(conf *config.Config, srv *server.SocketServer) *client.Client {
+func newTestClient(conf *config.Config, srv *server.Socket) *client.Client {
 	conn, err := client.DialConfig(srv.ListenAddress().String(), conf)
 	if err != nil {
 		log.Fatal(logWithStack("%v", err))
@@ -52,7 +52,7 @@ func failOnError(t *testing.T, err error) {
 	}
 }
 
-func stopServer(t *testing.T, srv *server.SocketServer) {
+func stopServer(t *testing.T, srv *server.Socket) {
 	if err := srv.Stop(); err != nil {
 		t.Fatalf("%+v", err)
 	}
@@ -61,7 +61,26 @@ func stopServer(t *testing.T, srv *server.SocketServer) {
 	}
 }
 
-func expectNoConnections(srv *server.SocketServer) error {
+func waitForNoConnections(srv *server.Socket) error {
+	errC := make(chan error)
+	go func() {
+		if conns := srv.Conns(); len(conns) > 0 {
+			errC <- errors.New("unclosed client connections")
+		} else {
+			errC <- nil
+		}
+	}()
+
+	select {
+	case err := <-errC:
+		return err
+	// TODO: graceful shutdown timeout
+	case <-time.After(1000 * time.Millisecond):
+		return errors.New("timed out waiting for connections to close")
+	}
+}
+
+func expectNoConnections(srv *server.Socket) error {
 	if conns := srv.Conns(); len(conns) > 0 {
 		return errors.New("unclosed client connections")
 	}
@@ -307,7 +326,7 @@ func testServerClientConnect(t *testing.T, conf *config.Config) {
 	c := newTestClient(conf, srv)
 	c.Close()
 
-	if err := expectNoConnections(srv); err != nil {
+	if err := waitForNoConnections(srv); err != nil {
 		t.Fatalf("%+v", err)
 	}
 }
