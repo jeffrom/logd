@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -285,13 +286,14 @@ func TestApp(t *testing.T) {
 	configs := []*config.Config{
 		config.DefaultConfig,
 		&config.Config{
-			ServerTimeout:   1000,
-			ClientTimeout:   1000,
-			LogFileMode:     0644,
-			MaxChunkSize:    1024 * 1024,
-			PartitionSize:   1024 * 1024,
-			IndexCursorSize: 10,
-			MaxPartitions:   5,
+			ServerTimeout:           1000,
+			ClientTimeout:           1000,
+			GracefulShutdownTimeout: 1000,
+			LogFileMode:             0644,
+			MaxChunkSize:            1024 * 1024,
+			PartitionSize:           1024 * 1024,
+			IndexCursorSize:         10,
+			MaxPartitions:           5,
 		},
 	}
 
@@ -311,6 +313,7 @@ func TestApp(t *testing.T) {
 		runTest(t, "invalid requests", testServerInvalidRequests, conf)
 		runTest(t, "writes partitions", testServerWritePartition, conf)
 		runTest(t, "concurrent writes", testConcurrentWrites, conf)
+		runTest(t, "graceful shutdown", testGracefulShutdown, conf)
 	}
 }
 
@@ -643,5 +646,58 @@ func testConcurrentWrites(t *testing.T, conf *config.Config) {
 
 	if nread != total {
 		t.Fatalf("expected to read %d message but only read %d", total, nread)
+	}
+}
+
+type commandArgs struct {
+	kind protocol.CmdType
+	args []string
+}
+
+var someCommands []commandArgs = []commandArgs{
+	{protocol.CmdPing, nil},
+	{protocol.CmdHead, nil},
+	{protocol.CmdClose, nil},
+	{protocol.CmdStats, nil},
+	{protocol.CmdMessage, []string{"cool message"}},
+	// {protocol.CmdRead, []string{"1", "1"}},
+	// {protocol.CmdTail, []string{"1", "1"}},
+	{protocol.CmdSleep, []string{"100"}},
+}
+
+func randomCommand(conf *config.Config) *protocol.Command {
+	raw := someCommands[rand.Intn(len(someCommands))]
+	var args [][]byte
+	for _, arg := range raw.args {
+		args = append(args, []byte(arg))
+	}
+	return protocol.NewCommand(conf, raw.kind, args...)
+}
+
+func testGracefulShutdown(t *testing.T, conf *config.Config) {
+	for n := 0; n < 5; n++ {
+		srv := newTestServer(conf)
+		wg := sync.WaitGroup{}
+
+		for i := 0; i < 10; i++ {
+			wg.Add(1)
+			go func() {
+				c := newTestClient(conf, srv)
+				defer wg.Done()
+
+				cmd := randomCommand(conf)
+				c.Do(cmd)
+			}()
+		}
+
+		if err := srv.Stop(); err != nil {
+			t.Fatalf("unexpected error: %+v", err)
+		}
+
+		if err := expectNoConnections(srv); err != nil {
+			t.Fatalf("leftover connections after shutdown")
+		}
+
+		wg.Wait()
 	}
 }

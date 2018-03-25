@@ -184,7 +184,7 @@ func (s *Socket) shutdown() error {
 				select {
 				case <-c.done:
 					internal.Debugf(s.config, "%s closed gracefully", c.RemoteAddr())
-				case <-time.After(1 * time.Second): // XXX config timeout
+				case <-time.After(time.Duration(s.config.GracefulShutdownTimeout) * time.Millisecond):
 					log.Printf("%s timed out", c.RemoteAddr())
 				}
 			}

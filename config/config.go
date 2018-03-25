@@ -6,18 +6,19 @@ import (
 
 // Config holds configuration variables
 type Config struct {
-	Verbose             bool   `json:"verbose"`
-	CanShutdown         bool   `json:"can_shutdown"`
-	Hostport            string `json:"host"`
-	ServerTimeout       uint   `json:"server_timeout"`
-	ClientTimeout       uint   `json:"client_timeout"`
-	LogFile             string `json:"log_file"`
-	LogFileMode         int    `json:"log_file_mode"`
-	MaxChunkSize        int    `json:"max_chunk_size"`
-	PartitionSize       int    `json:"partition_size"`
-	MaxPartitions       int    `json:"max_partitions"`
-	PartitionDeleteHook string `json:"partition_delete_hook"`
-	IndexCursorSize     uint64 `json:"index_cursor_size"`
+	Verbose                 bool   `json:"verbose"`
+	CanShutdown             bool   `json:"can_shutdown"`
+	Hostport                string `json:"host"`
+	ServerTimeout           uint   `json:"server_timeout"`
+	ClientTimeout           uint   `json:"client_timeout"`
+	GracefulShutdownTimeout uint   `json:"graceful_shutdown_timeout"`
+	LogFile                 string `json:"log_file"`
+	LogFileMode             int    `json:"log_file_mode"`
+	MaxChunkSize            int    `json:"max_chunk_size"`
+	PartitionSize           int    `json:"partition_size"`
+	MaxPartitions           int    `json:"max_partitions"`
+	PartitionDeleteHook     string `json:"partition_delete_hook"`
+	IndexCursorSize         uint64 `json:"index_cursor_size"`
 
 	// client configs
 	StartID      uint64 `json:"start"`
@@ -46,6 +47,7 @@ func init() {
 	DefaultConfig = NewConfig()
 	DefaultConfig.ServerTimeout = 1000
 	DefaultConfig.ClientTimeout = 1000
+	DefaultConfig.GracefulShutdownTimeout = 1000
 	DefaultConfig.LogFile = "__log"
 	DefaultConfig.LogFileMode = 0644
 	DefaultConfig.MaxChunkSize = 1024 * 1024 * 2

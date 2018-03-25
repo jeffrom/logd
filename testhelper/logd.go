@@ -31,15 +31,16 @@ var BenjaminLines = [][]byte{
 func DefaultTestConfig(verbose bool) *config.Config {
 
 	return &config.Config{
-		Verbose:         verbose,
-		ServerTimeout:   1000,
-		ClientTimeout:   1000,
-		LogFileMode:     0644,
-		LogFile:         TmpLog(),
-		MaxChunkSize:    1024 * 1024 * 2,
-		PartitionSize:   1024 * 1024 * 2,
-		IndexCursorSize: 100,
-		MaxPartitions:   5,
+		Verbose:                 verbose,
+		ServerTimeout:           1000,
+		ClientTimeout:           1000,
+		GracefulShutdownTimeout: 1000,
+		LogFileMode:             0644,
+		LogFile:                 TmpLog(),
+		MaxChunkSize:            1024 * 1024 * 2,
+		PartitionSize:           1024 * 1024 * 2,
+		IndexCursorSize:         100,
+		MaxPartitions:           5,
 	}
 }
 
