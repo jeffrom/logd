@@ -282,7 +282,9 @@ func readLastFromBytes(conf *config.Config, fname string) *protocol.Message {
 	}
 	return msg
 }
+
 func TestApp(t *testing.T) {
+	t.SkipNow()
 	configs := []*config.Config{
 		config.DefaultConfig,
 		&config.Config{
@@ -317,9 +319,43 @@ func TestApp(t *testing.T) {
 	}
 }
 
+func getConfigs() map[string]*config.Config {
+	return map[string]*config.Config{
+		"default": config.DefaultConfig,
+		"simple": &config.Config{
+			ServerTimeout:           1000,
+			ClientTimeout:           1000,
+			GracefulShutdownTimeout: 1000,
+			LogFileMode:             0644,
+			MaxChunkSize:            1024 * 1024,
+			PartitionSize:           1024 * 1024,
+			IndexCursorSize:         10,
+			MaxPartitions:           5,
+		},
+	}
+}
+
+func runTestConfs(t *testing.T, tf func(t *testing.T, c *config.Config)) {
+	for label, conf := range getConfigs() {
+		conf.Verbose = testing.Verbose()
+		conf.LogFile = testhelper.TmpLog()
+
+		t.Logf("config %s: %s", label, conf)
+		tf(t, conf)
+	}
+}
+
+func TestServerStartStop(t *testing.T) {
+	runTestConfs(t, testServerStartStop)
+}
+
 func testServerStartStop(t *testing.T, conf *config.Config) {
 	srv := newTestServer(conf)
 	stopServer(t, srv)
+}
+
+func TestServerClientConnect(t *testing.T) {
+	runTestConfs(t, testServerClientConnect)
 }
 
 func testServerClientConnect(t *testing.T, conf *config.Config) {
@@ -332,6 +368,10 @@ func testServerClientConnect(t *testing.T, conf *config.Config) {
 	if err := waitForNoConnections(srv); err != nil {
 		t.Fatalf("%+v", err)
 	}
+}
+
+func TestServerPing(t *testing.T) {
+	runTestConfs(t, testServerPing)
 }
 
 func testServerPing(t *testing.T, conf *config.Config) {
@@ -349,6 +389,10 @@ func testServerPing(t *testing.T, conf *config.Config) {
 	}
 }
 
+func TestServerMsg(t *testing.T) {
+	runTestConfs(t, testServerMsg)
+}
+
 func testServerMsg(t *testing.T, conf *config.Config) {
 	srv := newTestServer(conf)
 	defer stopServer(t, srv)
@@ -360,6 +404,10 @@ func testServerMsg(t *testing.T, conf *config.Config) {
 	testhelper.CheckError(err)
 
 	expectRespOKID(t, resp, 1)
+}
+
+func TestServerRead(t *testing.T) {
+	runTestConfs(t, testServerRead)
 }
 
 func testServerRead(t *testing.T, conf *config.Config) {
@@ -378,6 +426,10 @@ func testServerRead(t *testing.T, conf *config.Config) {
 	testhelper.CheckError(err)
 
 	expectLineMatch(t, scanner, msg)
+}
+
+func TestServerReadNewWrite(t *testing.T) {
+	runTestConfs(t, testServerReadNewWrite)
 }
 
 func testServerReadNewWrite(t *testing.T, conf *config.Config) {
@@ -406,6 +458,10 @@ func testServerReadNewWrite(t *testing.T, conf *config.Config) {
 	expectLineMatch(t, scanner, msg)
 }
 
+func TestServerTail(t *testing.T) {
+	runTestConfs(t, testServerTail)
+}
+
 func testServerTail(t *testing.T, conf *config.Config) {
 	srv := newTestServer(conf)
 	defer stopServer(t, srv)
@@ -427,6 +483,10 @@ func testServerTail(t *testing.T, conf *config.Config) {
 	testhelper.CheckError(err)
 
 	expectLineMatch(t, scanner, msg)
+}
+
+func TestServerTailNewWrite(t *testing.T) {
+	runTestConfs(t, testServerTailNewWrite)
 }
 
 func testServerTailNewWrite(t *testing.T, conf *config.Config) {
@@ -458,6 +518,10 @@ func testServerTailNewWrite(t *testing.T, conf *config.Config) {
 	expectLineMatch(t, scanner, msg)
 }
 
+func TestServerTailFromTail(t *testing.T) {
+	runTestConfs(t, testServerTailFromTail)
+}
+
 func testServerTailFromTail(t *testing.T, conf *config.Config) {
 	old := conf.LogFile
 	conf.LogFile = "testdata/workofart"
@@ -483,6 +547,10 @@ func testServerTailFromTail(t *testing.T, conf *config.Config) {
 	expectLineMatch(t, scanner, msg)
 }
 
+func TestServerSleep(t *testing.T) {
+	runTestConfs(t, testServerSleep)
+}
+
 func testServerSleep(t *testing.T, conf *config.Config) {
 	srv := newTestServer(conf)
 	defer stopServer(t, srv)
@@ -493,6 +561,10 @@ func testServerSleep(t *testing.T, conf *config.Config) {
 	resp, err := c.Do(protocol.NewCommand(conf, protocol.CmdSleep, []byte("1")))
 	testhelper.CheckError(err)
 	expectRespOK(t, resp)
+}
+
+func TestServerInvalidRequests(t *testing.T) {
+	runTestConfs(t, testServerInvalidRequests)
 }
 
 func testServerInvalidRequests(t *testing.T, conf *config.Config) {
@@ -564,6 +636,10 @@ func testServerInvalidRequests(t *testing.T, conf *config.Config) {
 	}
 }
 
+func TestServerWritePartition(t *testing.T) {
+	runTestConfs(t, testServerWritePartition)
+}
+
 func testServerWritePartition(t *testing.T, conf *config.Config) {
 	cmds := createMessageCommands(conf, 500, conf.PartitionSize)
 
@@ -602,6 +678,10 @@ func testServerWritePartition(t *testing.T, conf *config.Config) {
 		c2.Close()
 		stopServer(t, srv)
 	}
+}
+
+func TestConcurrentWrites(t *testing.T) {
+	runTestConfs(t, testConcurrentWrites)
 }
 
 func testConcurrentWrites(t *testing.T, conf *config.Config) {
@@ -672,6 +752,10 @@ func randomCommand(conf *config.Config) *protocol.Command {
 		args = append(args, []byte(arg))
 	}
 	return protocol.NewCommand(conf, raw.kind, args...)
+}
+
+func TestGracefulShutdown(t *testing.T) {
+	runTestConfs(t, testGracefulShutdown)
 }
 
 func testGracefulShutdown(t *testing.T, conf *config.Config) {

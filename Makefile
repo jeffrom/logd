@@ -2,6 +2,7 @@
 PKGS ?= $(shell go list ./...)
 SHORT_PKGS ?= $(shell go list -f '{{.Name}}' ./... | grep -v main)
 PKG_DIRS ?= $(shell go list -f '{{.Dir}}' ./...)
+WITHOUT_APPTEST ?= $(shell go list -f '{{.Name}}' ./... | grep -v main | grep -v app$$)
 
 GENERATED_FILES ?= __log* testdata/*.actual.golden logd.test log-cli.test *.pprof
 
@@ -62,7 +63,8 @@ test.race:
 
 .PHONY: test.cover
 test.cover:
-	go test -cover $(PKGS)
+	$(foreach pkg,$(WITHOUT_APPTEST),go test -outputdir=../report -cover ./$(pkg);)
+	go test -cover -coverpkg ./... ./...
 
 .PHONY: test.coverprofile
 test.coverprofile:
