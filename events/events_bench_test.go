@@ -137,7 +137,8 @@ func BenchmarkEventQReadOne(b *testing.B) {
 	}
 }
 
-func BenchmarkEventQReadFromHeadOne(b *testing.B) {
+func BenchmarkEventQReadFromTailOne(b *testing.B) {
+	b.SkipNow()
 	b.StopTimer()
 	config := eventQBenchConfig()
 	q, shutdown := startQForBench(b)
@@ -148,13 +149,24 @@ func BenchmarkEventQReadFromHeadOne(b *testing.B) {
 
 	msg := []byte("hey i'm a message")
 	cmd := protocol.NewCommand(config, protocol.CmdRead, []byte("1"), []byte("0"))
-	resp, _ := q.PushCommand(context.Background(), cmd)
+	resp, err := q.PushCommand(context.Background(), cmd)
+	testhelper.CheckError(err)
+	if resp.Status != protocol.RespOK {
+		panic("unexpected failure response")
+	}
 	cmd.SignalReady()
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdMessage, msg))
+		cmd := protocol.NewCommand(config, protocol.CmdMessage, msg)
+		ctx, cancel := context.WithCancel(context.Background())
+		resp, err := q.PushCommand(ctx, cmd)
+		testhelper.CheckError(err)
+		if resp.Status != protocol.RespOK {
+			panic("unexpected failure response")
+		}
 		drainReaderChan(resp.ReaderC)
+		cancel()
 	}
 }
 
@@ -192,7 +204,7 @@ func drainReaderChan(readerC chan io.Reader) {
 		select {
 		case <-readerC:
 			n++
-		case <-time.After(time.Millisecond * 200):
+		case <-time.After(time.Millisecond * 500):
 			panic("timed out waiting for messages on readerC")
 		default:
 			if n > 0 {

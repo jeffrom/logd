@@ -121,8 +121,8 @@ func NewCommand(conf *config.Config, name CmdType, args ...[]byte) *Command {
 		config: conf,
 		Name:   name,
 		Args:   args,
-		RespC:  make(chan *Response, 1),
-		ready:  make(chan struct{}, 1),
+		RespC:  make(chan *Response),
+		ready:  make(chan struct{}),
 		Wake:   make(chan struct{}),
 	}
 	return c
