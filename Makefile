@@ -99,7 +99,7 @@ bench:
 	mkdir -p report
 	# ./script/benchmark.sh
 	# $(foreach pkg,$(SHORT_PKGS),go test -bench=$(BENCH) -cpuprofile=$(pkg).cpu.pprof -memprofile=$(pkg).mem.pprof -mutexprofile=$(pkg).mutex.pprof -outputdir=../report -benchmem -run="^$$" ./$(pkg) | tee -a report/$(pkg).bench.out;)
-	$(foreach pkg,$(SHORT_PKGS),go test -bench=$(BENCH) -cpuprofile=$(pkg).cpu.pprof -outputdir=../report -benchmem -run="^$$" ./$(pkg) | tee -a report/$(pkg).bench.out;)
+	$(foreach pkg,$(SHORT_PKGS),go test -bench=$(BENCH) -benchtime=2s -cpuprofile=$(pkg).cpu.pprof -outputdir=../report -benchmem -run="^$$" ./$(pkg) | tee -a report/$(pkg).bench.out;)
 
 .PHONY: benchcmp
 benchcmp:
