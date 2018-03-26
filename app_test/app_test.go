@@ -23,6 +23,8 @@ import (
 	"github.com/jeffrom/logd/testhelper"
 )
 
+var someMessage = []byte("cool, reasonably-sized message. something about the length of an access log, or a json object displaying some information about a request. Not too big, not too small. Probably about 200 bytes, maybe more. I mean, these things are pretty arbitrary, really. In many instances, 200 bytes would be far too small. In others, too large.")
+
 func runTest(t *testing.T, name string, f func(t *testing.T, c *config.Config), conf *config.Config) {
 
 	t.Run(name, func(t *testing.T) {
@@ -171,6 +173,32 @@ func writeMessages(t testing.TB, conf *config.Config, c *client.Client, cmds []*
 		expectRespOK(t, resp)
 		expectNoPendingData(t, conf, c)
 		c.Flush()
+	}
+}
+
+func writeMessagesUntilDone(t testing.TB, conf *config.Config, c *client.Client, cmds []*protocol.Command) func() {
+	done := make(chan struct{})
+	i := 0
+
+	writeMessages(t, conf, c, cmds)
+	i++
+
+	go func() {
+		for {
+			writeMessages(t, conf, c, cmds)
+			i++
+
+			select {
+			case <-done:
+				return
+			default:
+			}
+		}
+	}()
+
+	return func() {
+		t.Logf("wrote %d commands in writeMessagesUntilDone", i)
+		done <- struct{}{}
 	}
 }
 
@@ -458,6 +486,45 @@ func testServerReadNewWrite(t *testing.T, conf *config.Config) {
 	expectLineMatch(t, scanner, msg)
 }
 
+func TestServerReadClose(t *testing.T) {
+	runTestConfs(t, testServerReadClose)
+}
+
+func testServerReadClose(t *testing.T, conf *config.Config) {
+	srv := newTestServer(conf)
+	defer stopServer(t, srv)
+
+	c := newTestClient(conf, srv)
+	defer c.Close()
+
+	msg := []byte("cool message")
+	resp, err := c.Do(protocol.NewCommand(conf, protocol.CmdMessage, msg))
+	testhelper.CheckError(err)
+	expectRespOKID(t, resp, 1)
+
+	readClient := newTestClient(conf, srv)
+	defer readClient.Close()
+
+	cmds := createMessageCommands(conf, 1, 20)
+	defer writeMessagesUntilDone(t, conf, c, cmds)()
+
+	scanner, err := readClient.DoRead(1, 0)
+	testhelper.CheckError(err)
+	expectLineMatch(t, scanner, msg)
+
+	for i := 0; i < 3; i++ {
+		scanner.Scan()
+		testhelper.CheckError(scanner.Error())
+		t.Logf("scanned %+v", scanner.Message())
+	}
+
+	readClient.Close()
+
+	if _, err := readClient.Do(protocol.NewCommand(conf, protocol.CmdPing)); err == nil {
+		t.Fatalf("command succeeded after close command")
+	}
+}
+
 func TestServerTail(t *testing.T) {
 	runTestConfs(t, testServerTail)
 }
@@ -681,6 +748,9 @@ func testServerWritePartition(t *testing.T, conf *config.Config) {
 }
 
 func TestConcurrentWrites(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
 	runTestConfs(t, testConcurrentWrites)
 }
 
@@ -755,6 +825,9 @@ func randomCommand(conf *config.Config) *protocol.Command {
 }
 
 func TestGracefulShutdown(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
 	runTestConfs(t, testGracefulShutdown)
 }
 
