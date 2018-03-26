@@ -293,11 +293,15 @@ func (idx *fileIndex) dump() {
 	}
 
 	sl := idx.data
-	for _, c := range sl[:5] {
+	slIdx := 5
+	if len(sl) < 5 {
+		slIdx = len(sl) - 1
+	}
+	for _, c := range sl[:slIdx] {
 		fmt.Println(c)
 	}
 
-	sl = sl[5:]
+	sl = sl[slIdx:]
 
 	if len(idx.data) > 10 {
 		fmt.Println("...")

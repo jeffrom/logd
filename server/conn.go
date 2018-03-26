@@ -81,7 +81,7 @@ func newServerConn(c net.Conn, conf *config.Config) *Conn {
 		readTimeout:  timeout,
 		bw:           bufio.NewWriter(c),
 		writeTimeout: timeout,
-		done:         make(chan struct{}),
+		done:         make(chan struct{}, 10),
 	}
 
 	return conn
@@ -158,7 +158,13 @@ func (c *Conn) close() error {
 	err := c.Conn.Close()
 
 	// we only care about the channel if we're gracefully shutting down
-	c.done <- struct{}{}
+	select {
+	case c.done <- struct{}{}:
+		internal.Debugf(c.config, "sent to done channel")
+	default:
+		internal.Debugf(c.config, "failed to write to done channel")
+	}
+
 	return err
 }
 

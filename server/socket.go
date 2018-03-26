@@ -183,10 +183,12 @@ func (s *Socket) shutdown() error {
 			if c.isActive() {
 				select {
 				case <-c.done:
-					internal.Debugf(s.config, "%s closed gracefully", c.RemoteAddr())
+					internal.Debugf(s.config, "%s(ACTIVE) closed gracefully", c.RemoteAddr())
 				case <-time.After(time.Duration(s.config.GracefulShutdownTimeout) * time.Millisecond):
 					log.Printf("%s timed out", c.RemoteAddr())
 				}
+			} else {
+				internal.Debugf(s.config, "%s(%s): closed gracefully", c.RemoteAddr(), c.getState())
 			}
 
 			s.removeConn(c)
@@ -247,7 +249,7 @@ func (s *Socket) addConn(conn *Conn) {
 
 func (s *Socket) removeConn(conn *Conn) {
 	if err := conn.Close(); err != nil {
-		log.Printf("error removing connection: %+v", err)
+		internal.Debugf(s.config, "error removing connection: %+v", err)
 	}
 
 	s.connMu.Lock()
@@ -285,10 +287,10 @@ func (s *Socket) handleConnection(conn *Conn) {
 		cancel()
 		s.q.Stats.Decr("connections")
 
-		s.removeConn(conn)
 		if err := conn.close(); err != nil {
 			internal.Debugf(s.config, "error closing connection: %+v", err)
 		}
+		s.removeConn(conn)
 	}()
 
 	for {
@@ -451,6 +453,7 @@ func (s *Socket) handleClose(ctx context.Context, conn *Conn, cmd *protocol.Comm
 
 func (s *Socket) handleShutdownRequest(conn *Conn, cmd *protocol.Command, resp *protocol.Response) bool {
 	if cmd.Name == protocol.CmdShutdown && resp.Status == protocol.RespOK {
+		// conn.close()
 		s.removeConn(conn)
 		if err := s.Stop(); err != nil {
 			log.Print(err)

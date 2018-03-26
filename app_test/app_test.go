@@ -13,6 +13,7 @@ import (
 	"reflect"
 	"runtime/debug"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -178,15 +179,15 @@ func writeMessages(t testing.TB, conf *config.Config, c *client.Client, cmds []*
 
 func writeMessagesUntilDone(t testing.TB, conf *config.Config, c *client.Client, cmds []*protocol.Command) func() {
 	done := make(chan struct{})
-	i := 0
+	var i uint32
 
 	writeMessages(t, conf, c, cmds)
-	i++
+	atomic.AddUint32(&i, 1)
 
 	go func() {
 		for {
 			writeMessages(t, conf, c, cmds)
-			i++
+			atomic.AddUint32(&i, 1)
 
 			select {
 			case <-done:
@@ -197,7 +198,7 @@ func writeMessagesUntilDone(t testing.TB, conf *config.Config, c *client.Client,
 	}()
 
 	return func() {
-		t.Logf("wrote %d commands in writeMessagesUntilDone", i)
+		t.Logf("wrote %d commands in writeMessagesUntilDone", atomic.LoadUint32(&i))
 		done <- struct{}{}
 	}
 }
@@ -351,9 +352,9 @@ func getConfigs() map[string]*config.Config {
 	return map[string]*config.Config{
 		"default": config.DefaultConfig,
 		"simple": &config.Config{
-			ServerTimeout:           1000,
-			ClientTimeout:           1000,
-			GracefulShutdownTimeout: 1000,
+			ServerTimeout:           500,
+			ClientTimeout:           500,
+			GracefulShutdownTimeout: 500,
 			LogFileMode:             0644,
 			MaxChunkSize:            1024 * 1024,
 			PartitionSize:           1024 * 1024,
@@ -502,27 +503,35 @@ func testServerReadClose(t *testing.T, conf *config.Config) {
 	testhelper.CheckError(err)
 	expectRespOKID(t, resp, 1)
 
-	readClient := newTestClient(conf, srv)
-	defer readClient.Close()
-
 	cmds := createMessageCommands(conf, 1, 20)
 	defer writeMessagesUntilDone(t, conf, c, cmds)()
 
-	scanner, err := readClient.DoRead(1, 0)
-	testhelper.CheckError(err)
-	expectLineMatch(t, scanner, msg)
+	for n := 0; n < 10; n++ {
+		readClient := newTestClient(conf, srv)
 
-	for i := 0; i < 3; i++ {
-		scanner.Scan()
-		testhelper.CheckError(scanner.Error())
-		t.Logf("scanned %+v", scanner.Message())
+		_, err := readClient.DoRead(1, 0)
+		testhelper.CheckError(err)
+		readClient.Close()
+
+		readClient = newTestClient(conf, srv)
+		scanner, err := readClient.DoRead(1, 0)
+		testhelper.CheckError(err)
+		expectLineMatch(t, scanner, msg)
+
+		for i := 0; i < n/2; i++ {
+			scanner.Scan()
+			testhelper.CheckError(scanner.Error())
+			t.Logf("scanned %+v", scanner.Message())
+		}
+
+		readClient.Close()
+
+		if _, err := readClient.Do(protocol.NewCommand(conf, protocol.CmdPing)); err == nil {
+			t.Fatalf("command succeeded after close command")
+		}
+
 	}
 
-	readClient.Close()
-
-	if _, err := readClient.Do(protocol.NewCommand(conf, protocol.CmdPing)); err == nil {
-		t.Fatalf("command succeeded after close command")
-	}
 }
 
 func TestServerTail(t *testing.T) {
