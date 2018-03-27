@@ -134,6 +134,8 @@ func (q *EventQ) handleMsg(cmd *protocol.Command) {
 		return
 	}
 
+	pw := protocol.NewProtocolWriter()
+
 	// TODO if any messages are invalid, throw out the whole bunch
 	for _, msg := range cmd.Args {
 		if len(msg) == 0 {
@@ -142,7 +144,7 @@ func (q *EventQ) handleMsg(cmd *protocol.Command) {
 		}
 
 		id++
-		msgb := protocol.NewProtocolWriter().WriteLogLine(protocol.NewMessage(id, msg))
+		msgb := pw.WriteLogLine(protocol.NewMessage(id, msg))
 		msgs = append(msgs, msgb)
 
 		q.log.SetID(id)

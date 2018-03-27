@@ -9,10 +9,12 @@ package logger
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -29,6 +31,8 @@ type filePartitions struct {
 	w            LogWriteableFile
 	written      int
 	currReadPart uint64
+	currHead     uint64
+	headFresh    bool
 }
 
 func newFilePartitions(config *config.Config) *filePartitions {
@@ -52,6 +56,7 @@ func (p *filePartitions) setCurrentFileHandles(create bool) error {
 	}
 	if create {
 		curr++
+		p.currHead = curr
 	}
 	if serr := p.setWriteHandle(curr); serr != nil {
 		return serr
@@ -133,11 +138,17 @@ func (p *filePartitions) logFilePath(part uint64) string {
 }
 
 func (p *filePartitions) head() (uint64, error) {
+	if p.headFresh {
+		return p.currHead, nil
+	}
+
 	parts, err := p.partitions()
 	if err != nil {
 		return 0, nil
 	}
 	n := maxUint64(parts...)
+	p.currHead = n
+	p.headFresh = true
 	return n, nil
 }
 
@@ -195,7 +206,21 @@ func minUint64(args ...uint64) uint64 {
 }
 
 func (p *filePartitions) matches() ([]string, error) {
-	return filepath.Glob(p.config.LogFile + ".[0-9]*")
+	files, err := ioutil.ReadDir(filepath.Dir(p.config.LogFile))
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([]string, len(files))
+	n := 0
+	for _, f := range files {
+		dotidx := strings.LastIndex(f.Name(), ".")
+		if dotidx >= 0 && strings.LastIndexAny(f.Name(), "1234567890") > dotidx {
+			res[n] = f.Name()
+			n++
+		}
+	}
+	return res[:n], nil
 }
 
 func (p *filePartitions) partitions() ([]uint64, error) {
@@ -203,14 +228,18 @@ func (p *filePartitions) partitions() ([]uint64, error) {
 	if err != nil {
 		return nil, err
 	}
-	var res []uint64
 
-	for _, m := range matches {
+	res := make([]uint64, len(matches))
+	for i, m := range matches {
 		parts := strings.Split(m, ".")
 		s := parts[len(parts)-1]
-		var n uint64
-		fmt.Sscanf(s, "%d", &n)
-		res = append(res, n)
+
+		n, err := strconv.ParseUint(s, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+
+		res[i] = n
 	}
 
 	sort.Slice(res, func(i, j int) bool { return res[i] < res[j] })
