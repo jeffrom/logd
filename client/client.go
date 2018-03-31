@@ -88,7 +88,7 @@ func (c *Client) Do(cmds ...*protocol.Command) (*protocol.Response, error) {
 
 // DoRead returns a scanner that can be used to loop over messages, similar to
 // bufio.Scanner
-func (c *Client) DoRead(id uint64, limit int) (*protocol.ProtocolScanner, error) {
+func (c *Client) DoRead(id uint64, limit int) (*protocol.Scanner, error) {
 	internal.Debugf(c.config, "DoRead(%d, %d)", id, limit)
 	cmdType := protocol.CmdRead
 	if c.config.ReadFromTail {
@@ -181,7 +181,7 @@ func (c *Client) readResponse() (*protocol.Response, error) {
 	return resp, nil
 }
 
-func (c *Client) readScanResponse(forever bool) (*protocol.ProtocolScanner, error) {
+func (c *Client) readScanResponse(forever bool) (*protocol.Scanner, error) {
 	deadline := time.Time{}
 	if !forever {
 		deadline = time.Now().Add(c.readTimeout)
@@ -207,7 +207,7 @@ func (c *Client) readScanResponse(forever bool) (*protocol.ProtocolScanner, erro
 			return nil, err
 		}
 	}
-	return protocol.NewProtocolScanner(c.config, c.pr.Br), nil
+	return protocol.NewScanner(c.config, c.pr.Br), nil
 }
 
 func (c *Client) handleErr(err error) error {

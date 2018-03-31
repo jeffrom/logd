@@ -12,11 +12,11 @@ import (
 	"github.com/pkg/errors"
 )
 
-// ProtocolScanner reads the log protocol. The same protocol is used for both
+// Scanner reads the log protocol. The same protocol is used for both
 // the file log and network chunk protocol.
-type ProtocolScanner struct {
+type Scanner struct {
 	config       *config.Config
-	Br           *bufio.Reader
+	br           *bufio.Reader
 	LastChunkPos int64
 	ChunkPos     int64
 	chunkEnd     int64
@@ -24,18 +24,18 @@ type ProtocolScanner struct {
 	err          error
 }
 
-// NewProtocolScanner returns a new instance of a buffered protocol scanner.
-func NewProtocolScanner(conf *config.Config, r io.Reader) *ProtocolScanner {
+// NewScanner returns a new instance of a buffered protocol scanner.
+func NewScanner(conf *config.Config, r io.Reader) *Scanner {
 	// TODO maybe pass through bufio.Reader instead of creating a new one if r
 	// is a bufio.Reader?
-	return &ProtocolScanner{
+	return &Scanner{
 		config: conf,
-		Br:     bufio.NewReaderSize(r, 1024*8),
+		br:     bufio.NewReaderSize(r, 1024*8),
 	}
 }
 
 // Scan reads over log data in a loop
-func (ps *ProtocolScanner) Scan() bool {
+func (ps *Scanner) Scan() bool {
 	if ps.chunkEnd <= 0 { // need to read chunk envelope
 		if err := ps.scanEnvelope(); err != nil && err != errInvalidFirstByte {
 			ps.err = err
@@ -57,7 +57,7 @@ func (ps *ProtocolScanner) Scan() bool {
 	return err == nil
 }
 
-func (ps *ProtocolScanner) ReadMessage() (int, *Message, error) {
+func (ps *Scanner) ReadMessage() (int, *Message, error) {
 	var id uint64
 	var body []byte
 	var bodylen int64
@@ -66,7 +66,7 @@ func (ps *ProtocolScanner) ReadMessage() (int, *Message, error) {
 	var read int
 
 	// fmt.Println("reading line")
-	line, err := ReadLine(ps.Br)
+	line, err := ReadLine(ps.br)
 	// fmt.Printf("read: %q (length: %d) (err: %v)\n", line, len(line)+2, err)
 	read += len(line)
 	read += 2 // \r\n
@@ -110,8 +110,8 @@ func (ps *ProtocolScanner) ReadMessage() (int, *Message, error) {
 	return read, NewMessage(id, bytes.TrimRight(body, "\r\n")), err
 }
 
-func (ps *ProtocolScanner) scanEnvelope() error {
-	if b, err := ps.Br.Peek(1); err != nil {
+func (ps *Scanner) scanEnvelope() error {
+	if b, err := ps.br.Peek(1); err != nil {
 		if err == io.EOF {
 			return err
 		}
@@ -119,10 +119,10 @@ func (ps *ProtocolScanner) scanEnvelope() error {
 	} else if b[0] != '+' {
 		return errInvalidFirstByte
 	}
-	ps.Br.ReadByte()
+	ps.br.ReadByte()
 	internal.Debugf(ps.config, "scanning envelope")
 
-	line, err := ReadLine(ps.Br)
+	line, err := ReadLine(ps.br)
 	if err != nil {
 		return err
 	}
@@ -142,10 +142,10 @@ func (ps *ProtocolScanner) scanEnvelope() error {
 }
 
 // Message returns the message of the current iteration
-func (ps *ProtocolScanner) Message() *Message {
+func (ps *Scanner) Message() *Message {
 	return ps.msg
 }
 
-func (ps *ProtocolScanner) Error() error {
+func (ps *Scanner) Error() error {
 	return ps.err
 }

@@ -168,7 +168,7 @@ func (p *filePartitions) firstMessage(part uint64) (*protocol.Message, error) {
 	}
 	defer f.Close()
 
-	scanner := protocol.NewProtocolScanner(p.config, newLogFile(f))
+	scanner := protocol.NewScanner(p.config, newLogFile(f))
 	scanner.Scan()
 	err = scanner.Error()
 	if err != nil && err != io.EOF {

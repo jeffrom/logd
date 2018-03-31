@@ -32,13 +32,13 @@ func (m *Message) String() string {
 }
 
 func MsgFromBytes(b []byte) (*Message, error) {
-	ps := NewProtocolScanner(config.DefaultConfig, bytes.NewReader(b))
+	ps := NewScanner(config.DefaultConfig, bytes.NewReader(b))
 	_, msg, err := ps.ReadMessage()
 	return msg, err
 }
 
 func MsgFromReader(r io.Reader) (*Message, error) {
-	ps := NewProtocolScanner(config.DefaultConfig, r)
+	ps := NewScanner(config.DefaultConfig, r)
 	_, msg, err := ps.ReadMessage()
 	return msg, err
 }

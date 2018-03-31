@@ -256,11 +256,11 @@ func (l *FileLogger) getPartOffset(id uint64, inclusive bool) (uint64, int64, er
 		return 0, 0, nil
 	}
 
-	var scanner *protocol.ProtocolScanner
+	var scanner *protocol.Scanner
 
 Loop:
 	for {
-		scanner = protocol.NewProtocolScanner(l.config, l.parts.r)
+		scanner = protocol.NewScanner(l.config, l.parts.r)
 
 		for scanner.Scan() {
 			msg := scanner.Message()
@@ -326,7 +326,7 @@ func (l *FileLogger) Tail() (uint64, error) {
 	}
 
 	var msg *protocol.Message
-	scanner := protocol.NewProtocolScanner(l.config, l)
+	scanner := protocol.NewScanner(l.config, l)
 	for scanner.Scan() {
 		if scanned := scanner.Message(); scanned != nil {
 			msg = scanned
@@ -463,7 +463,7 @@ func (pi *PartitionIterator) LogFile() LogReadableFile {
 }
 
 func (l *FileLogger) loadState() error {
-	scanner := protocol.NewProtocolScanner(l.config, l)
+	scanner := protocol.NewScanner(l.config, l)
 	var lastMsg *protocol.Message
 	var firstMsg *protocol.Message
 	for scanner.Scan() {
@@ -517,7 +517,7 @@ func CheckIndex(conf *config.Config) error {
 			return err
 		}
 
-		scanner := protocol.NewProtocolScanner(logger.config, logger.parts.r)
+		scanner := protocol.NewScanner(logger.config, logger.parts.r)
 		scanner.Scan()
 		if err := scanner.Error(); err != nil {
 			if err == io.EOF {
