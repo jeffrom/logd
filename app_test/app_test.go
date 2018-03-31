@@ -116,7 +116,7 @@ func expectNoPendingData(t testing.TB, conf *config.Config, c *client.Client) {
 	c.Conn.SetReadDeadline(time.Now().Add(time.Duration(conf.ClientTimeout)))
 }
 
-func expectLineMatch(t testing.TB, scanner *protocol.Scanner, msg []byte) {
+func expectLineMatch(t testing.TB, scanner *client.Scanner, msg []byte) {
 	readALine := scanner.Scan()
 	if !readALine {
 		t.Fatal(logWithStack("Expected to scan one message but failed: %s", scanner.Error()))
@@ -134,7 +134,7 @@ func expectLineMatch(t testing.TB, scanner *protocol.Scanner, msg []byte) {
 	}
 }
 
-func expectLineMatchID(t testing.TB, scanner *protocol.Scanner, msg []byte, id uint64) {
+func expectLineMatchID(t testing.TB, scanner *client.Scanner, msg []byte, id uint64) {
 	expectLineMatch(t, scanner, msg)
 	m := scanner.Message()
 	if m.ID != id {
@@ -231,7 +231,7 @@ func expectPartitionReads(t testing.TB, conf *config.Config, c *client.Client) {
 
 }
 
-func expectAllScanned(t testing.TB, conf *config.Config, scanner *protocol.Scanner) {
+func expectAllScanned(t testing.TB, conf *config.Config, scanner *client.Scanner) {
 	var firstMsg *protocol.Message
 	var lastMsg *protocol.Message
 	for scanner.Scan() {

@@ -4,6 +4,8 @@ package client
 
 import (
 	"bufio"
+	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -14,6 +16,8 @@ import (
 	"github.com/jeffrom/logd/internal"
 	"github.com/jeffrom/logd/protocol"
 )
+
+var errNotFound = errors.New("id not found")
 
 // Client represents a connection to the database
 type Client struct {
@@ -88,7 +92,7 @@ func (c *Client) Do(cmds ...*protocol.Command) (*protocol.Response, error) {
 
 // DoRead returns a scanner that can be used to loop over messages, similar to
 // bufio.Scanner
-func (c *Client) DoRead(id uint64, limit int) (*protocol.Scanner, error) {
+func (c *Client) DoRead(id uint64, limit int) (*Scanner, error) {
 	internal.Debugf(c.config, "DoRead(%d, %d)", id, limit)
 	cmdType := protocol.CmdRead
 	if c.config.ReadFromTail {
@@ -100,7 +104,7 @@ func (c *Client) DoRead(id uint64, limit int) (*protocol.Scanner, error) {
 		[]byte(fmt.Sprintf("%d", limit)),
 	)
 	timeout := time.Duration(c.config.ClientTimeout) * time.Millisecond
-	if err := c.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+	if err := c.SetWriteDeadline(time.Now().Add(timeout)); err != nil {
 		return nil, err
 	}
 	if err := c.WriteCommand(cmd); c.handleErr(err) != nil {
@@ -110,7 +114,27 @@ func (c *Client) DoRead(id uint64, limit int) (*protocol.Scanner, error) {
 		return nil, err
 	}
 
-	return c.readScanResponse(limit == 0)
+	return newScanner(c.config, c).fromScanResponse()
+}
+
+func (c *Client) continueRead(id uint64, limit int) (*protocol.Scanner, error) {
+	internal.Debugf(c.config, "continueRead(%d, %d)", id, limit)
+	cmd := protocol.NewCommand(c.config, protocol.CmdRead,
+		[]byte(fmt.Sprintf("%d", id)),
+		[]byte(fmt.Sprintf("%d", limit)))
+
+	timeout := time.Duration(c.config.ClientTimeout) * time.Millisecond
+	if err := c.SetWriteDeadline(time.Now().Add(timeout)); err != nil {
+		return nil, err
+	}
+	if err := c.WriteCommand(cmd); c.handleErr(err) != nil {
+		return nil, err
+	}
+	if err := c.Flush(); c.handleErr(err) != nil {
+		return nil, err
+	}
+
+	return c.readScanResponse(true)
 }
 
 func (c *Client) Write(p []byte) (int, error) {
@@ -147,6 +171,7 @@ func (c *Client) Close() error {
 	return c.handleErr(c.Conn.Close())
 }
 
+// WriteCommand issues a protocol command to the server
 // TODO make this private
 func (c *Client) WriteCommand(cmd *protocol.Command) error {
 	if err := c.Conn.SetWriteDeadline(time.Now().Add(c.writeTimeout)); err != nil {
@@ -162,6 +187,7 @@ func (c *Client) WriteCommand(cmd *protocol.Command) error {
 	return nil
 }
 
+// Flush flushes all pending data to the server
 func (c *Client) Flush() error {
 	// return nil
 	return c.bw.Flush()
@@ -182,10 +208,7 @@ func (c *Client) readResponse() (*protocol.Response, error) {
 }
 
 func (c *Client) readScanResponse(forever bool) (*protocol.Scanner, error) {
-	deadline := time.Time{}
-	if !forever {
-		deadline = time.Now().Add(c.readTimeout)
-	}
+	deadline := time.Now().Add(c.readTimeout)
 
 	if err := c.Conn.SetReadDeadline(deadline); err != nil {
 		return nil, err
@@ -197,16 +220,13 @@ func (c *Client) readScanResponse(forever bool) (*protocol.Scanner, error) {
 	}
 
 	if resp.Failed() {
+		if bytes.Equal(resp.Body, protocol.ErrRespNotFound) {
+			return nil, errNotFound
+		}
 		return nil, fmt.Errorf("%s %s", resp.Status, resp.Body)
 	}
 
 	internal.Debugf(c.config, "initial scan response: %s", resp.Status)
-
-	if !forever {
-		if err := c.Conn.SetReadDeadline(time.Now().Add(c.readTimeout)); err != nil {
-			return nil, err
-		}
-	}
 	return protocol.NewScanner(c.config, c.pr.Br), nil
 }
 

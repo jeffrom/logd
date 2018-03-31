@@ -8,8 +8,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/pkg/errors"
@@ -143,9 +141,6 @@ func doReadCmdAction(conf *config.Config) func(c *cli.Context) error {
 		}
 		defer c.Close()
 
-		sigc := make(chan os.Signal, 1)
-		signal.Notify(sigc, os.Interrupt, syscall.SIGTERM)
-
 		if start == 0 {
 			resp, headErr := c.Do(protocol.NewCommand(conf, protocol.CmdHead))
 			if err != nil {
@@ -164,7 +159,7 @@ func doReadCmdAction(conf *config.Config) func(c *cli.Context) error {
 		}
 
 		if conf.ReadForever {
-			limit = 0
+			limit = conf.ClientChunkSize
 		}
 
 		// fmt.Printf("Reading %d messages from id %d\n", limit, start)
@@ -191,32 +186,32 @@ func doReadCmdAction(conf *config.Config) func(c *cli.Context) error {
 			}
 		}
 
-		if conf.ReadForever {
-			for {
-				// fmt.Printf("waiting for more log entries\n")
+		// if conf.ReadForever {
+		// 	for {
+		// 		// fmt.Printf("waiting for more log entries\n")
 
-				select {
-				case <-sigc:
-					return nil
-				case <-time.After(200 * time.Millisecond):
-				}
+		// 		select {
+		// 		case <-sigc:
+		// 			return nil
+		// 		case <-time.After(200 * time.Millisecond):
+		// 		}
 
-				c.SetDeadline(time.Now().Add(200 * time.Millisecond))
-				for scanner.Scan() {
-					msg := scanner.Message()
-					fmt.Printf("%d %s\n", msg.ID, msg.Body)
-					c.SetDeadline(time.Now().Add(200 * time.Millisecond))
-				}
+		// 		c.SetDeadline(time.Now().Add(200 * time.Millisecond))
+		// 		for scanner.Scan() {
+		// 			msg := scanner.Message()
+		// 			fmt.Printf("%d %s\n", msg.ID, msg.Body)
+		// 			c.SetDeadline(time.Now().Add(200 * time.Millisecond))
+		// 		}
 
-				if err := scanner.Error(); err != nil && err != io.EOF {
-					if cerr, ok := errors.Cause(err).(net.Error); !ok || !cerr.Timeout() {
-						log.Printf("%+v", err)
-						return cli.NewExitError(err, 3)
-					}
-				}
+		// 		if err := scanner.Error(); err != nil && err != io.EOF {
+		// 			if cerr, ok := errors.Cause(err).(net.Error); !ok || !cerr.Timeout() {
+		// 				log.Printf("%+v", err)
+		// 				return cli.NewExitError(err, 3)
+		// 			}
+		// 		}
 
-			}
-		}
+		// 	}
+		// }
 
 		return nil
 	}

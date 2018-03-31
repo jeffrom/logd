@@ -298,6 +298,7 @@ func (q *EventQ) doRead(cmd *protocol.Command, iterator logger.LogRangeIterator,
 
 	if !forever {
 		resp.SendEOF()
+		q.removeSubscription(cmd)
 	}
 }
 
@@ -387,6 +388,7 @@ func (q *EventQ) handleClose(cmd *protocol.Command) {
 }
 
 func (q *EventQ) removeSubscription(cmd *protocol.Command) {
+	internal.Debugf(q.config, "removing subscription for %s", cmd.ConnID)
 	delete(q.subscriptions, cmd.ConnID)
 }
 

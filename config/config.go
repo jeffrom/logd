@@ -22,10 +22,12 @@ type Config struct {
 	IndexCursorSize         uint64 `json:"index_cursor_size"`
 
 	// client configs
-	StartID      uint64 `json:"start"`
-	ReadLimit    uint64 `json:"limit"`
-	ReadForever  bool   `json:"forever"`
-	ReadFromTail bool   `json:"from_tail"`
+	StartID            uint64 `json:"start"`
+	ReadLimit          uint64 `json:"limit"`
+	ReadForever        bool   `json:"forever"`
+	ReadFromTail       bool   `json:"from_tail"`
+	ClientChunkSize    int    `json:"client_chunk_size"`
+	ClientWaitInterval int    `json:"client_wait_interval"`
 }
 
 // NewConfig returns a new configuration object
@@ -47,7 +49,6 @@ var DefaultConfig *Config
 func init() {
 	DefaultConfig = NewConfig()
 	DefaultConfig.ServerTimeout = 500
-	DefaultConfig.ClientTimeout = 500
 	DefaultConfig.GracefulShutdownTimeout = 500
 	DefaultConfig.LogFile = "__log"
 	DefaultConfig.LogFileMode = 0644
@@ -58,13 +59,17 @@ func init() {
 	// DefaultConfig.IndexCursorSize = 1000
 	DefaultConfig.IndexCursorSize = 10
 
+	DefaultConfig.ClientTimeout = 500
+	DefaultConfig.ClientWaitInterval = 500
 	DefaultConfig.ReadLimit = 15
 	DefaultConfig.ReadFromTail = false
+	DefaultConfig.ClientChunkSize = 100
 
 	// XXX just for dev
 	DefaultConfig.CanShutdown = true
 }
 
+// IndexFileName returns the path of the index file
 func (c *Config) IndexFileName() string {
 	return c.LogFile + ".index"
 }
