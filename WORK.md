@@ -2,15 +2,12 @@
 
 # TODO
 
-* [ ] make synchronization idiomatic w/ stuff like https://udhos.github.io/golang-concurrency-tricks/
-
 # later
 
 * [ ] Store head/tail id in index
   * [X] head
   * [ ] tail
 * [ ] clear index entries that have been deleted
-* [ ] backpressure in the form of max concurrent connections
 * [ ] refuse/accept functionality
   * `refuse(_at)` / `accept(_at)` should be able to synchronize switching at
     partition boundaries, as well as ids.
@@ -69,6 +66,8 @@
 * [X] test suite that runs the same set of tests with different configurations,
       but also supports expected failures in some cases
 * [X] graceful shutdown: clients connections should close cleanly if possible
+* [X] backpressure in the form of max concurrent connections
+    - done as event queue buffer size
 
 ## DEC 2017
 
@@ -85,3 +84,5 @@
 * [x] index isn't being written to disk, probably other issues too
 * [x] subscribers are removed when their connection closes
 * [x] test suite should also include system-level tests with coverage
+
+* [X] make synchronization idiomatic w/ stuff like https://udhos.github.io/golang-concurrency-tricks/

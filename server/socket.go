@@ -30,6 +30,8 @@ type Socket struct {
 	connMu sync.Mutex
 	connIn chan *Conn
 
+	disallowedCommands map[protocol.CmdType]bool
+
 	readyC       chan struct{}
 	stopC        chan struct{}
 	shutdownC    chan struct{}
@@ -111,9 +113,7 @@ func (s *Socket) listenAndServe(wait bool) error {
 
 // ready signals that the application is ready to serve on this host:port
 func (s *Socket) ready() {
-	select {
-	case <-s.readyC:
-	}
+	<-s.readyC
 }
 
 func (s *Socket) isShuttingDown() bool {
@@ -257,6 +257,10 @@ func (s *Socket) removeConn(conn *Conn) {
 	s.connMu.Unlock()
 }
 
+func (s *Socket) setDisallowedCommands(cmds map[protocol.CmdType]bool) {
+	s.disallowedCommands = cmds
+}
+
 func handleConnErr(config *config.Config, err error, conn *Conn) error {
 	if err == nil {
 		return nil
@@ -359,6 +363,11 @@ func (s *Socket) executeCommand(ctx context.Context, conn *Conn, cmd *protocol.C
 	timeout := time.Duration(s.config.ServerTimeout) * time.Millisecond
 	cmdCtx, cmdCancel := context.WithTimeout(ctx, timeout)
 	defer cmdCancel()
+
+	if _, ok := s.disallowedCommands[cmd.Name]; ok {
+		resp := protocol.NewClientErrResponse(s.config, []byte("command not allowed"))
+		return resp, nil
+	}
 
 	// push to event queue and wait for a result
 	resp, err := s.q.PushCommand(cmdCtx, cmd)

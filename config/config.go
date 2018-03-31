@@ -9,6 +9,7 @@ type Config struct {
 	Verbose                 bool   `json:"verbose"`
 	CanShutdown             bool   `json:"can_shutdown"`
 	Hostport                string `json:"host"`
+	MasterHostport          string `json:"master_host"`
 	ServerTimeout           uint   `json:"server_timeout"`
 	ClientTimeout           uint   `json:"client_timeout"`
 	GracefulShutdownTimeout uint   `json:"graceful_shutdown_timeout"`
