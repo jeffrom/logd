@@ -24,7 +24,7 @@ func fileLoggerBenchConfig() *config.Config {
 
 func BenchmarkFileLoggerLifecycle(b *testing.B) {
 	config := fileLoggerBenchConfig()
-	l := NewFileLogger(config)
+	l := New(config)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -35,7 +35,7 @@ func BenchmarkFileLoggerLifecycle(b *testing.B) {
 
 func BenchmarkFileLoggerWrite(b *testing.B) {
 	config := fileLoggerBenchConfig()
-	l := NewFileLogger(config)
+	l := New(config)
 	l.Setup()
 	defer l.Shutdown()
 
@@ -47,7 +47,7 @@ func BenchmarkFileLoggerWrite(b *testing.B) {
 
 func BenchmarkFileLoggerWriteWithFlush(b *testing.B) {
 	config := fileLoggerBenchConfig()
-	l := NewFileLogger(config)
+	l := New(config)
 	l.Setup()
 	defer l.Shutdown()
 

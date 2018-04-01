@@ -10,7 +10,7 @@ import (
 func SetupTestFileLoggerConfig(conf *config.Config, verbose bool) (*config.Config, Logger, func()) {
 	conf.Verbose = verbose
 	var l Logger
-	l = NewFileLogger(conf)
+	l = New(conf)
 
 	if err := l.(LogManager).Setup(); err != nil {
 		log.Fatalf("error setting up: %+v", err)

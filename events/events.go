@@ -41,7 +41,7 @@ type EventQ struct {
 
 // NewEventQ creates a new instance of an EventQ
 func NewEventQ(conf *config.Config) *EventQ {
-	log := logger.NewFileLogger(conf)
+	log := logger.New(conf)
 
 	q := &EventQ{
 		config: conf,

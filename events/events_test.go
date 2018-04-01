@@ -220,7 +220,7 @@ func TestEventQWriteFilePartitions(t *testing.T) {
 	config, _, teardown := logger.SetupTestFileLoggerConfig(config, testing.Verbose())
 	defer teardown()
 
-	q := startQConfig(t, logger.NewFileLogger(config), config)
+	q := startQConfig(t, logger.New(config), config)
 	defer stopQ(t, q)
 
 	msg := []byte(testhelper.Repeat("A", 50))
@@ -253,7 +253,7 @@ func TestEventQWriteAfterRestart(t *testing.T) {
 	config, _, teardown := logger.SetupTestFileLoggerConfig(config, testing.Verbose())
 	defer teardown()
 
-	l := logger.NewFileLogger(config)
+	l := logger.New(config)
 	q := startQConfig(t, l, config)
 	// defer stopQ(t, q)
 
@@ -267,7 +267,7 @@ func TestEventQWriteAfterRestart(t *testing.T) {
 	}
 
 	stopQ(t, q)
-	q = startQConfig(t, logger.NewFileLogger(config), config)
+	q = startQConfig(t, logger.New(config), config)
 	defer stopQ(t, q)
 
 	for _, line := range testhelper.SomeLines {
@@ -302,7 +302,7 @@ func TestEventQReadFilePartitions(t *testing.T) {
 	config.PartitionSize = 500
 	config.LogFile = path.Join("testdata", "q.read_file_test_log")
 
-	q := startQConfig(t, logger.NewFileLogger(config), config)
+	q := startQConfig(t, logger.New(config), config)
 	defer stopQ(t, q)
 
 	msg := []byte(testhelper.Repeat("A", 50))
