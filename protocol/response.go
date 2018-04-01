@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"bytes"
-	"io"
 	"log"
 
 	"github.com/jeffrom/logd/config"
@@ -42,11 +41,19 @@ var (
 
 var (
 	// ErrRespInvalid are the error response bytes sent for invalid requests
-	ErrRespInvalid      = []byte("invalid request")
+	ErrRespInvalid = []byte("invalid request")
+
+	// ErrRespEmptyMessage indicates a write was attempted that included no data
 	ErrRespEmptyMessage = []byte("empty message not allowed")
-	ErrRespNoArguments  = []byte("must supply an argument")
-	ErrRespNotFound     = []byte("not found")
-	ErrRespServer       = []byte("internal error")
+
+	// ErrRespNoArguments indicates no arguments were supplied
+	ErrRespNoArguments = []byte("must supply an argument")
+
+	// ErrRespNotFound indicates the messages could not be found
+	ErrRespNotFound = []byte("not found")
+
+	// ErrRespServer indicates an internal server error
+	ErrRespServer = []byte("internal error")
 )
 
 func (resp RespType) String() string {
@@ -71,7 +78,7 @@ type Response struct {
 	Status  RespType
 	ID      uint64
 	Body    []byte
-	ReaderC chan io.Reader
+	ReaderC chan ReadPart
 }
 
 // NewResponse returns a new instance of a Response
@@ -104,16 +111,19 @@ func (r *Response) String() string {
 	return string(b)
 }
 
+// Failed indicates whether the command should continue execution.
 func (r *Response) Failed() bool {
 	return r.Status != RespOK && r.Status != RespEOF
 }
 
+// SendBytes sends a PartReader back to the connection
 func (r *Response) SendBytes(b []byte) {
 	internal.Debugf(r.config, "<-ReaderC %q", b)
 	reader := bytes.NewReader(b)
-	r.ReaderC <- reader
+	r.ReaderC <- NewPartReader(reader)
 }
 
+// SendEOF sends an EOF to a connection, then finishes the response.
 func (r *Response) SendEOF() {
 	w := NewProtocolWriter()
 	b, err := w.writeResponse(NewResponse(r.config, RespEOF))
@@ -124,5 +134,6 @@ func (r *Response) SendEOF() {
 	}
 	internal.Debugf(r.config, "<-ReaderC %q (with flush)", b)
 	reader := newFlushReader(bytes.NewReader(b))
-	r.ReaderC <- reader
+	r.ReaderC <- NewPartReader(reader)
+	r.ReaderC <- &PartDone{}
 }

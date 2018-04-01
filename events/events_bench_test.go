@@ -3,7 +3,6 @@ package events
 import (
 	"context"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"runtime/debug"
@@ -64,27 +63,25 @@ func BenchmarkEventQLifecycle(b *testing.B) {
 }
 
 func BenchmarkEventQPing(b *testing.B) {
-	b.StopTimer()
 	config := eventQBenchConfig()
 	q, shutdown := startQForBench(b)
 	defer shutdown()
 	defer stopQ(b, q)
 
-	b.StartTimer()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdPing))
 	}
 }
 
 func BenchmarkEventQLogOne(b *testing.B) {
-	b.StopTimer()
 	config := eventQBenchConfig()
 	q, shutdown := startQForBench(b)
 	defer shutdown()
 	defer stopQ(b, q)
 
 	msg := []byte("hey i'm a message")
-	b.StartTimer()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		resp, err := q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdMessage, msg))
 		if err != nil {
@@ -98,14 +95,13 @@ func BenchmarkEventQLogOne(b *testing.B) {
 }
 
 func BenchmarkEventQLogFive(b *testing.B) {
-	b.StopTimer()
 	config := eventQBenchConfig()
 	q, shutdown := startQForBench(b)
 	defer shutdown()
 	defer stopQ(b, q)
 
 	msg := []byte("hey i'm a message")
-	b.StartTimer()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		resp, err := q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdMessage, msg, msg, msg, msg, msg))
 		if err != nil {
@@ -120,7 +116,6 @@ func BenchmarkEventQLogFive(b *testing.B) {
 
 func BenchmarkEventQReadOne(b *testing.B) {
 	b.SkipNow()
-	b.StopTimer()
 	config := eventQBenchConfig()
 	q, shutdown := startQForBench(b)
 	defer shutdown()
@@ -128,7 +123,7 @@ func BenchmarkEventQReadOne(b *testing.B) {
 
 	q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdMessage, []byte("hey i'm a message")))
 
-	b.StartTimer()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		fmt.Println(i)
 		cmd := protocol.NewCommand(config, protocol.CmdRead, []byte("1"), []byte("1"))
@@ -140,7 +135,6 @@ func BenchmarkEventQReadOne(b *testing.B) {
 
 func BenchmarkEventQReadFromTailOne(b *testing.B) {
 	b.SkipNow()
-	b.StopTimer()
 	config := eventQBenchConfig()
 	q, shutdown := startQForBench(b)
 	defer shutdown()
@@ -157,7 +151,7 @@ func BenchmarkEventQReadFromTailOne(b *testing.B) {
 	}
 	cmd.SignalReady()
 
-	b.StartTimer()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		cmd := protocol.NewCommand(config, protocol.CmdMessage, msg)
 		ctx, cancel := context.WithCancel(context.Background())
@@ -173,7 +167,6 @@ func BenchmarkEventQReadFromTailOne(b *testing.B) {
 
 func BenchmarkEventQReadFromHeadTen(b *testing.B) {
 	b.SkipNow()
-	b.StopTimer()
 	config := eventQBenchConfig()
 	q, shutdown := startQForBench(b)
 	defer shutdown()
@@ -190,7 +183,7 @@ func BenchmarkEventQReadFromHeadTen(b *testing.B) {
 		subs = append(subs, resp)
 	}
 
-	b.StartTimer()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdMessage, msg))
 		for _, resp := range subs {
@@ -199,7 +192,7 @@ func BenchmarkEventQReadFromHeadTen(b *testing.B) {
 	}
 }
 
-func drainReaderChan(readerC chan io.Reader) {
+func drainReaderChan(readerC chan protocol.ReadPart) {
 	n := 0
 	for {
 		select {

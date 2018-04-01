@@ -26,7 +26,6 @@ import (
 
 type filePartitions struct {
 	config       *config.Config
-	data         []LogReadableFile
 	r            LogReadableFile
 	w            LogWriteableFile
 	written      int
@@ -39,6 +38,13 @@ func newFilePartitions(config *config.Config) *filePartitions {
 	return &filePartitions{
 		config: config,
 	}
+}
+
+func (p *filePartitions) reset() {
+	p.written = 0
+	p.currReadPart = 0
+	p.currHead = 0
+	p.headFresh = false
 }
 
 func (p *filePartitions) Write(b []byte) (int, error) {

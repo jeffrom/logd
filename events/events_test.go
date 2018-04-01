@@ -63,7 +63,7 @@ func checkNoErrAndSuccess(t *testing.T, resp *protocol.Response, err error) {
 	}
 }
 
-func readAllPending(readerC chan io.Reader) ([]byte, error) {
+func readAllPending(readerC chan protocol.ReadPart) ([]byte, error) {
 	numRead := 0
 	var read int64
 	buf := bytes.Buffer{}
@@ -72,8 +72,12 @@ Loop:
 	for {
 		select {
 		case r := <-readerC:
+			if r.Done() {
+				return nil, nil
+			}
+
 			var n int64
-			n, err = buf.ReadFrom(r)
+			n, err = buf.ReadFrom(r.Reader())
 			numRead++
 			read += n
 
@@ -138,7 +142,10 @@ func checkMessageReceived(t *testing.T, resp *protocol.Response, expectedID uint
 func checkEOF(t *testing.T, resp *protocol.Response) {
 	select {
 	case r, recvd := <-resp.ReaderC:
-		b, err := ioutil.ReadAll(r)
+		if r.Done() {
+			t.Fatalf("expected EOF reader but received done message")
+		}
+		b, err := ioutil.ReadAll(r.Reader())
 		if err != nil {
 			t.Fatalf("error reading response: %+v", err)
 		}
@@ -246,7 +253,8 @@ func TestEventQWriteAfterRestart(t *testing.T) {
 	config, _, teardown := logger.SetupTestFileLoggerConfig(config, testing.Verbose())
 	defer teardown()
 
-	q := startQConfig(t, logger.NewFileLogger(config), config)
+	l := logger.NewFileLogger(config)
+	q := startQConfig(t, l, config)
 	// defer stopQ(t, q)
 
 	for _, line := range testhelper.SomeLines[:2] {
@@ -267,7 +275,7 @@ func TestEventQWriteAfterRestart(t *testing.T) {
 		checkNoErrAndSuccess(t, resp, err)
 	}
 
-	// logger.Flush()
+	// l.Flush()
 	if err := logger.CheckIndex(config); err != nil {
 		t.Fatalf("bad index after restart: %+v", err)
 	}
@@ -438,10 +446,6 @@ func TestEventQReadClose(t *testing.T) {
 
 	resp, err = q.PushCommand(context.Background(), protocol.NewCommand(config, protocol.CmdMessage, expectedMsg))
 	checkNoErrAndSuccess(t, resp, err)
-
-	if len(q.subscriptions) > 0 {
-		t.Fatalf("Expected subscriptions to be empty but had %d subscribers", len(q.subscriptions))
-	}
 }
 
 func TestEventQReadInvalidParams(t *testing.T) {

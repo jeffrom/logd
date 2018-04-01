@@ -15,6 +15,7 @@ import (
 
 // FileLogger manages reading and writing to the log partitions
 type FileLogger struct {
+	other   *FileLogger
 	config  *config.Config
 	parts   *filePartitions
 	index   *fileIndex
@@ -30,11 +31,28 @@ type flusher interface {
 func NewFileLogger(conf *config.Config) *FileLogger {
 	l := &FileLogger{
 		config: conf,
+		other:  newFileLoggerCopy(conf),
 		index:  newFileIndex(conf),
 		parts:  newFilePartitions(conf),
 	}
 
 	return l
+}
+
+func newFileLoggerCopy(conf *config.Config) *FileLogger {
+	return &FileLogger{
+		config: conf,
+		index:  newFileIndex(conf),
+		parts:  newFilePartitions(conf),
+	}
+}
+
+// Reset resets the logger to its initial state
+func (l *FileLogger) Reset() {
+	l.index.reset()
+	l.parts.reset()
+	l.currID = 0
+	l.written = 0
 }
 
 // Setup loads to current state from disk
@@ -68,6 +86,9 @@ func (l *FileLogger) Setup() error {
 	head, _ := l.parts.head()
 	log.Printf("Starting at log id %d, partition %d, offset %d", l.currID, head, l.written)
 
+	if l.other != nil {
+		return l.other.Setup()
+	}
 	return nil
 }
 
@@ -76,11 +97,27 @@ func (l *FileLogger) Shutdown() error {
 	internal.Debugf(l.config, "shutting down file logger")
 	var firstErr error
 	if err := l.index.shutdown(); err != nil {
+		log.Printf("error shutting down index: %+v", err)
 		firstErr = err
 	}
 	if err := l.parts.shutdown(); err != nil {
+		log.Printf("error shutting down partitions: %+v", err)
 		if firstErr == nil {
 			firstErr = err
+		}
+	}
+
+	if l.other != nil {
+		other := l.other
+		files := []io.Closer{
+			other.index.r, other.index.w, other.index.hw,
+			other.parts.r, other.parts.w,
+		}
+		if err := internal.CloseAll(files); err != nil {
+			log.Printf("error shutting down other logger: %+v", err)
+			if firstErr == nil {
+				firstErr = err
+			}
 		}
 	}
 	return firstErr
@@ -157,7 +194,6 @@ func (l *FileLogger) Write(b []byte) (int, error) {
 		offset := uint64(written - n)
 
 		internal.Debugf(l.config, "Writing to index, id: %d, partition: %d, offset: %d", id, part, offset)
-
 		if _, werr := l.index.Append(id, part, offset); werr != nil {
 			return written, errors.Wrap(werr, "Failed to write to index")
 		}
@@ -176,9 +212,11 @@ func (l *FileLogger) SetID(id uint64) {
 // Flush flushes the current partition to disk
 func (l *FileLogger) Flush() error {
 	if fl, ok := l.parts.w.(flusher); ok {
-		return fl.Flush()
+		if err := fl.Flush(); err != nil {
+			return err
+		}
 	}
-	return nil
+	return l.index.bw.Flush()
 }
 
 func (l *FileLogger) Read(b []byte) (int, error) {
@@ -231,6 +269,9 @@ func (l *FileLogger) SeekToID(id uint64) error {
 
 func (l *FileLogger) getPartOffset(id uint64, inclusive bool) (uint64, int64, error) {
 	// fmt.Printf("\ngetPartOffset: %+v\n", l.index)
+	if id == 0 {
+		return 0, 0, errors.New("0 passed to getPartOffset")
+	}
 
 	// catch up any new indexes written
 	if _, err := l.index.loadFromReader(); err != nil {
@@ -256,11 +297,11 @@ func (l *FileLogger) getPartOffset(id uint64, inclusive bool) (uint64, int64, er
 		return 0, 0, nil
 	}
 
-	var scanner *protocol.Scanner
+	scanner := protocol.NewScanner(l.config, l.parts.r)
 
 Loop:
 	for {
-		scanner = protocol.NewScanner(l.config, l.parts.r)
+		scanner.Reset(l.parts.r)
 
 		for scanner.Scan() {
 			msg := scanner.Message()
@@ -292,7 +333,6 @@ Loop:
 		} else if err != nil {
 			return part, 0, errors.Wrap(err, "failed to scan log")
 		}
-
 	}
 
 	off := int64(offset) + int64(scanner.ChunkPos)
@@ -355,11 +395,11 @@ func (l *FileLogger) Copy() Logger {
 func (l *FileLogger) Range(start, end uint64) (LogRangeIterator, error) {
 	internal.Debugf(l.config, "Range(%d, %d)", start, end)
 
-	lcopy := NewFileLogger(l.config)
+	lcopy := l.other
+	lcopy.Reset()
 	if err := lcopy.Setup(); err != nil {
 		return nil, err
 	}
-	defer lcopy.Shutdown()
 
 	endpart, endoff, pcerr := lcopy.getPartOffset(end, true)
 	if pcerr != nil {
@@ -463,6 +503,13 @@ func (pi *PartitionIterator) LogFile() LogReadableFile {
 }
 
 func (l *FileLogger) loadState() error {
+	head := l.index.head
+	if head > 1 {
+		if err := l.SeekToID(head - 1); err != nil {
+			return err
+		}
+	}
+
 	scanner := protocol.NewScanner(l.config, l)
 	var lastMsg *protocol.Message
 	var firstMsg *protocol.Message

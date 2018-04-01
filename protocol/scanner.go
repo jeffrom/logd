@@ -34,6 +34,16 @@ func NewScanner(conf *config.Config, r io.Reader) *Scanner {
 	}
 }
 
+// Reset resets the scanner to its initial state
+func (ps *Scanner) Reset(r io.Reader) {
+	ps.br.Reset(r)
+	ps.LastChunkPos = 0
+	ps.ChunkPos = 0
+	ps.chunkEnd = 0
+	ps.msg = nil
+	ps.err = nil
+}
+
 // Scan reads over log data in a loop
 func (ps *Scanner) Scan() bool {
 	if ps.chunkEnd <= 0 { // need to read chunk envelope

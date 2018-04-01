@@ -118,11 +118,12 @@ func (idx *fileIndex) shutdown() error {
 	return internal.CloseAll([]io.Closer{idx.r, idx.w, idx.hw})
 }
 
-func (idx *fileIndex) reset() error {
-	if err := idx.shutdown(); err != nil {
-		return err
-	}
-	return idx.setup()
+func (idx *fileIndex) reset() {
+	idx.br.Reset(idx.r)
+	// idx.bw.Reset(idx.w)
+	idx.buf.Reset()
+	idx.head = 0
+	idx.tail = 0
 }
 
 func (idx *fileIndex) setupReadWriters() error {

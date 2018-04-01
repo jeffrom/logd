@@ -31,13 +31,12 @@ import (
 
 // EventQ manages the receiving, processing, and responding to events.
 type EventQ struct {
-	config        *config.Config
-	currID        uint64
-	in            chan *protocol.Command
-	close         chan struct{}
-	subscriptions map[string]*Subscription
-	log           logger.Logger
-	Stats         *internal.Stats
+	config *config.Config
+	currID uint64
+	in     chan *protocol.Command
+	close  chan struct{}
+	log    logger.Logger
+	Stats  *internal.Stats
 }
 
 // NewEventQ creates a new instance of an EventQ
@@ -45,17 +44,17 @@ func NewEventQ(conf *config.Config) *EventQ {
 	log := logger.NewFileLogger(conf)
 
 	q := &EventQ{
-		config:        conf,
-		in:            make(chan *protocol.Command, 1000),
-		close:         make(chan struct{}),
-		subscriptions: make(map[string]*Subscription),
-		log:           log,
-		Stats:         internal.NewStats(),
+		config: conf,
+		in:     make(chan *protocol.Command, 1000),
+		close:  make(chan struct{}),
+		log:    log,
+		Stats:  internal.NewStats(),
 	}
 
 	return q
 }
 
+// Start begins handling messages
 func (q *EventQ) Start() error {
 	if manager, ok := q.log.(logger.LogManager); ok {
 		if err := manager.Setup(); err != nil {
@@ -115,6 +114,7 @@ func (q *EventQ) loop() {
 	}
 }
 
+// Stop halts the event queue
 func (q *EventQ) Stop() error {
 	select {
 	case q.close <- struct{}{}:
@@ -162,17 +162,6 @@ func (q *EventQ) handleMsg(cmd *protocol.Command) {
 	resp := protocol.NewResponse(q.config, protocol.RespOK)
 	resp.ID = id
 	cmd.Respond(resp)
-
-	q.publishMessages(cmd, msgs)
-}
-
-func (q *EventQ) publishMessages(cmd *protocol.Command, msgs [][]byte) {
-	internal.Debugf(q.config, "publishing to %d subscribers", len(q.subscriptions))
-	for _, sub := range q.subscriptions {
-		for i := range msgs {
-			sub.send(msgs[i])
-		}
-	}
 }
 
 func (q *EventQ) handleRead(cmd *protocol.Command) {
@@ -208,14 +197,14 @@ func (q *EventQ) handleRead(cmd *protocol.Command) {
 			cmd.Respond(protocol.NewErrResponse(q.config, protocol.ErrRespNotFound))
 			internal.Debugf(q.config, "id %d not found", startID)
 		} else {
-			cmd.Respond(protocol.NewErrResponse(q.config, []byte("")))
+			cmd.Respond(protocol.NewErrResponse(q.config, []byte("internal error")))
 			log.Printf("failed to handle read command: %+v", err)
 		}
 		return
 	}
 
 	q.Stats.Incr("total_reads")
-	q.doRead(cmd, iterator, limit == 0)
+	q.doRead(cmd, iterator)
 }
 
 func (q *EventQ) handleTail(cmd *protocol.Command) {
@@ -266,7 +255,7 @@ func (q *EventQ) handleTail(cmd *protocol.Command) {
 			}
 
 			q.Stats.Incr("total_reads")
-			q.doRead(cmd, iterator, limit == 0)
+			q.doRead(cmd, iterator)
 		} else {
 			cmd.Respond(protocol.NewErrResponse(q.config, []byte("")))
 			log.Printf("failed to handle read command: %+v", err)
@@ -275,17 +264,13 @@ func (q *EventQ) handleTail(cmd *protocol.Command) {
 	}
 
 	q.Stats.Incr("total_reads")
-	q.doRead(cmd, iterator, limit == 0)
+	q.doRead(cmd, iterator)
 }
 
-func (q *EventQ) doRead(cmd *protocol.Command, iterator logger.LogRangeIterator, forever bool) {
+func (q *EventQ) doRead(cmd *protocol.Command, iterator logger.LogRangeIterator) {
 	resp := protocol.NewResponse(q.config, protocol.RespOK)
-
 	cmd.Respond(resp)
 	cmd.WaitForReady()
-
-	internal.Debugf(q.config, "adding subscription for %s", cmd.ConnID)
-	q.subscriptions[cmd.ConnID] = newSubscription(q.config, resp.ReaderC)
 
 	for iterator.Next() {
 		if err := iterator.Error(); err != nil {
@@ -296,13 +281,11 @@ func (q *EventQ) doRead(cmd *protocol.Command, iterator logger.LogRangeIterator,
 		q.sendChunk(iterator.LogFile(), resp.ReaderC)
 	}
 
-	if !forever {
-		resp.SendEOF()
-		q.removeSubscription(cmd)
-	}
+	resp.SendEOF()
+	// q.removeSubscription(cmd)
 }
 
-func (q *EventQ) sendChunk(lf logger.LogReadableFile, readerC chan io.Reader) {
+func (q *EventQ) sendChunk(lf logger.LogReadableFile, readerC chan protocol.ReadPart) {
 	size, limit, err := lf.SizeLimit()
 	if err != nil {
 		log.Printf("failed to get log size/limit: %+v", err)
@@ -315,8 +298,8 @@ func (q *EventQ) sendChunk(lf logger.LogReadableFile, readerC chan io.Reader) {
 	// buflen does not take seek position into account
 
 	f := lf.AsFile()
-	readerC <- bytes.NewReader([]byte(fmt.Sprintf("+%d\r\n", buflen)))
-	readerC <- io.LimitReader(f, buflen)
+	readerC <- protocol.NewPartReader(bytes.NewReader([]byte(fmt.Sprintf("+%d\r\n", buflen))))
+	readerC <- protocol.NewPartReader(io.LimitReader(f, buflen))
 
 	internal.Debugf(q.config, "readerC <-%s: %d bytes", f.Name(), buflen)
 }
@@ -383,13 +366,8 @@ func (q *EventQ) handleClose(cmd *protocol.Command) {
 		return
 	}
 
-	q.removeSubscription(cmd)
+	// q.removeSubscription(cmd)
 	cmd.Respond(protocol.NewResponse(q.config, protocol.RespOK))
-}
-
-func (q *EventQ) removeSubscription(cmd *protocol.Command) {
-	internal.Debugf(q.config, "removing subscription for %s", cmd.ConnID)
-	delete(q.subscriptions, cmd.ConnID)
 }
 
 func (q *EventQ) handleSleep(cmd *protocol.Command) {
@@ -413,6 +391,7 @@ func (q *EventQ) handleSleep(cmd *protocol.Command) {
 	cmd.Respond(protocol.NewResponse(q.config, protocol.RespOK))
 }
 
+// HandleShutdown handles a shutdown request
 func (q *EventQ) HandleShutdown(cmd *protocol.Command) error {
 	// check if shutdown command is allowed and wait to finish any outstanding
 	// work here
@@ -424,6 +403,7 @@ func (q *EventQ) HandleShutdown(cmd *protocol.Command) error {
 	return nil
 }
 
+// PushCommand adds an event to the queue
 func (q *EventQ) PushCommand(ctx context.Context, cmd *protocol.Command) (*protocol.Response, error) {
 	select {
 	case q.in <- cmd:
@@ -437,9 +417,6 @@ func (q *EventQ) PushCommand(ctx context.Context, cmd *protocol.Command) (*proto
 		return resp, nil
 	}
 }
-
-// func (q *EventQ) handleHup() {
-// }
 
 // Subscription is used to tail logs
 type Subscription struct {

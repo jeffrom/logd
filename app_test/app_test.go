@@ -142,6 +142,13 @@ func expectLineMatchID(t testing.TB, scanner *client.Scanner, msg []byte, id uin
 	}
 }
 
+func expectNoLineRead(t testing.TB, scanner *client.Scanner) {
+	readALine := scanner.Scan()
+	if readALine {
+		t.Fatal("expected not to read a line")
+	}
+}
+
 func createMessageCommands(conf *config.Config, n int, size int) []*protocol.Command {
 	if size <= n {
 		panic("createMessageCommands: n must be greater than size")
@@ -232,6 +239,8 @@ func expectPartitionReads(t testing.TB, conf *config.Config, c *client.Client) {
 }
 
 func expectAllScanned(t testing.TB, conf *config.Config, scanner *client.Scanner) {
+	prevmsg := scanner.Message()
+
 	var firstMsg *protocol.Message
 	var lastMsg *protocol.Message
 	for scanner.Scan() {
@@ -242,7 +251,7 @@ func expectAllScanned(t testing.TB, conf *config.Config, scanner *client.Scanner
 	}
 
 	if firstMsg != nil {
-		t.Logf("unexpected additional message: %+v", firstMsg)
+		t.Logf("unexpected additional message after %v: %+v", firstMsg, prevmsg)
 	}
 	if firstMsg != lastMsg {
 		t.Logf("unexpected final additional message: %+v", lastMsg)
@@ -484,7 +493,7 @@ func testServerReadNewWrite(t *testing.T, conf *config.Config) {
 	testhelper.CheckError(err)
 	expectRespOKID(t, resp, 2)
 
-	expectLineMatch(t, scanner, msg)
+	expectNoLineRead(t, scanner)
 }
 
 func TestServerReadClose(t *testing.T) {
@@ -591,7 +600,7 @@ func testServerTailNewWrite(t *testing.T, conf *config.Config) {
 	testhelper.CheckError(err)
 	expectRespOKID(t, resp, 2)
 
-	expectLineMatch(t, scanner, msg)
+	expectNoLineRead(t, scanner)
 }
 
 func TestServerTailFromTail(t *testing.T) {
@@ -719,14 +728,12 @@ func TestServerWritePartition(t *testing.T) {
 func testServerWritePartition(t *testing.T, conf *config.Config) {
 	cmds := createMessageCommands(conf, 500, conf.PartitionSize)
 
+	srv := newTestServer(conf)
+	defer stopServer(t, srv)
+	c := newTestClient(conf, srv)
+	defer c.Close()
+
 	for i := 0; i < conf.MaxPartitions; i++ {
-		srv := newTestServer(conf)
-		c := newTestClient(conf, srv)
-		// XXX can't read and write safely from the same client yet
-		c2 := newTestClient(conf, srv)
-
-		expectPartitionReads(t, conf, c2)
-
 		t.Logf("filling partition %d with %d messages", i, len(cmds))
 
 		writeMessages(t, conf, c, cmds)
@@ -737,9 +744,7 @@ func testServerWritePartition(t *testing.T, conf *config.Config) {
 			t.Fatalf("partition was larger than partition size: %d", conf.PartitionSize)
 		}
 
-		c2.Close()
-		c2 = newTestClient(conf, srv)
-		expectPartitionReads(t, conf, c2)
+		expectPartitionReads(t, conf, c)
 
 		// XXX we don't account for the protocol envelope when calculating
 		// message sizes, so we can't be sure if there will be a later
@@ -749,10 +754,6 @@ func testServerWritePartition(t *testing.T, conf *config.Config) {
 		// if err == nil {
 		// 	t.Fatalf("Expected no partition %d", i+1)
 		// }
-
-		c.Close()
-		c2.Close()
-		stopServer(t, srv)
 	}
 }
 

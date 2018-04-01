@@ -72,8 +72,8 @@ func (s *Scanner) Scan() bool {
 
 		for {
 			pscanner, err := s.client.continueRead(start, s.config.ClientChunkSize)
+			s.err = err
 			if err != nil {
-				s.err = err
 				if err == errNotFound {
 					time.Sleep(time.Duration(s.config.ClientWaitInterval) * time.Millisecond)
 					continue
@@ -93,8 +93,12 @@ func (s *Scanner) Scan() bool {
 }
 
 func (s *Scanner) Error() error {
-	if s.err != nil {
+	if s.err != nil && s.err != io.EOF {
 		return s.err
 	}
-	return s.Scanner.Error()
+	err := s.Scanner.Error()
+	if err != nil && err != io.EOF {
+		return err
+	}
+	return nil
 }

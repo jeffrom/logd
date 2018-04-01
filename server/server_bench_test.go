@@ -19,6 +19,10 @@ func serverBenchConfig(t testing.TB) *config.Config {
 }
 
 func serverBenchConfigWithOpts(t testing.TB, discard bool) *config.Config {
+	if !testing.Verbose() {
+		log.SetOutput(ioutil.Discard)
+	}
+
 	conf := config.NewConfig()
 	conf.ServerTimeout = 1000
 	conf.ClientTimeout = 1000
@@ -33,9 +37,11 @@ func serverBenchConfigWithOpts(t testing.TB, discard bool) *config.Config {
 	// _, _, teardown := logger.SetupTestFileLoggerConfig(conf, testing.Verbose())
 	conf.LogFile = testhelper.TmpLog()
 
-	conf.Verbose = false
+	conf.Verbose = testing.Verbose()
 
-	log.SetOutput(ioutil.Discard)
+	conf.ClientChunkSize = 10
+	conf.ClientWaitInterval = 200
+
 	return conf
 }
 
@@ -59,13 +65,12 @@ func serverBenchConfigWithOpts(t testing.TB, discard bool) *config.Config {
 // }
 
 func BenchmarkServerConnect(b *testing.B) {
-	b.StopTimer()
 	conf := serverBenchConfig(b)
 	// fmt.Printf("config: %s\n", conf)
 	srv := NewTestServer(conf)
 	defer CloseTestServer(b, srv)
 
-	b.StartTimer()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		c := newTestClient(conf, srv)
 		c.Close()
@@ -73,7 +78,6 @@ func BenchmarkServerConnect(b *testing.B) {
 }
 
 func BenchmarkServerPing(b *testing.B) {
-	b.StopTimer()
 	config := serverBenchConfig(b)
 	srv := NewTestServer(config)
 	defer CloseTestServer(b, srv)
@@ -81,14 +85,13 @@ func BenchmarkServerPing(b *testing.B) {
 	c := newTestClient(config, srv)
 	defer c.Close()
 
-	b.StartTimer()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		c.Do(protocol.NewCommand(config, protocol.CmdPing))
 	}
 }
 
 func BenchmarkServerMsg(b *testing.B) {
-	b.StopTimer()
 	config := serverBenchConfig(b)
 	srv := NewTestServer(config)
 	defer CloseTestServer(b, srv)
@@ -97,46 +100,42 @@ func BenchmarkServerMsg(b *testing.B) {
 	defer c.Close()
 
 	msg := someMessage
-	b.StartTimer()
-
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		c.Do(protocol.NewCommand(config, protocol.CmdMessage, msg))
 	}
 }
 
 func BenchmarkServerRead(b *testing.B) {
-	b.StopTimer()
 	config := serverBenchConfig(b)
 	srv := NewTestServer(config)
 	defer CloseTestServer(b, srv)
 
 	client := newTestClient(config, srv)
+	defer client.Close()
+
 	client.Do(protocol.NewCommand(config, protocol.CmdMessage, someMessage))
-	client.Close()
 
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		client = newTestClient(config, srv)
-		b.StartTimer()
-
 		scanner, err := client.DoRead(1, 1)
 		if err != nil {
 			b.Fatalf("failed to start scanning: %+v", err)
 		}
 		for scanner.Scan() {
-		}
 
-		b.StopTimer()
-		client.Close()
+		}
+		if err := scanner.Error(); err != nil {
+			panic(err)
+		}
 	}
 }
 
 func BenchmarkServerTail(b *testing.B) {
-	b.StopTimer()
 	config := serverBenchConfig(b)
 	srv := NewTestServer(config)
 	defer CloseTestServer(b, srv)
 
-	config.ReadForever = true
 	client := newTestClient(config, srv)
 	defer client.Close()
 
@@ -149,45 +148,33 @@ func BenchmarkServerTail(b *testing.B) {
 		log.Panicf("expected ok response but got %s", resp)
 	}
 
-	done := make(chan struct{})
-	defer func() {
-		done <- struct{}{}
-	}()
-
-	go func() {
-		for {
-			if resp, err := writerClient.Do(protocol.NewCommand(config, protocol.CmdMessage, someMessage)); err != nil {
-				panic(err)
-			} else if resp.Status != protocol.RespOK {
-				log.Panicf("expected ok response but got %s", resp)
-			}
-
-			select {
-			case <-done:
-				return
-			default:
-			}
+	for n := 0; n < config.ClientChunkSize; n++ {
+		if resp, err := writerClient.Do(protocol.NewCommand(config, protocol.CmdMessage, someMessage)); err != nil {
+			panic(err)
+		} else if resp.Status != protocol.RespOK {
+			log.Panicf("expected ok response but got %s", resp)
 		}
-	}()
 
-	scanner, err := client.DoRead(1, config.ClientChunkSize)
-	if err != nil {
-		panic(err)
 	}
 
-	b.StartTimer()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		scanner.Scan()
+		scanner, err := client.DoRead(1, config.ClientChunkSize)
+		if err != nil {
+			panic(err)
+		}
+
+		for scanner.Scan() {
+
+		}
 		if err := scanner.Error(); err != nil {
 			panic(err)
 		}
 	}
-	b.StopTimer()
 }
 
 func BenchmarkServerTailTen(b *testing.B) {
 	total := 10
-	b.StopTimer()
 	config := serverBenchConfig(b)
 	srv := NewTestServer(config)
 	defer CloseTestServer(b, srv)
@@ -195,52 +182,44 @@ func BenchmarkServerTailTen(b *testing.B) {
 	writerClient := newTestClient(config, srv)
 	defer writerClient.Close()
 
-	if resp, err := writerClient.Do(protocol.NewCommand(config, protocol.CmdMessage, someMessage)); err != nil {
+	cmd := protocol.NewCommand(config, protocol.CmdMessage, someMessage)
+	if resp, err := writerClient.Do(cmd); err != nil {
 		panic(err)
 	} else if resp.Status != protocol.RespOK {
 		log.Panicf("expected ok response but got %s", resp)
 	}
 
-	done := make(chan struct{})
-	defer func() {
-		done <- struct{}{}
-	}()
-
-	go func() {
-		for {
-			if resp, err := writerClient.Do(protocol.NewCommand(config, protocol.CmdMessage, someMessage)); err != nil {
-				panic(err)
-			} else if resp.Status != protocol.RespOK {
-				log.Panicf("expected ok response but got %s", resp)
-			}
-
-			select {
-			case <-done:
-				return
-			default:
-			}
-		}
-	}()
-
-	var scanners []*client.Scanner
+	var clients []*client.Client
 	for i := 0; i < total; i++ {
 		client := newTestClient(config, srv)
 		defer client.Close()
+		clients = append(clients, client)
 
-		scanner, _ := client.DoRead(1, 0)
-		scanners = append(scanners, scanner)
 	}
 
-	b.StartTimer()
+	for n := 0; n < config.ClientChunkSize; n++ {
+		if resp, err := writerClient.Do(cmd); err != nil {
+			panic(err)
+		} else if resp.Status != protocol.RespOK {
+			log.Panicf("expected ok response but got %s", resp)
+		}
+	}
+
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		for _, scanner := range scanners {
-			scanner.Scan()
-			if err := scanner.Error(); err != nil {
+		for _, client := range clients {
+			scanner, err := client.DoRead(1, config.ClientChunkSize)
+			if err != nil {
 				panic(err)
+			}
+			for scanner.Scan() {
+
+			}
+			if serr := scanner.Error(); serr != nil {
+				panic(serr)
 			}
 		}
 	}
-	b.StopTimer()
 }
 
 func BenchmarkServerLoadTest(b *testing.B) {

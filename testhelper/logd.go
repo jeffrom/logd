@@ -65,7 +65,7 @@ func CheckGoldenFile(filename string, b []byte, golden bool) {
 func CheckError(err error) {
 	if err != nil {
 		log.Printf("%s", debug.Stack())
-		log.Fatalf("Unexpected error %v", err)
+		log.Fatalf("Unexpected error: %+v", err)
 	}
 }
 

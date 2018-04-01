@@ -26,6 +26,7 @@ func BenchmarkFileLoggerLifecycle(b *testing.B) {
 	config := fileLoggerBenchConfig()
 	l := NewFileLogger(config)
 
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		l.Setup()
 		l.Shutdown()
@@ -38,6 +39,7 @@ func BenchmarkFileLoggerWrite(b *testing.B) {
 	l.Setup()
 	defer l.Shutdown()
 
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		l.Write(someMessage)
 	}
@@ -49,6 +51,7 @@ func BenchmarkFileLoggerWriteWithFlush(b *testing.B) {
 	l.Setup()
 	defer l.Shutdown()
 
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		l.Write(someMessage)
 		l.Flush()
