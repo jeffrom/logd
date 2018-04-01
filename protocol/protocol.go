@@ -72,7 +72,7 @@ func newFlushReader(r io.Reader) *flushReader {
 func ReadLine(br *bufio.Reader) ([]byte, error) {
 	line, err := br.ReadSlice('\n')
 	if err == bufio.ErrBufferFull {
-		return nil, ProtocolError("long response line")
+		return nil, Error("long response line")
 	}
 	if err == io.EOF {
 		return nil, err
@@ -82,20 +82,20 @@ func ReadLine(br *bufio.Reader) ([]byte, error) {
 	}
 
 	if len(line) < termLen {
-		return nil, ProtocolError("line missing terminator")
+		return nil, Error("line missing terminator")
 	}
 
 	if line[len(line)-1] != '\n' || line[len(line)-2] != '\r' {
-		return nil, ProtocolError("bad response line terminator")
+		return nil, Error("bad response line terminator")
 	}
 
 	line = line[:len(line)-2]
 	return line, nil
 }
 
-// ProtocolError is a client error type
-type ProtocolError string
+// Error is a client error type
+type Error string
 
-func (pe ProtocolError) Error() string {
+func (pe Error) Error() string {
 	return fmt.Sprintf("%s (possible server error)", string(pe))
 }
