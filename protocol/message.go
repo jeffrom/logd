@@ -85,5 +85,5 @@ func msgFromLogReader(r *bufio.Reader) (int, *Message, error) {
 		return read, nil, errors.Wrap(err, "failed reading body")
 	}
 
-	return read, NewMessage(id, bytes.TrimRight(buf, "\r\n")), nil
+	return read, NewMessage(id, trimNewline(buf)), nil
 }

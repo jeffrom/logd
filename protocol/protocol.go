@@ -30,9 +30,11 @@ package protocol
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"hash/crc32"
 	"io"
+	"strconv"
 
 	"github.com/pkg/errors"
 )
@@ -98,4 +100,40 @@ type Error string
 
 func (pe Error) Error() string {
 	return fmt.Sprintf("%s (possible server error)", string(pe))
+}
+
+func trimNewline(line []byte) []byte {
+	if line[len(line)-1] == '\n' {
+		line = line[len(line):]
+	}
+	if line[len(line)-1] == '\r' {
+		line = line[len(line):]
+	}
+	return line
+}
+
+func readInt(line []byte, size int) ([]byte, int64, error) {
+	n := bytes.IndexAny(line, " \n")
+	if n <= 0 {
+		return line, 0, errors.New("invalid bytes")
+	}
+	numb := line[:n]
+	if numb[n-1] == '\r' {
+		numb = line[:n]
+	}
+	num, err := strconv.ParseInt(string(numb), 10, size)
+	return line[n+1:], num, err
+}
+
+func readUint(line []byte, size int) ([]byte, uint64, error) {
+	n := bytes.IndexAny(line, " \n")
+	if n <= 0 {
+		return line, 0, errors.New("invalid bytes")
+	}
+	numb := line[:n]
+	if numb[n-1] == '\r' {
+		numb = line[:n]
+	}
+	num, err := strconv.ParseUint(string(numb), 10, size)
+	return line[n+1:], num, err
 }

@@ -67,6 +67,7 @@ func (ps *Scanner) Scan() bool {
 	return err == nil
 }
 
+// ReadMessage reads a single log message
 func (ps *Scanner) ReadMessage() (int, *Message, error) {
 	var id uint64
 	var body []byte
@@ -89,25 +90,19 @@ func (ps *Scanner) ReadMessage() (int, *Message, error) {
 		return read, nil, io.EOF
 	}
 
-	parts := bytes.SplitN(line, []byte(" "), 4)
-	if len(parts) != 4 {
-		// fmt.Printf("%q\n", parts)
-		return read, nil, errInvalidProtocolLine
-	}
-
-	if id, err = strconv.ParseUint(string(parts[0]), 10, 64); err != nil {
+	if line, id, err = readUint(line, 64); err != nil {
 		return read, nil, errors.Wrap(err, "scanning id failed")
 	}
 
-	if bodylen, err = strconv.ParseInt(string(parts[1]), 10, 64); err != nil {
+	if line, bodylen, err = readInt(line, 64); err != nil {
 		return read, nil, errors.Wrap(err, "scanning body length failed")
 	}
 
-	if checksum, err = strconv.ParseUint(string(parts[2]), 10, 32); err != nil {
+	if line, checksum, err = readUint(line, 32); err != nil {
 		return read, nil, errors.Wrap(err, "failed to scan crc")
 	}
 
-	body = parts[3]
+	body = line
 	// fmt.Printf("%q\n", body)
 	if int(bodylen) != len(body) {
 		return read, nil, errInvalidBodyLength
@@ -117,7 +112,7 @@ func (ps *Scanner) ReadMessage() (int, *Message, error) {
 		return read, nil, errCrcChecksumMismatch
 	}
 
-	return read, NewMessage(id, bytes.TrimRight(body, "\r\n")), err
+	return read, NewMessage(id, trimNewline(body)), err
 }
 
 func (ps *Scanner) scanEnvelope() error {
