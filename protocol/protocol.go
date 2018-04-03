@@ -34,7 +34,6 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
-	"strconv"
 
 	"github.com/pkg/errors"
 )
@@ -121,7 +120,7 @@ func readInt(line []byte, size int) ([]byte, int64, error) {
 	if numb[n-1] == '\r' {
 		numb = line[:n]
 	}
-	num, err := strconv.ParseInt(string(numb), 10, size)
+	num, err := asciiToInt(numb)
 	return line[n+1:], num, err
 }
 
@@ -134,6 +133,30 @@ func readUint(line []byte, size int) ([]byte, uint64, error) {
 	if numb[n-1] == '\r' {
 		numb = line[:n]
 	}
-	num, err := strconv.ParseUint(string(numb), 10, size)
+	num, err := asciiToUint(numb)
 	return line[n+1:], num, err
+}
+
+func asciiToUint(tok []byte) (uint64, error) {
+	var n uint64
+	for i := 0; i < len(tok); i++ {
+		ch := tok[i]
+		if ch < 48 || ch > 57 {
+			return 0, errors.New("invalid byte")
+		}
+		n = (n * 10) + uint64(ch-'0')
+	}
+	return n, nil
+}
+
+func asciiToInt(tok []byte) (int64, error) {
+	var n int64
+	for i := 0; i < len(tok); i++ {
+		ch := tok[i]
+		if ch < 48 || ch > 57 {
+			return 0, errors.New("invalid byte")
+		}
+		n = (n * 10) + int64(ch-'0')
+	}
+	return n, nil
 }

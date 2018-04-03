@@ -62,6 +62,15 @@ func CheckGoldenFile(filename string, b []byte, golden bool) {
 	}
 }
 
+func LoadFixture(name string) []byte {
+	filename := "testdata/fixture." + name
+	b, err := ioutil.ReadFile(filename)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
 func CheckError(err error) {
 	if err != nil {
 		log.Printf("%s", debug.Stack())
