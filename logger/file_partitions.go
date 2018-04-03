@@ -71,9 +71,9 @@ func (p *filePartitions) setCurrentFileHandles(create bool) error {
 	return p.setReadHandle(curr)
 }
 
-func (p *filePartitions) remove(parts []uint64) error {
-	log.Printf("Deleting %d partitions: %v", len(parts), parts)
-	for _, part := range parts {
+func (p *filePartitions) remove(start, end uint64) error {
+	log.Printf("Deleting %d partitions: %d -> %d", start-end, start, end)
+	for part := start; part < end; part++ {
 		if err := p.removeOne(part); err != nil {
 			log.Printf("failed to delete partitions: %+v", err)
 			return err

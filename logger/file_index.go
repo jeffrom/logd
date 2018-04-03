@@ -59,8 +59,8 @@ func (c *fileIndexCursor) String() string {
 	return fmt.Sprintf("%d\t%d\t%d", c.id, c.part, c.offset)
 }
 
-// TODO update this to 24 for easier human diffing
-const fileIndexHeaderSize = 16
+const fileIndexHeaderSize = 48
+const fileIndexRowSize = 24
 
 type fileIndex struct {
 	config *config.Config
@@ -77,6 +77,8 @@ type fileIndex struct {
 	headerBuf []byte
 	head      uint64
 	tail      uint64
+	partHead  uint64
+	partTail  uint64
 }
 
 func zeroBuffer(b []byte) {
@@ -124,6 +126,8 @@ func (idx *fileIndex) reset() {
 	idx.buf.Reset()
 	idx.head = 0
 	idx.tail = 0
+	idx.partHead = 0
+	idx.partTail = 0
 }
 
 func (idx *fileIndex) setupReadWriters() error {
@@ -188,9 +192,9 @@ func (idx *fileIndex) loadFromReader() (int64, error) {
 	}
 
 	b := idx.buf.Bytes()
-	for i := 0; i < len(b); i += 24 {
+	for i := 0; i < len(b); i += fileIndexRowSize {
 		c := newFileIndexCursor(0, 0, 0)
-		c.load(b[i : i+24])
+		c.load(b[i : i+fileIndexRowSize])
 
 		idx.data = append(idx.data, c)
 	}
@@ -216,9 +220,13 @@ func (idx *fileIndex) readHeader() (int, error) {
 
 	head, _ := binary.Uvarint(idx.headerBuf)
 	tail, _ := binary.Uvarint(idx.headerBuf[8:])
+	partHead, _ := binary.Uvarint(idx.headerBuf[24:])
+	partTail, _ := binary.Uvarint(idx.headerBuf[32:])
 
 	idx.head = head
 	idx.tail = tail
+	idx.partHead = partHead
+	idx.partTail = partTail
 
 	return n, err
 }
@@ -228,6 +236,8 @@ func (idx *fileIndex) writeHeader() (int, error) {
 	zeroBuffer(idx.headerBuf)
 	binary.PutUvarint(idx.headerBuf, idx.head)
 	binary.PutUvarint(idx.headerBuf[8:], idx.tail)
+	binary.PutUvarint(idx.headerBuf[24:], idx.partHead)
+	binary.PutUvarint(idx.headerBuf[32:], idx.partTail)
 
 	_, err := idx.hw.Seek(0, io.SeekStart)
 	if err != nil {
@@ -250,7 +260,7 @@ func (idx *fileIndex) writeHeader() (int, error) {
 }
 
 func (idx *fileIndex) Append(id uint64, part uint64, offset uint64) (int, error) {
-	buf := make([]byte, 24)
+	buf := make([]byte, fileIndexRowSize)
 	binary.PutUvarint(buf, id)
 	binary.PutUvarint(buf[8:], part)
 	binary.PutUvarint(buf[16:], offset)

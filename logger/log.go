@@ -83,7 +83,7 @@ func (l *Log) Setup() error {
 		return err
 	}
 
-	head, _ := l.parts.head()
+	head := l.index.partHead
 	log.Printf("Starting at log id %d, partition %d, offset %d", l.currID, head, l.written)
 
 	if l.other != nil {
@@ -126,27 +126,22 @@ func (l *Log) Shutdown() error {
 func (l *Log) Write(b []byte) (int, error) {
 	internal.Debugf(l.config, "LOG <- %s (%d)", internal.Prettybuf(bytes.Trim(b, "\n")), len(b))
 
-	head, err := l.parts.head()
-	if err != nil {
-		return 0, err
-	}
+	head := l.index.partHead
 
 	written := l.written + len(b)
 	madeNewPartition := false
-	if written > l.config.PartitionSize {
+	if written >= l.config.PartitionSize {
 		fherr := l.parts.setCurrentFileHandles(true)
 		if fherr != nil {
 			return 0, fherr
 		}
+		l.index.partHead = l.parts.currHead
 
-		parts, perr := l.parts.partitions()
-		if perr != nil {
-			return 0, perr
-		}
+		partlen := l.index.partHead - l.index.partTail
 
 		maxParts := l.config.MaxPartitions
-		if maxParts > 0 && len(parts) > maxParts {
-			tailPart := parts[1]
+		if maxParts > 0 && partlen > uint64(maxParts) {
+			tailPart := l.index.partTail + 1
 			msg, merr := l.parts.firstMessage(tailPart)
 			if merr != nil && merr != io.EOF {
 				return 0, merr
@@ -158,8 +153,10 @@ func (l *Log) Write(b []byte) (int, error) {
 
 			// TODO move the file synchronously first, then any hook acts on the
 			// moved file
-			extraParts := parts[:len(parts)-maxParts]
-			go l.parts.remove(extraParts)
+			extraEnd := partlen - uint64(maxParts)
+			extraStart := l.index.partTail
+			l.index.partTail = tailPart
+			go l.parts.remove(extraStart, extraEnd)
 		}
 
 		internal.Debugf(l.config, "Moved to partition %d", head)
@@ -184,11 +181,7 @@ func (l *Log) Write(b []byte) (int, error) {
 	}
 
 	if l.currID > 0 && l.currID%l.config.IndexCursorSize == 0 {
-		head, err = l.parts.head()
-		if err != nil {
-			return 0, err
-		}
-
+		head := l.index.partHead
 		id := l.currID
 		part := uint64(head)
 		offset := uint64(written - n)
@@ -231,10 +224,7 @@ func (l *Log) Read(b []byte) (int, error) {
 			return read, nil
 		}
 		if err == io.EOF {
-			head, herr := l.parts.head()
-			if herr != nil {
-				return read, herr
-			}
+			head := l.index.partHead
 
 			if l.parts.currReadPart < head {
 				if oerr := l.parts.setReadHandle(l.parts.currReadPart + 1); oerr != nil {
@@ -315,10 +305,7 @@ Loop:
 		}
 
 		if err := scanner.Error(); err == io.EOF {
-			head, herr := l.parts.head()
-			if herr != nil {
-				return part, 0, errors.Wrap(herr, "failed to find head")
-			}
+			head := l.index.partHead
 			if l.parts.currReadPart < head {
 				if oerr := l.parts.setReadHandle(l.parts.currReadPart + 1); oerr != nil {
 					return part, 0, errors.Wrap(oerr, "failed to set read handle")
@@ -353,10 +340,7 @@ func (l *Log) Head() (uint64, error) {
 func (l *Log) Tail() (uint64, error) {
 	// return l.index.tail, nil
 
-	part, herr := l.parts.tail()
-	if herr != nil {
-		return 0, herr
-	}
+	part := l.index.partTail
 
 	if err := l.parts.setReadHandle(part); err != nil {
 		return 0, err
@@ -430,10 +414,7 @@ func (l *Log) Range(start, end uint64) (LogRangeIterator, error) {
 	fn := func() (LogReadableFile, error) {
 		if lf != nil {
 			currpart++
-			head, herr := l.parts.head()
-			if herr != nil {
-				return nil, errors.Wrap(herr, "failed to get log head")
-			}
+			head := l.index.partHead
 			if currpart > endpart || currpart > head {
 				return nil, io.EOF
 			}
