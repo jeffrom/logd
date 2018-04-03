@@ -55,20 +55,18 @@ func (p *filePartitions) shutdown() error {
 	return internal.CloseAll([]io.Closer{p.w, p.r})
 }
 
-func (p *filePartitions) setCurrentFileHandles(create bool) error {
-	curr, err := p.head()
-	if err != nil {
-		return err
-	}
-	if create {
-		curr++
-		p.currHead = curr
-	}
+func (p *filePartitions) setCurrentFileHandles(curr uint64) error {
+	p.currHead = curr
 	if serr := p.setWriteHandle(curr); serr != nil {
 		return serr
 	}
 
 	return p.setReadHandle(curr)
+}
+
+func (p *filePartitions) create(head uint64) error {
+	p.currHead = head + 1
+	return p.setCurrentFileHandles(p.currHead)
 }
 
 func (p *filePartitions) remove(start, end uint64) error {

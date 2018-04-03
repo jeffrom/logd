@@ -61,19 +61,18 @@ func (l *Log) Setup() error {
 		panic("config: LogFile not set")
 	}
 
-	err := l.parts.setCurrentFileHandles(false)
-	if err != nil {
-		return errors.Wrap(err, "failed to get file handles")
-	}
-
 	if err := l.index.setup(); err != nil {
 		return err
 	}
-	// fmt.Printf("%+v\n", l.index)
 
 	if l.config.Verbose {
 		internal.Debugf(l.config, "Current index")
 		l.index.dump()
+	}
+
+	// fmt.Printf("%+v\n", l.index)
+	if err := l.parts.setCurrentFileHandles(l.index.partHead); err != nil {
+		return errors.Wrap(err, "failed to get file handles")
 	}
 
 	// TODO on startup we need to make sure index head is the latest id
@@ -131,7 +130,7 @@ func (l *Log) Write(b []byte) (int, error) {
 	written := l.written + len(b)
 	madeNewPartition := false
 	if written >= l.config.PartitionSize {
-		fherr := l.parts.setCurrentFileHandles(true)
+		fherr := l.parts.create(l.index.partHead)
 		if fherr != nil {
 			return 0, fherr
 		}
