@@ -33,6 +33,7 @@ func serverBenchConfigWithOpts(t testing.TB, discard bool) *config.Config {
 	conf.PartitionSize = 1024 * 500
 	conf.IndexCursorSize = 100
 	conf.LogFileMode = 0644
+	conf.MaxPartitions = 5
 
 	// _, _, teardown := logger.SetupTestFileLoggerConfig(conf, testing.Verbose())
 	conf.LogFile = testhelper.TmpLog()

@@ -6,7 +6,6 @@ import (
 	"io"
 	"log"
 	"net"
-	"os"
 	"runtime/debug"
 	"strings"
 	"sync"
@@ -427,9 +426,9 @@ func (s *Socket) executeCommand(ctx context.Context, conn *Conn, cmd *protocol.C
 }
 
 func (s *Socket) finishCommand(ctx context.Context, conn *Conn, cmd *protocol.Command, resp *protocol.Response) {
-	if cmd.IsRead() {
-		return
-	}
+	// if cmd.IsRead() {
+	// 	return
+	// }
 
 	conn.setState(connStateInactive)
 }
@@ -486,7 +485,7 @@ func (s *Socket) handleSubscriber(ctx context.Context, conn *Conn, cmd *protocol
 
 		select {
 		case r := <-resp.ReaderC:
-			internal.Debugf(s.config, "%s <-reader: %+v", conn.RemoteAddr(), r)
+			internal.Debugf(s.config, "%s <-reader: %+v (%+v)", conn.RemoteAddr(), r, r.Reader())
 
 			if r.Done() {
 				internal.Debugf(s.config, "read part is done")
@@ -502,9 +501,9 @@ func (s *Socket) handleSubscriber(ctx context.Context, conn *Conn, cmd *protocol
 		case <-ctx.Done():
 			internal.Debugf(s.config, "%s: subscriber context received <-Done", conn.RemoteAddr())
 
-			if _, err := s.readPending(ctx, conn, resp); err != nil {
-				log.Printf("%s: error reading pending buffers: %+v", conn.RemoteAddr(), err)
-			}
+			// if _, err := s.readPending(ctx, conn, resp); err != nil {
+			// 	log.Printf("%s: error reading pending buffers: %+v", conn.RemoteAddr(), err)
+			// }
 
 			close(resp.ReaderC)
 			return
@@ -513,6 +512,11 @@ func (s *Socket) handleSubscriber(ctx context.Context, conn *Conn, cmd *protocol
 }
 
 func (s *Socket) sendReader(ctx context.Context, r io.Reader, conn *Conn) error {
+	// lf, ok := r.(*internal.LogFile)
+	// if ok {
+
+	// }
+
 	n, err := conn.readFrom(r)
 	s.q.Stats.Add("total_bytes_written", int64(n))
 	if err != nil {
@@ -526,9 +530,9 @@ func (s *Socket) sendReader(ctx context.Context, r io.Reader, conn *Conn) error 
 		r = lr.R
 	}
 
-	f, ok := r.(*os.File)
+	f, ok := r.(*internal.LogFile)
 	if ok {
-		internal.Debugf(s.config, "%s: closing %s", conn.RemoteAddr(), f.Name())
+		internal.Debugf(s.config, "%s: closing logfile %s", conn.RemoteAddr(), f.Name())
 		if cerr := f.Close(); err != nil {
 			log.Printf("error closing reader to %s: %+v", conn.RemoteAddr(), cerr)
 			return cerr

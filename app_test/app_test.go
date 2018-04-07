@@ -142,6 +142,21 @@ func expectLineMatchID(t testing.TB, scanner *client.Scanner, msg []byte, id uin
 	}
 }
 
+func expectLineID(t testing.TB, scanner *client.Scanner, id uint64) {
+	readALine := scanner.Scan()
+	if !readALine {
+		t.Fatal(logWithStack("Expected to scan one message but failed: %s", scanner.Error()))
+	}
+	if err := scanner.Error(); err != nil {
+		t.Fatal(logWithStack("unexpected error scanning: %+v", err))
+	}
+
+	m := scanner.Message()
+	if m.ID != id {
+		t.Fatal(logWithStack("Expected id %d but got %d", id, m.ID))
+	}
+}
+
 func expectNoLineRead(t testing.TB, scanner *client.Scanner) {
 	readALine := scanner.Scan()
 	if readALine {
@@ -227,11 +242,27 @@ func expectPartitionReads(t testing.TB, conf *config.Config, c *client.Client) {
 		first := readFirstFromFile(conf, part)
 		if first != nil {
 			// panic(fmt.Sprintf("%+v", first))
+			// fmt.Println(first)
 			scanner, err := c.DoRead(first.ID, 1)
 			if err != nil {
 				panic(err)
 			}
 			expectLineMatchID(t, scanner, first.Body, first.ID)
+			expectAllScanned(t, conf, scanner)
+
+			scanner, err = c.DoRead(first.ID, 2)
+			if err != nil {
+				panic(err)
+			}
+			expectLineMatchID(t, scanner, first.Body, first.ID)
+			expectLineID(t, scanner, first.ID+1)
+			expectAllScanned(t, conf, scanner)
+
+			scanner, err = c.DoRead(first.ID+1, 1)
+			if err != nil {
+				panic(err)
+			}
+			expectLineID(t, scanner, first.ID+1)
 			expectAllScanned(t, conf, scanner)
 		}
 	}
@@ -358,12 +389,11 @@ func TestApp(t *testing.T) {
 }
 
 func getConfigs() map[string]*config.Config {
-	return map[string]*config.Config{
-		"default": config.DefaultConfig,
+	m := map[string]*config.Config{
 		"simple": &config.Config{
-			ServerTimeout:           500,
-			ClientTimeout:           500,
-			GracefulShutdownTimeout: 500,
+			ServerTimeout:           200,
+			ClientTimeout:           200,
+			GracefulShutdownTimeout: 200,
 			LogFileMode:             0644,
 			MaxChunkSize:            1024 * 1024,
 			PartitionSize:           1024 * 1024,
@@ -371,6 +401,12 @@ func getConfigs() map[string]*config.Config {
 			MaxPartitions:           5,
 		},
 	}
+
+	if !testing.Short() {
+		m["default"] = config.DefaultConfig
+	}
+
+	return m
 }
 
 func runTestConfs(t *testing.T, tf func(t *testing.T, c *config.Config)) {
@@ -464,6 +500,7 @@ func testServerRead(t *testing.T, conf *config.Config) {
 	testhelper.CheckError(err)
 
 	expectLineMatch(t, scanner, msg)
+	expectAllScanned(t, conf, scanner)
 }
 
 func TestServerReadNewWrite(t *testing.T) {
@@ -518,12 +555,12 @@ func testServerReadClose(t *testing.T, conf *config.Config) {
 	for n := 0; n < 10; n++ {
 		readClient := newTestClient(conf, srv)
 
-		_, err := readClient.DoRead(1, 0)
+		_, err := readClient.DoRead(1, 10)
 		testhelper.CheckError(err)
 		readClient.Close()
 
 		readClient = newTestClient(conf, srv)
-		scanner, err := readClient.DoRead(1, 0)
+		scanner, err := readClient.DoRead(1, 10)
 		testhelper.CheckError(err)
 		expectLineMatch(t, scanner, msg)
 
@@ -822,7 +859,7 @@ var someCommands []commandArgs = []commandArgs{
 	{protocol.CmdMessage, []string{"cool message"}},
 	// {protocol.CmdRead, []string{"1", "1"}},
 	// {protocol.CmdTail, []string{"1", "1"}},
-	{protocol.CmdSleep, []string{"100"}},
+	{protocol.CmdSleep, []string{"75"}},
 }
 
 func randomCommand(conf *config.Config) *protocol.Command {

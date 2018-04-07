@@ -5,7 +5,8 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"os"
+
+	"github.com/jeffrom/logd/internal"
 )
 
 // MemLogger is used internally for testing. It mocks the default file logger.
@@ -159,7 +160,7 @@ func newMemFile(b []byte) *memFile {
 	}
 }
 
-func (mf *memFile) AsFile() *os.File {
+func (mf *memFile) AsFile() *internal.LogFile {
 	return nil
 }
 

@@ -181,7 +181,7 @@ func doReadCmdAction(conf *config.Config) func(c *cli.Context) error {
 
 		if err := scanner.Error(); err != io.EOF && err != nil {
 			if cerr, ok := errors.Cause(err).(net.Error); !ok || !cerr.Timeout() {
-				log.Printf("%+v", err)
+				log.Printf("%v", err)
 				return cli.NewExitError(err, 3)
 			}
 		}

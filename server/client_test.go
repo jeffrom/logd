@@ -70,11 +70,11 @@ func TestConnProtocolWriter(t *testing.T) {
 }
 
 func TestClientWriteFails(t *testing.T) {
-	config := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultTestConfig(testing.Verbose())
 
 	srv := NewTestServer(testhelper.TestConfig(testing.Verbose()))
 	defer CloseTestServer(t, srv)
-	client, mockConn := newMockClient(config, srv)
+	client, mockConn := newMockClient(conf, srv)
 	defer client.Close()
 
 	mockConn.failWriteWith(&net.OpError{
@@ -84,7 +84,7 @@ func TestClientWriteFails(t *testing.T) {
 		Err:    errors.New("unknown host"),
 	})
 
-	_, err := client.Do(protocol.NewCommand(config, protocol.CmdPing))
+	_, err := client.Do(protocol.NewCommand(conf, protocol.CmdPing))
 	if err == nil {
 		t.Fatalf("Expected error but got none")
 	}

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"os"
 
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/internal"
@@ -29,11 +28,8 @@ type LogWriter interface {
 // be able to read the log file into the connection.
 // ReadFromID(rf io.ReaderFrom, id uint64, limit int) error
 type LogReader interface {
-	io.Reader
-	SeekToID(id uint64) error
 	Head() (uint64, error)
 	Tail() (uint64, error)
-	Copy() Logger
 	Range(start, end uint64) (LogRangeIterator, error)
 }
 
@@ -55,7 +51,7 @@ type LogReadableFile interface {
 	io.Closer
 	SetLimit(limit int64)
 	SizeLimit() (int64, int64, error)
-	AsFile() *os.File
+	AsFile() *internal.LogFile
 }
 
 type LogWriteableFile interface {
@@ -85,34 +81,6 @@ type LogRangeIterator interface {
 	Next() bool
 	Error() error
 	LogFile() LogReadableFile
-}
-
-type logFile struct {
-	*os.File
-	limit int64
-}
-
-func newLogFile(f *os.File) *logFile {
-	return &logFile{File: f}
-}
-
-func (lf *logFile) SetLimit(limit int64) {
-	lf.limit = limit
-}
-
-func (lf *logFile) SizeLimit() (int64, int64, error) {
-	if lf.limit > 0 {
-		return 0, lf.limit, nil
-	}
-	stat, err := lf.Stat()
-	if err != nil {
-		return -1, -1, err
-	}
-	return stat.Size(), 0, nil
-}
-
-func (lf *logFile) AsFile() *os.File {
-	return lf.File
 }
 
 // CheckIndex verifies the index against the log file

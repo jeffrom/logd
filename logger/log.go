@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"io"
 	"log"
-	"os"
 
 	"github.com/pkg/errors"
 
@@ -15,7 +14,6 @@ import (
 
 // Log manages reading and writing to the log partitions
 type Log struct {
-	other   *Log
 	config  *config.Config
 	parts   *filePartitions
 	index   *fileIndex
@@ -31,20 +29,11 @@ type flusher interface {
 func New(conf *config.Config) *Log {
 	l := &Log{
 		config: conf,
-		other:  newFileLoggerCopy(conf),
 		index:  newFileIndex(conf),
 		parts:  newFilePartitions(conf),
 	}
 
 	return l
-}
-
-func newFileLoggerCopy(conf *config.Config) *Log {
-	return &Log{
-		config: conf,
-		index:  newFileIndex(conf),
-		parts:  newFilePartitions(conf),
-	}
 }
 
 // Reset resets the logger to its initial state
@@ -75,6 +64,11 @@ func (l *Log) Setup() error {
 		return errors.Wrap(err, "failed to get file handles")
 	}
 
+	if err := l.parts.setup(l.index.partHead); err != nil {
+		log.Printf("error setting up partitions: %+v", err)
+		return errors.Wrap(err, "failed to set up partitions")
+	}
+
 	// TODO on startup we need to make sure index head is the latest id
 
 	if err := l.loadState(); err != nil {
@@ -82,12 +76,8 @@ func (l *Log) Setup() error {
 		return err
 	}
 
-	head := l.index.partHead
-	log.Printf("Starting at log id %d, partition %d, offset %d", l.currID, head, l.written)
+	log.Printf("Starting at log id %d, partition %d, offset %d", l.currID, l.index.partHead, l.written)
 
-	if l.other != nil {
-		return l.other.Setup()
-	}
 	return nil
 }
 
@@ -106,19 +96,6 @@ func (l *Log) Shutdown() error {
 		}
 	}
 
-	if l.other != nil {
-		other := l.other
-		files := []io.Closer{
-			other.index.r, other.index.w, other.index.hw,
-			other.parts.r, other.parts.w,
-		}
-		if err := internal.CloseAll(files); err != nil {
-			log.Printf("error shutting down other logger: %+v", err)
-			if firstErr == nil {
-				firstErr = err
-			}
-		}
-	}
 	return firstErr
 }
 
@@ -136,7 +113,11 @@ func (l *Log) Write(b []byte) (int, error) {
 		}
 		l.index.partHead = l.parts.currHead
 
-		partlen := l.index.partHead - l.index.partTail
+		if err := l.parts.add(l.parts.currHead); err != nil {
+			return 0, err
+		}
+
+		partlen := 1 + (l.index.partHead - l.index.partTail)
 
 		maxParts := l.config.MaxPartitions
 		if maxParts > 0 && partlen > uint64(maxParts) {
@@ -150,12 +131,21 @@ func (l *Log) Write(b []byte) (int, error) {
 				l.index.tail = msg.ID
 			}
 
+			// extraStart := l.index.partTail - (partlen - uint64(maxParts))
+			extraStart := l.index.partTail
+			n := 1
+			if partlen > uint64(maxParts) {
+				n = int(partlen - uint64(maxParts))
+				if n > 1 {
+					extraStart -= uint64(n - 1)
+				}
+			}
+
+			l.index.partTail = tailPart
+
 			// TODO move the file synchronously first, then any hook acts on the
 			// moved file
-			extraEnd := partlen - uint64(maxParts)
-			extraStart := l.index.partTail
-			l.index.partTail = tailPart
-			go l.parts.remove(extraStart, extraEnd)
+			go l.parts.remove(extraStart, n)
 		}
 
 		internal.Debugf(l.config, "Moved to partition %d", head)
@@ -263,34 +253,34 @@ func (l *Log) getPartOffset(id uint64, inclusive bool) (uint64, int64, error) {
 	}
 
 	// catch up any new indexes written
-	if _, err := l.index.loadFromReader(); err != nil {
-		return 0, 0, errors.Wrap(err, "failed to initialize index")
-	}
+	// if _, err := l.index.loadFromReader(); err != nil {
+	// 	return 0, 0, errors.Wrap(err, "failed to initialize index")
+	// }
 
-	part, offset := l.index.Get(id)
+	partn, offset := l.index.Get(id)
+	// fmt.Println("index.Get(", id, ")", partn, offset)
 
-	if err := l.parts.setReadHandle(part); err != nil {
-		// the matching message may be on the next partition
-		part++
-		if nperr := l.parts.setReadHandle(part); nperr != nil {
-			return part, 0, errors.Wrap(nperr, "failed setting read handle")
+	var r *internal.LogFile
+	r, err := l.parts.getReader(partn)
+	if err != nil {
+		partn++
+		r, err = l.parts.getReader(partn)
+		if err != nil {
+			return partn, 0, errors.Wrap(err, "failed to set read handle")
 		}
 		offset = 0
-	} else {
-		if _, err := l.parts.r.Seek(int64(offset), io.SeekStart); err != nil {
-			return part, 0, errors.Wrap(err, "failed seeking in partition")
-		}
 	}
+	defer r.Close()
 
 	if id == 1 && !inclusive {
 		return 0, 0, nil
 	}
 
-	scanner := protocol.NewScanner(l.config, l.parts.r)
+	scanner := protocol.NewScanner(l.config, r)
 
 Loop:
 	for {
-		scanner.Reset(l.parts.r)
+		scanner.Reset(r)
 
 		for scanner.Scan() {
 			msg := scanner.Message()
@@ -299,25 +289,27 @@ Loop:
 				break Loop
 			}
 			if msg.ID > id {
-				return part, 0, errors.New("failed to scan to id")
+				return partn, 0, errors.New("failed to scan to id")
 			}
 		}
 
 		if err := scanner.Error(); err == io.EOF {
 			head := l.index.partHead
-			if l.parts.currReadPart < head {
-				if oerr := l.parts.setReadHandle(l.parts.currReadPart + 1); oerr != nil {
-					return part, 0, errors.Wrap(oerr, "failed to set read handle")
+			if partn < head {
+				partn++
+				r.Close()
+				r, err = l.parts.getReader(partn)
+				if err != nil {
+					return partn, 0, errors.Wrap(err, "failed to get partition")
 				}
 
 				offset = 0
-				part++
 				continue
 			} else {
 				break
 			}
 		} else if err != nil {
-			return part, 0, errors.Wrap(err, "failed to scan log")
+			return partn, 0, errors.Wrap(err, "failed to scan log")
 		}
 	}
 
@@ -326,8 +318,8 @@ Loop:
 		off -= int64(scanner.LastChunkPos)
 	}
 	// fmt.Println(offset, scanner.ChunkPos, scanner.LastChunkPos)
-	internal.Debugf(l.config, "looked up id %d: partition: %d, offset: %d", id, part, off)
-	return part, off, nil
+	internal.Debugf(l.config, "looked up id %d: partition: %d, offset: %d", id, partn, off)
+	return partn, off, nil
 }
 
 // Head returns the current latest ID
@@ -339,17 +331,16 @@ func (l *Log) Head() (uint64, error) {
 func (l *Log) Tail() (uint64, error) {
 	// return l.index.tail, nil
 
-	part := l.index.partTail
+	partn := l.index.partTail
 
-	if err := l.parts.setReadHandle(part); err != nil {
+	r, err := l.parts.getReader(partn)
+	if err != nil {
 		return 0, err
 	}
-	if _, err := l.parts.r.Seek(0, io.SeekStart); err != nil {
-		return 0, err
-	}
+	defer r.Close()
 
 	var msg *protocol.Message
-	scanner := protocol.NewScanner(l.config, l)
+	scanner := protocol.NewScanner(l.config, r)
 	for scanner.Scan() {
 		if scanned := scanner.Message(); scanned != nil {
 			msg = scanned
@@ -357,7 +348,7 @@ func (l *Log) Tail() (uint64, error) {
 		break
 	}
 
-	err := scanner.Error()
+	err = scanner.Error()
 	if err == io.EOF {
 		err = nil
 	}
@@ -378,13 +369,7 @@ func (l *Log) Copy() Logger {
 func (l *Log) Range(start, end uint64) (LogRangeIterator, error) {
 	internal.Debugf(l.config, "Range(%d, %d)", start, end)
 
-	lcopy := l.other
-	lcopy.Reset()
-	if err := lcopy.Setup(); err != nil {
-		return nil, err
-	}
-
-	endpart, endoff, pcerr := lcopy.getPartOffset(end, true)
+	endpart, endoff, pcerr := l.getPartOffset(end, true)
 	if pcerr != nil {
 		return nil, errors.Wrap(pcerr, "failed to get range upper bound")
 	}
@@ -394,17 +379,9 @@ func (l *Log) Range(start, end uint64) (LogRangeIterator, error) {
 		return nil, errors.Wrap(perr, "failed to get range lower bound")
 	}
 
-	if err := l.parts.setReadHandle(currpart); err != nil {
-		return nil, errors.Wrap(err, "failed to make new read handle after range")
-	}
-	if _, serr := l.parts.r.Seek(curroff, io.SeekStart); serr != nil {
-		return nil, errors.Wrap(serr, "failed to seek log in range query")
-	}
-
-	r := l.parts.r
-	l.parts.r = nil
-	if err := l.parts.setReadHandle(l.parts.currReadPart); err != nil {
-		return nil, errors.Wrap(err, "failed to make new read handle after range")
+	r, err := l.parts.getReader(currpart)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get readable logFile")
 	}
 
 	internal.Debugf(l.config, "Range: start %d:%d end %d:%d", currpart, curroff, endpart, endoff)
@@ -413,19 +390,21 @@ func (l *Log) Range(start, end uint64) (LogRangeIterator, error) {
 	fn := func() (LogReadableFile, error) {
 		if lf != nil {
 			currpart++
+			l.parts.currReadPart = currpart
 			head := l.index.partHead
 			if currpart > endpart || currpart > head {
 				return nil, io.EOF
 			}
 			curroff = 0
 
-			nextpath := l.parts.logFilePath(currpart)
-			f, err := os.Open(nextpath)
+			r, err = l.parts.getReader(currpart)
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to open next file in range")
+				return nil, errors.Wrap(err, "failed to get next reader")
 			}
-
-			r = newLogFile(f)
+		} else {
+			if _, serr := r.Seek(curroff, io.SeekStart); serr != nil {
+				return nil, errors.Wrap(serr, "failed to seek log in range query")
+			}
 		}
 		lf = r
 
@@ -483,13 +462,6 @@ func (pi *PartitionIterator) LogFile() LogReadableFile {
 }
 
 func (l *Log) loadState() error {
-	head := l.index.head
-	if head > 1 {
-		if err := l.SeekToID(head - 1); err != nil {
-			return err
-		}
-	}
-
 	scanner := protocol.NewScanner(l.config, l)
 	var lastMsg *protocol.Message
 	var firstMsg *protocol.Message

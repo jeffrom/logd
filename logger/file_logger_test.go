@@ -55,29 +55,6 @@ func TestFileLoggerWrite(t *testing.T) {
 	testhelper.CheckGoldenFile("file_logger_write", b, testhelper.Golden)
 }
 
-func TestFileLoggerReadSeek(t *testing.T) {
-	config, l, teardown := SetupTestFileLogger(testing.Verbose())
-	defer teardown()
-
-	fileWriteLog(t, l, 1, "one")
-	fileWriteLog(t, l, 2, "two")
-	fileWriteLog(t, l, 3, "three")
-	fileWriteLog(t, l, 4, "four")
-
-	if head, err := l.Head(); err != nil {
-		t.Fatalf("failed getting head of log: %+v", err)
-	} else if head != 4 {
-		t.Fatalf("expected head to be 4 but was %d", head)
-	}
-
-	if err := l.SeekToID(2); err != nil {
-		t.Fatalf("unexpected error seeking: %+v", err)
-	}
-
-	out := testhelper.GetLogOutput(config, l)
-	testhelper.CheckGoldenFile("file_logger_read_seek", out, testhelper.Golden)
-}
-
 func TestFileLoggerReadPartition(t *testing.T) {
 	config := testhelper.TestConfig(testing.Verbose())
 	config.IndexCursorSize = 10

@@ -24,6 +24,10 @@ func (pr *PartReader) Done() bool {
 	return false
 }
 
+// func (pr *PartReader) Read(b []byte) (int, error) {
+// 	return pr.r.Read(b)
+// }
+
 // Reader implements ReadPart interface
 func (pr *PartReader) Reader() io.Reader {
 	return pr.r

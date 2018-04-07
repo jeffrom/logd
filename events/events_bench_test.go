@@ -27,6 +27,7 @@ func eventQBenchConfig() *config.Config {
 	config.MaxChunkSize = 1024 * 10
 	config.IndexCursorSize = 1000
 	config.PartitionSize = 2048
+	config.MaxPartitions = 5
 
 	config.Verbose = false
 

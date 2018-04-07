@@ -197,7 +197,7 @@ func (q *EventQ) handleRead(cmd *protocol.Command) {
 			cmd.Respond(protocol.NewErrResponse(q.config, protocol.ErrRespNotFound))
 			internal.Debugf(q.config, "id %d not found", startID)
 		} else {
-			cmd.Respond(protocol.NewErrResponse(q.config, []byte("internal error")))
+			cmd.Respond(protocol.NewErrResponse(q.config, protocol.ErrRespServer))
 			log.Printf("failed to handle read command: %+v", err)
 		}
 		return
@@ -282,7 +282,6 @@ func (q *EventQ) doRead(cmd *protocol.Command, iterator logger.LogRangeIterator)
 	}
 
 	resp.SendEOF()
-	// q.removeSubscription(cmd)
 }
 
 func (q *EventQ) sendChunk(lf logger.LogReadableFile, readerC chan protocol.ReadPart) {
@@ -366,7 +365,6 @@ func (q *EventQ) handleClose(cmd *protocol.Command) {
 		return
 	}
 
-	// q.removeSubscription(cmd)
 	cmd.Respond(protocol.NewResponse(q.config, protocol.RespOK))
 }
 

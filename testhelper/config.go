@@ -14,6 +14,7 @@ func TestConfig(verbose bool) *config.Config {
 	conf.LogFile = TmpLog()
 	conf.LogFileMode = 0644
 	conf.IndexCursorSize = 1000
+	conf.MaxPartitions = 5
 
 	conf.Verbose = verbose
 

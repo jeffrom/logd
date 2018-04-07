@@ -130,6 +130,13 @@ func (idx *fileIndex) reset() {
 	idx.partTail = 0
 }
 
+func (idx *fileIndex) flush() error {
+	if err := idx.bw.Flush(); err != nil {
+		return errors.Wrap(err, "failed to flush index bw")
+	}
+	return nil
+}
+
 func (idx *fileIndex) setupReadWriters() error {
 	idxFileName := idx.config.IndexFileName()
 	w, err := os.OpenFile(idxFileName, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.FileMode(idx.config.LogFileMode))
@@ -252,10 +259,6 @@ func (idx *fileIndex) writeHeader() (int, error) {
 	if n != fileIndexHeaderSize {
 		return n, errors.New("wrote incorrect number of bytes to index header")
 	}
-
-	// if ferr := idx.hw.Flush(); ferr != nil {
-	// 	return n, errors.Wrap(ferr, "failed to flush index header to disk")
-	// }
 	return n, nil
 }
 
