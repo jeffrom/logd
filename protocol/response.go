@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"bytes"
-	"log"
 
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/internal"
@@ -79,6 +78,8 @@ type Response struct {
 	ID      uint64
 	Body    []byte
 	ReaderC chan ReadPart
+	pw      *ProtocolWriter
+	eofbuf  *bytes.Reader
 }
 
 // NewResponse returns a new instance of a Response
@@ -86,6 +87,8 @@ func NewResponse(conf *config.Config, status RespType) *Response {
 	r := &Response{
 		config: conf,
 		Status: status,
+		pw:     NewProtocolWriter(),
+		eofbuf: bytes.NewReader(nil),
 	}
 	return r
 }
@@ -125,15 +128,9 @@ func (r *Response) SendBytes(b []byte) {
 
 // SendEOF sends an EOF to a connection, then finishes the response.
 func (r *Response) SendEOF() {
-	w := NewProtocolWriter()
-	b, err := w.writeResponse(NewResponse(r.config, RespEOF))
-	if err != nil {
-		// NOTE shouldn't ever happen, just being pedantic
-		log.Printf("error writing protocol response: %+v", err)
-		return
-	}
+	b := r.pw.writeEOF()
 	internal.Debugf(r.config, "<-ReaderC %q (with flush)", b)
-	reader := newFlushReader(bytes.NewReader(b))
-	r.ReaderC <- NewPartReader(reader)
+	r.eofbuf.Reset(b)
+	r.ReaderC <- NewPartReader(r.eofbuf)
 	r.ReaderC <- &PartDone{}
 }

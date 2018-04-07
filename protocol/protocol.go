@@ -49,26 +49,6 @@ var errRangeNotFound = errors.New("id range not found")
 
 var crcTable = crc32.MakeTable(crc32.Koopman)
 
-type protocolFlusher interface {
-	shouldFlush() bool
-}
-
-type flushReader struct {
-	r io.Reader
-}
-
-func (fr *flushReader) Read(p []byte) (int, error) {
-	return fr.r.Read(p)
-}
-
-func (fr *flushReader) shouldFlush() bool {
-	return true
-}
-
-func newFlushReader(r io.Reader) *flushReader {
-	return &flushReader{r: r}
-}
-
 // ReadLine reads a line from a bufio.Reader
 func ReadLine(br *bufio.Reader) ([]byte, error) {
 	line, err := br.ReadSlice('\n')
