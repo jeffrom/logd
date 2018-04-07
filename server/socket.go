@@ -512,10 +512,9 @@ func (s *Socket) handleSubscriber(ctx context.Context, conn *Conn, cmd *protocol
 }
 
 func (s *Socket) sendReader(ctx context.Context, r io.Reader, conn *Conn) error {
-	// lf, ok := r.(*internal.LogFile)
-	// if ok {
-
-	// }
+	// TODO LogFile needs to be able to return its limit here so we can
+	// properly wrap an *os.File with a io.LimitedReader. then we can use the
+	// sendfile magic
 
 	n, err := conn.readFrom(r)
 	s.q.Stats.Add("total_bytes_written", int64(n))
