@@ -3,7 +3,6 @@ package protocol
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"io"
 
 	"github.com/jeffrom/logd/config"
@@ -59,7 +58,7 @@ func msgFromLogReader(r *bufio.Reader) (int, *Message, error) {
 	// fmt.Printf("id: %q\n", idBytes)
 
 	var id uint64
-	_, err = fmt.Sscanf(string(idBytes), "%d", &id)
+	id, err = asciiToUint(idBytes)
 	if err != nil {
 		return read, nil, errors.Wrap(err, "invalid id bytes")
 	}
@@ -72,7 +71,7 @@ func msgFromLogReader(r *bufio.Reader) (int, *Message, error) {
 	}
 
 	var length uint64
-	_, err = fmt.Sscanf(string(lenBytes), "%d", &length)
+	length, err = asciiToUint(lenBytes)
 	if err != nil {
 		return read, nil, errors.Wrap(err, "invalid length bytes")
 	}

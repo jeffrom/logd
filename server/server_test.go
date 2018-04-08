@@ -28,6 +28,17 @@ func newTestClient(config *config.Config, srv *Socket) *client.Client {
 	return conn
 }
 
+func newTestClientLogger(conf *config.Config, srv *Socket) *client.Logger {
+	if conf == nil {
+		conf = testhelper.DefaultTestConfig(testing.Verbose())
+	}
+	l, err := client.DialLoggerConfig(srv.ln.Addr().String(), conf)
+	if err != nil {
+		panic(err)
+	}
+	return l
+}
+
 func NewTestServer(config *config.Config) *Socket {
 	srv := NewSocket("127.0.0.1:0", config)
 	srv.GoServe()

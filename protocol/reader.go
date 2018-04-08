@@ -3,9 +3,7 @@ package protocol
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"io"
-	"strconv"
 
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/internal"
@@ -36,19 +34,19 @@ func (pr *ProtocolReader) ReadCommand(r io.Reader) (*Command, error) {
 	}
 	internal.Debugf(pr.config, "read(raw): %q", line)
 
-	parts := bytes.SplitN(line, []byte(" "), 2)
-	if len(parts) != 2 {
-		return nil, errors.New("Badly formatted command")
-	}
-
-	name := cmdNamefromBytes(parts[0])
-	numArgs, err := strconv.ParseInt(string(parts[1]), 10, 16)
+	line, cmdBytes, err := readWord(line)
 	if err != nil {
 		return nil, err
 	}
 
-	var args [][]byte
-	// TODO read args efficiently
+	name := cmdNamefromBytes(cmdBytes)
+	_, numArgs, err := readInt(line)
+	// fmt.Printf("readInt: %d %q %+v\n", numArgs, line, err)
+	if err != nil {
+		return nil, err
+	}
+
+	args := make([][]byte, int(numArgs))
 	for i := 0; i < int(numArgs); i++ {
 		line, err = ReadLine(pr.Br)
 		if err != nil {
@@ -56,19 +54,19 @@ func (pr *ProtocolReader) ReadCommand(r io.Reader) (*Command, error) {
 		}
 		internal.Debugf(pr.config, "read arg(raw): %q", internal.Prettybuf(line))
 
-		parts = bytes.SplitN(line, []byte(" "), 2)
-		if len(parts) != 2 {
-			return nil, errors.New("Badly formatted argument")
-		}
-
-		_, err := ParseNumber(parts[0])
+		var arglen uint64
+		line, arglen, err = readUint(line)
 		if err != nil {
 			return nil, errors.New("Badly formatted argument length")
 		}
 
-		arg := parts[1]
+		arg := trimNewline(line)
 
-		args = append(args, arg)
+		if arglen != uint64(len(arg)) {
+			return nil, errors.New("length did not match argument body")
+		}
+
+		args[i] = arg
 	}
 
 	return NewCommand(pr.config, name, args...), nil
@@ -91,7 +89,7 @@ func (pr *ProtocolReader) ReadResponse(r io.Reader) (*Response, error) {
 
 			subParts := bytes.SplitN(parts[1], []byte(" "), 2)
 
-			_, err := fmt.Sscanf(string(subParts[0]), "%d", &n)
+			n, err := asciiToUint(subParts[0])
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to parse response id or body length")
 			}

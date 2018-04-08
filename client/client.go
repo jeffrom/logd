@@ -177,13 +177,13 @@ func (c *Client) WriteCommand(cmd *protocol.Command) error {
 	if err := c.Conn.SetWriteDeadline(time.Now().Add(c.writeTimeout)); err != nil {
 		return err
 	}
-	if _, err := c.bw.Write(c.pw.WriteCommand(cmd)); err != nil {
+	if _, err := cmd.WriteTo(c.bw); err != nil {
 		return err
 	}
 	if err := c.Flush(); err != nil {
 		return err
 	}
-	internal.Debugf(c.config, "%s->%s: %q", c.Conn.LocalAddr(), c.Conn.RemoteAddr(), cmd.Bytes())
+	// internal.Debugf(c.config, "%s->%s: %q", c.Conn.LocalAddr(), c.Conn.RemoteAddr(), cmd.Bytes())
 	return nil
 }
 

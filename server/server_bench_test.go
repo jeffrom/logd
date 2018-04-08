@@ -107,6 +107,21 @@ func BenchmarkServerMsg(b *testing.B) {
 	}
 }
 
+func BenchmarkServerMsgBatched(b *testing.B) {
+	config := serverBenchConfig(b)
+	srv := NewTestServer(config)
+	defer CloseTestServer(b, srv)
+
+	l := newTestClientLogger(config, srv)
+	defer l.Close()
+
+	msg := someMessage
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		l.Write(msg)
+	}
+}
+
 func BenchmarkServerRead(b *testing.B) {
 	config := serverBenchConfig(b)
 	srv := NewTestServer(config)

@@ -22,12 +22,13 @@ type Config struct {
 	IndexCursorSize         uint64 `json:"index_cursor_size"`
 
 	// client configs
-	StartID            uint64 `json:"start"`
-	ReadLimit          uint64 `json:"limit"`
-	ReadForever        bool   `json:"forever"`
-	ReadFromTail       bool   `json:"from_tail"`
-	ClientChunkSize    int    `json:"client_chunk_size"`
-	ClientWaitInterval int    `json:"client_wait_interval"`
+	StartID             uint64 `json:"start"`
+	ReadLimit           uint64 `json:"limit"`
+	ReadForever         bool   `json:"forever"`
+	ReadFromTail        bool   `json:"from_tail"`
+	ClientChunkSize     int    `json:"client_chunk_size"`
+	ClientChunkInterval int    `json:"client_chunk_interval"`
+	ClientWaitInterval  int    `json:"client_wait_interval"`
 }
 
 // NewConfig returns a new configuration object
@@ -64,6 +65,7 @@ func init() {
 	DefaultConfig.ReadLimit = 15
 	DefaultConfig.ReadFromTail = false
 	DefaultConfig.ClientChunkSize = 100
+	DefaultConfig.ClientChunkInterval = 1000
 
 	// XXX just for dev
 	DefaultConfig.CanShutdown = true

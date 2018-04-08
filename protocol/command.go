@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"strconv"
 
 	"github.com/jeffrom/logd/config"
@@ -72,6 +73,30 @@ func (cmd *CmdType) String() string {
 	return fmt.Sprintf("<unknown_command %q>", *cmd)
 }
 
+func (cmd *CmdType) Bytes() []byte {
+	switch *cmd {
+	case CmdMessage:
+		return []byte("MSG")
+	case CmdRead:
+		return []byte("READ")
+	case CmdTail:
+		return []byte("TAIL")
+	case CmdHead:
+		return []byte("HEAD")
+	case CmdStats:
+		return []byte("STATS")
+	case CmdPing:
+		return []byte("PING")
+	case CmdClose:
+		return []byte("CLOSE")
+	case CmdSleep:
+		return []byte("SLEEP")
+	case CmdShutdown:
+		return []byte("SHUTDOWN")
+	}
+	return []byte(fmt.Sprintf("<unknown_command %q>", *cmd))
+}
+
 func cmdNamefromBytes(b []byte) CmdType {
 	if bytes.Equal(b, []byte("MSG")) {
 		return CmdMessage
@@ -113,6 +138,8 @@ type Command struct {
 
 	ready chan struct{}
 	Wake  chan struct{}
+
+	digitbuf [32]byte
 }
 
 // NewCommand returns a new instance of a command type
@@ -153,6 +180,65 @@ func (cmd *Command) Bytes() []byte {
 	return buf.Bytes()
 }
 
+// WriteTo implements io.WriterTo. Intended for writing to a net.Conn
+func (cmd *Command) WriteTo(w io.Writer) (int64, error) {
+	var total int64
+	n, err := w.Write(cmd.Name.Bytes())
+	total += int64(n)
+	if err != nil {
+		return total, err
+	}
+
+	n, err = w.Write([]byte(" "))
+	total += int64(n)
+	if err != nil {
+		return total, err
+	}
+
+	l := uintToASCII(uint64(len(cmd.Args)), &cmd.digitbuf)
+	n, err = w.Write(cmd.digitbuf[l:])
+	total += int64(n)
+	if err != nil {
+		return total, err
+	}
+
+	n, err = w.Write([]byte("\r\n"))
+	total += int64(n)
+	if err != nil {
+		return total, err
+	}
+
+	for _, arg := range cmd.Args {
+		l = uintToASCII(uint64(len(arg)), &cmd.digitbuf)
+		n, err = w.Write(cmd.digitbuf[l:])
+		total += int64(n)
+		if err != nil {
+			return total, err
+		}
+
+		n, err = w.Write([]byte(" "))
+		total += int64(n)
+		if err != nil {
+			return total, err
+		}
+
+		n, err = w.Write(arg)
+		total += int64(n)
+		if err != nil {
+			return total, err
+		}
+
+		n, err = w.Write([]byte("\r\n"))
+		total += int64(n)
+		if err != nil {
+			return total, err
+		}
+	}
+
+	return total, nil
+}
+
+// Fill fills a buffer with a commands bytes
 func (cmd *Command) Respond(resp *Response) {
 	internal.Debugf(cmd.config, "<-response: %q", resp)
 	select {

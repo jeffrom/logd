@@ -90,15 +90,15 @@ func (ps *Scanner) ReadMessage() (int, *Message, error) {
 		return read, nil, io.EOF
 	}
 
-	if line, id, err = readUint(line, 64); err != nil {
+	if line, id, err = readUint(line); err != nil {
 		return read, nil, errors.Wrap(err, "scanning id failed")
 	}
 
-	if line, bodylen, err = readInt(line, 64); err != nil {
+	if line, bodylen, err = readInt(line); err != nil {
 		return read, nil, errors.Wrap(err, "scanning body length failed")
 	}
 
-	if line, checksum, err = readUint(line, 32); err != nil {
+	if line, checksum, err = readUint(line); err != nil {
 		return read, nil, errors.Wrap(err, "failed to scan crc")
 	}
 
