@@ -2,7 +2,14 @@
 
 # TODO
 
-# later
+* [ ] fix sendfile. internal.LogFile needs to be able to return a seeked
+  os.File wrapped in an io.LimitReader
+* [ ] read from a partition:offset, not just an id
+* [ ] add batch to protocol so we can seek quickly around the logfile without an index
+* [ ] replication. replicas ACK to master. instrument replica delay
+
+
+# maybe later
 
 * [ ] Store head/tail id in index
   * [X] head
