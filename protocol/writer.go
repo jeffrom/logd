@@ -5,23 +5,28 @@ import (
 	"fmt"
 	"hash/crc32"
 	"strconv"
-
-	"github.com/pkg/errors"
 )
 
-// ProtocolWriter constructs all command request and response bytes.
-type ProtocolWriter struct {
-	buf bytes.Buffer
+// Writer constructs all command request and response bytes.
+type Writer struct {
+	buf    bytes.Buffer
+	numbuf [32]byte
 }
 
-// NewProtocolWriter returns a new instance of a protocol writer
-func NewProtocolWriter() *ProtocolWriter {
-	return &ProtocolWriter{}
+// NewWriter returns a new instance of a protocol writer
+func NewWriter() *Writer {
+	return &Writer{}
 }
 
-func (pw *ProtocolWriter) WriteCommand(cmd *Command) []byte {
-	buf := pw.buf
-	buf.Reset()
+// Reset resets the writer
+func (w *Writer) Reset() {
+	w.buf.Reset()
+}
+
+// Command returns a byte representation of the command
+func (w *Writer) Command(cmd *Command) (int, []byte) {
+	w.Reset()
+	buf := w.buf
 	buf.WriteString(cmd.Name.String())
 	buf.WriteByte(' ')
 	buf.WriteString(strconv.FormatInt(int64(len(cmd.Args)), 10))
@@ -33,33 +38,40 @@ func (pw *ProtocolWriter) WriteCommand(cmd *Command) []byte {
 		buf.Write(arg)
 		buf.WriteString("\r\n")
 	}
-	return buf.Bytes()
+	b := buf.Bytes()
+	return len(b), b
 }
 
-func (pw *ProtocolWriter) writeChunkEnvelope(b []byte) []byte {
-	buf := pw.buf
-	buf.Reset()
+// ChunkEnvelope returns a byte representation of a chunk envelope
+func (w *Writer) ChunkEnvelope(size int64) (int, []byte) {
+	w.Reset()
+	buf := w.buf
 	buf.WriteByte('+')
-	buf.WriteString(strconv.FormatInt(int64(len(b)), 10))
-	buf.WriteString("\r\n")
-	return buf.Bytes()
+	n := intToASCII(size, &w.numbuf)
+	buf.Write(w.numbuf[:n])
+	buf.Write([]byte("\r\n"))
+	b := buf.Bytes()
+	return len(b), b
 }
 
-func (pw *ProtocolWriter) writeEOF() []byte {
-	return []byte("+EOF\r\n")
+// EOF returns a byte representation of an EOF chunk response
+func (w *Writer) EOF() (int, []byte) {
+	b := []byte("+EOF\r\n")
+	return len(b), b
 }
 
-func (pw *ProtocolWriter) writeResponse(r *Response) ([]byte, error) {
+// Response returns a byte representation of a Response
+func (w *Writer) Response(r *Response) (int, []byte) {
 	if r.Status == RespEOF {
-		return []byte("+EOF\r\n"), nil
+		return w.EOF()
 	}
 
-	buf := pw.buf
-	buf.Reset()
+	w.Reset()
+	buf := w.buf
 	buf.WriteString(r.Status.String())
 
 	if r.ID > 0 && r.Body != nil {
-		return nil, errors.New("invalid response: id and body both set")
+		panic("invalid response: id and body both set")
 	}
 
 	if r.ID != 0 {
@@ -76,10 +88,13 @@ func (pw *ProtocolWriter) writeResponse(r *Response) ([]byte, error) {
 	}
 
 	buf.WriteString("\r\n")
-	return buf.Bytes(), nil
+	b := buf.Bytes()
+	return len(b), b
 }
 
-func (pw *ProtocolWriter) WriteLogLine(m *Message) []byte {
+// Message returns a byte representation of a message
+func (w *Writer) Message(m *Message) []byte {
+	w.Reset()
 	checksum := crc32.Checksum(m.Body, crcTable)
 	// fmt.Printf("write log: %d %d %d %q\n", m.ID, len(m.Body), checksum, m.Body)
 	return []byte(fmt.Sprintf("%d %d %d %s\r\n", m.ID, len(m.Body), checksum, m.Body))

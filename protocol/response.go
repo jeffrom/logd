@@ -78,7 +78,7 @@ type Response struct {
 	ID      uint64
 	Body    []byte
 	ReaderC chan ReadPart
-	pw      *ProtocolWriter
+	pw      *Writer
 	eofbuf  *bytes.Reader
 }
 
@@ -87,7 +87,7 @@ func NewResponse(conf *config.Config, status RespType) *Response {
 	r := &Response{
 		config: conf,
 		Status: status,
-		pw:     NewProtocolWriter(),
+		pw:     NewWriter(),
 		eofbuf: bytes.NewReader(nil),
 	}
 	return r
@@ -105,8 +105,9 @@ func NewClientErrResponse(conf *config.Config, body []byte) *Response {
 
 // SprintBytes returns a byte representation of the response
 func (r *Response) SprintBytes() ([]byte, error) {
-	w := NewProtocolWriter()
-	return w.writeResponse(r)
+	w := NewWriter()
+	_, b := w.Response(r)
+	return b, nil
 }
 
 func (r *Response) String() string {
@@ -128,7 +129,7 @@ func (r *Response) SendBytes(b []byte) {
 
 // SendEOF sends an EOF to a connection, then finishes the response.
 func (r *Response) SendEOF() {
-	b := r.pw.writeEOF()
+	_, b := r.pw.EOF()
 	internal.Debugf(r.config, "<-ReaderC %q (with flush)", b)
 	r.eofbuf.Reset(b)
 	r.ReaderC <- NewPartReader(r.eofbuf)

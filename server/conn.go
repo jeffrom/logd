@@ -58,7 +58,7 @@ type Conn struct {
 
 	id string
 
-	pr           *protocol.ProtocolReader
+	pr           *protocol.Reader
 	readTimeout  time.Duration
 	writeTimeout time.Duration
 	bw           *bufio.Writer
@@ -77,7 +77,7 @@ func newServerConn(c net.Conn, conf *config.Config) *Conn {
 		config:       conf,
 		id:           newUUID(),
 		Conn:         c,
-		pr:           protocol.NewProtocolReader(conf),
+		pr:           protocol.NewReader(conf),
 		readTimeout:  timeout,
 		bw:           bufio.NewWriter(c),
 		writeTimeout: timeout,

@@ -33,7 +33,7 @@ func (s *Scanner) fromScanResponse() (*Scanner, error) {
 		return nil, err
 	}
 
-	resp, err := c.pr.ReadResponse(c.Conn)
+	resp, err := c.pr.ResponseFrom(c.Conn)
 	if c.handleErr(err) != nil {
 		return nil, err
 	}

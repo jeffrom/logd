@@ -346,7 +346,7 @@ func (s *Socket) handleConnection(conn *Conn) {
 
 func (s *Socket) readCommand(conn *Conn) (*protocol.Command, error) {
 	internal.Debugf(s.config, "waiting to read a new command")
-	cmd, err := conn.pr.ReadCommand(conn)
+	_, cmd, err := conn.pr.CommandFrom(conn)
 	if cmd != nil && conn != nil {
 		cmd.ConnID = conn.id
 	}

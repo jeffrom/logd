@@ -25,10 +25,10 @@ type Client struct {
 	config *config.Config
 
 	readTimeout time.Duration
-	pr          *protocol.ProtocolReader
+	pr          *protocol.Reader
 
 	bw           *bufio.Writer
-	pw           *protocol.ProtocolWriter
+	pw           *protocol.Writer
 	writeTimeout time.Duration
 }
 
@@ -68,10 +68,10 @@ func DialConfig(addr string, conf *config.Config, conns ...net.Conn) (*Client, e
 	return &Client{
 		config:       conf,
 		Conn:         conn,
-		pr:           protocol.NewProtocolReader(conf),
+		pr:           protocol.NewReader(conf),
 		readTimeout:  timeout,
 		bw:           bufio.NewWriter(conn),
-		pw:           protocol.NewProtocolWriter(),
+		pw:           protocol.NewWriter(),
 		writeTimeout: timeout,
 	}, nil
 }
@@ -197,7 +197,7 @@ func (c *Client) readResponse() (*protocol.Response, error) {
 	if err := c.Conn.SetReadDeadline(time.Now().Add(c.readTimeout)); err != nil {
 		return nil, err
 	}
-	resp, err := c.pr.ReadResponse(c.Conn)
+	resp, err := c.pr.ResponseFrom(c.Conn)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +214,7 @@ func (c *Client) readScanResponse(forever bool) (*protocol.Scanner, error) {
 		return nil, err
 	}
 
-	resp, err := c.pr.ReadResponse(c.Conn)
+	resp, err := c.pr.ResponseFrom(c.Conn)
 	if c.handleErr(err) != nil {
 		return nil, err
 	}
@@ -244,7 +244,8 @@ func (c *Client) handleErr(err error) error {
 }
 
 func (c *Client) readLine() ([]byte, error) {
-	return protocol.ReadLine(c.pr.Br)
+	_, b, err := protocol.ReadLine(c.pr.Br)
+	return b, err
 }
 
 func (c *Client) resetLimit() {

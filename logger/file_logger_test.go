@@ -142,7 +142,7 @@ func TestFilePartitionDeleteOldOnes(t *testing.T) {
 
 func fileWriteLog(t *testing.T, l Logger, id uint64, body string) (int, error) {
 	l.SetID(id)
-	b := protocol.NewProtocolWriter().WriteLogLine(protocol.NewMessage(id, []byte(body)))
+	b := protocol.NewWriter().Message(protocol.NewMessage(id, []byte(body)))
 	n, err := l.Write(b)
 	if err != nil {
 		t.Fatalf("unexpectedly failed to write to log: %+v", err)

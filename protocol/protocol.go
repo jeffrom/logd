@@ -50,28 +50,29 @@ var errRangeNotFound = errors.New("id range not found")
 var crcTable = crc32.MakeTable(crc32.Koopman)
 
 // ReadLine reads a line from a bufio.Reader
-func ReadLine(br *bufio.Reader) ([]byte, error) {
+func ReadLine(br *bufio.Reader) (int, []byte, error) {
 	line, err := br.ReadSlice('\n')
+	n := len(line) + 1
 	if err == bufio.ErrBufferFull {
-		return nil, Error("long response line")
+		return n, nil, Error("long response line")
 	}
 	if err == io.EOF {
-		return nil, err
+		return n, nil, err
 	}
 	if err != nil {
-		return nil, errors.Wrap(err, "reading line failed")
+		return n, nil, errors.Wrap(err, "reading line failed")
 	}
 
 	if len(line) < termLen {
-		return nil, Error("line missing terminator")
+		return n, nil, Error("line missing terminator")
 	}
 
 	if line[len(line)-1] != '\n' || line[len(line)-2] != '\r' {
-		return nil, Error("bad response line terminator")
+		return n, nil, Error("bad response line terminator")
 	}
 
 	line = line[:len(line)-2]
-	return line, nil
+	return n, line, nil
 }
 
 // Error is a client error type

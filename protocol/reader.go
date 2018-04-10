@@ -10,72 +10,78 @@ import (
 	"github.com/pkg/errors"
 )
 
-// ProtocolReader reads commands and responses
+// Reader reads commands and responses
 // turns a []byte of socket data into a *response or *ReadResponse
-type ProtocolReader struct {
+type Reader struct {
 	config *config.Config
 	Br     *bufio.Reader
 }
 
-// NewProtocolReader readers an instance of a protocol reader
-func NewProtocolReader(config *config.Config) *ProtocolReader {
-	return &ProtocolReader{
+// NewReader readers an instance of a protocol reader
+func NewReader(config *config.Config) *Reader {
+	return &Reader{
 		config: config,
 		Br:     bufio.NewReaderSize(bytes.NewReader([]byte("")), 1024*8),
 	}
 }
 
-func (pr *ProtocolReader) ReadCommand(r io.Reader) (*Command, error) {
-	pr.Br.Reset(r)
+// Reset resets all state and sets the Reader to read from rdr
+func (r *Reader) Reset(rdr io.Reader) {
+	r.Br.Reset(rdr)
+}
 
-	line, err := ReadLine(pr.Br)
+// CommandFrom reads a Command from an io.Reader
+func (r *Reader) CommandFrom(rdr io.Reader) (int, *Command, error) {
+	r.Br.Reset(rdr)
+
+	_, line, err := ReadLine(r.Br)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
-	internal.Debugf(pr.config, "read(raw): %q", line)
+	internal.Debugf(r.config, "read(raw): %q", line)
 
 	line, cmdBytes, err := readWord(line)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 
 	name := cmdNamefromBytes(cmdBytes)
 	_, numArgs, err := readInt(line)
 	// fmt.Printf("readInt: %d %q %+v\n", numArgs, line, err)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 
 	args := make([][]byte, int(numArgs))
 	for i := 0; i < int(numArgs); i++ {
-		line, err = ReadLine(pr.Br)
+		_, line, err = ReadLine(r.Br)
 		if err != nil {
-			return nil, err
+			return 0, nil, err
 		}
-		internal.Debugf(pr.config, "read arg(raw): %q", internal.Prettybuf(line))
+		internal.Debugf(r.config, "read arg(raw): %q", internal.Prettybuf(line))
 
 		var arglen uint64
 		line, arglen, err = readUint(line)
 		if err != nil {
-			return nil, errors.New("Badly formatted argument length")
+			return 0, nil, errors.New("Badly formatted argument length")
 		}
 
 		arg := trimNewline(line)
 
 		if arglen != uint64(len(arg)) {
-			return nil, errors.New("length did not match argument body")
+			return 0, nil, errors.New("length did not match argument body")
 		}
 
 		args[i] = arg
 	}
 
-	return NewCommand(pr.config, name, args...), nil
+	return 0, NewCommand(r.config, name, args...), nil
 }
 
-// ReadResponse reads a READ command response from an io.Reader
-func (pr *ProtocolReader) ReadResponse(r io.Reader) (*Response, error) {
-	pr.Br.Reset(r)
-	line, err := ReadLine(pr.Br)
+// ResponseFrom reads a READ command response from an io.Reader
+func (r *Reader) ResponseFrom(rdr io.Reader) (*Response, error) {
+	r.Br.Reset(rdr)
+	_, line, err := ReadLine(r.Br)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +89,7 @@ func (pr *ProtocolReader) ReadResponse(r io.Reader) (*Response, error) {
 	parts := bytes.SplitN(line, []byte(" "), 2)
 	var resp *Response
 	if bytes.Equal(parts[0], []byte("OK")) {
-		resp = NewResponse(pr.config, RespOK)
+		resp = NewResponse(r.config, RespOK)
 		if len(parts) > 1 {
 			var n uint64
 
@@ -100,7 +106,7 @@ func (pr *ProtocolReader) ReadResponse(r io.Reader) (*Response, error) {
 				rest = append(rest, []byte("\r\n")...)
 				if uint64(len(rest)) < n {
 					restBytes := make([]byte, n-uint64(len(rest)))
-					if _, err := io.ReadFull(pr.Br, restBytes); err != nil {
+					if _, err := io.ReadFull(r.Br, restBytes); err != nil {
 						return nil, errors.Wrap(err, "failed to read OK body")
 					}
 
@@ -116,17 +122,17 @@ func (pr *ProtocolReader) ReadResponse(r io.Reader) (*Response, error) {
 			}
 		}
 	} else if bytes.Equal(parts[0], []byte("+EOF")) {
-		resp = NewResponse(pr.config, RespEOF)
+		resp = NewResponse(r.config, RespEOF)
 	} else if bytes.Equal(parts[0], []byte("ERR")) {
 		var arg []byte
 		if len(parts) > 1 {
 			arg = parts[1]
 		}
-		resp = NewErrResponse(pr.config, arg)
+		resp = NewErrResponse(r.config, arg)
 	} else if bytes.Equal(parts[0], []byte("ERR_CLIENT")) {
-		resp = NewClientErrResponse(pr.config, parts[1])
+		resp = NewClientErrResponse(r.config, parts[1])
 	} else {
-		internal.Debugf(pr.config, "invalid response: %q", line)
+		internal.Debugf(r.config, "invalid response: %q", line)
 		return nil, errors.New("Invalid response")
 	}
 

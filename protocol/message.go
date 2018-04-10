@@ -11,18 +11,37 @@ import (
 
 // Message is a log message type.
 type Message struct {
-	ID   uint64
-	Body []byte
+	ID        uint64
+	Body      []byte
+	partition uint64
+	offset    uint64
+	checksum  uint32
+	size      int
+	allread   bool
 }
 
 // NewMessage returns a new instance of a Message.
 func NewMessage(id uint64, body []byte) *Message {
 	// fmt.Printf("NewMessage: %d -> %q\n", id, body)
-	return &Message{ID: id, Body: body}
+	return &Message{
+		ID:   id,
+		Body: body,
+	}
+}
+
+// Reset resets the message data
+func (m *Message) Reset() {
+	m.ID = 0
+	m.Body = nil
+	m.partition = 0
+	m.offset = 0
+	m.checksum = 0
+	m.size = 0
+	m.allread = false
 }
 
 func (m *Message) logBytes() []byte {
-	b := NewProtocolWriter().WriteLogLine(m)
+	b := NewWriter().Message(m)
 	return []byte(b)
 }
 
@@ -30,12 +49,14 @@ func (m *Message) String() string {
 	return string(m.logBytes())
 }
 
+// MsgFromBytes loads the message from b
 func MsgFromBytes(b []byte) (*Message, error) {
 	ps := NewScanner(config.DefaultConfig, bytes.NewReader(b))
 	_, msg, err := ps.ReadMessage()
 	return msg, err
 }
 
+// MsgFromReader loads the message from r
 func MsgFromReader(r io.Reader) (*Message, error) {
 	ps := NewScanner(config.DefaultConfig, r)
 	_, msg, err := ps.ReadMessage()

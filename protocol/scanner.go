@@ -77,7 +77,7 @@ func (ps *Scanner) ReadMessage() (int, *Message, error) {
 	var read int
 
 	// fmt.Println("reading line")
-	line, err := ReadLine(ps.br)
+	_, line, err := ReadLine(ps.br)
 	// fmt.Printf("read: %q (length: %d) (err: %v)\n", line, len(line)+2, err)
 	read += len(line)
 	read += 2 // \r\n
@@ -127,7 +127,7 @@ func (ps *Scanner) scanEnvelope() error {
 	ps.br.ReadByte()
 	internal.Debugf(ps.config, "scanning envelope")
 
-	line, err := ReadLine(ps.br)
+	_, line, err := ReadLine(ps.br)
 	if err != nil {
 		return err
 	}
