@@ -7,6 +7,8 @@
 * [ ] read from a partition:offset, not just an id
 * [ ] add batch to protocol so we can seek quickly around the logfile without an index
 * [ ] replication. replicas ACK to master. instrument replica delay
+* [ ] protocol.Reader, Writer should not hold their own buffers, should
+  implement something similar to io.ReaderFrom and io.WriterTo
 
 
 # maybe later
