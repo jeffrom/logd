@@ -50,8 +50,10 @@ var errRangeNotFound = errors.New("id range not found")
 var crcTable = crc32.MakeTable(crc32.Koopman)
 
 // ReadLine reads a line from a bufio.Reader
+// TODO replace this with a version that copies the data into a supplied
+// buffer. ReadBytes is too many allocs
 func ReadLine(br *bufio.Reader) (int, []byte, error) {
-	line, err := br.ReadSlice('\n')
+	line, err := br.ReadBytes('\n')
 	n := len(line) + 1
 	if err == bufio.ErrBufferFull {
 		return n, nil, Error("long response line")
