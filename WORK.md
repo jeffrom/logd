@@ -9,6 +9,8 @@
 * [ ] replication. replicas ACK to master. instrument replica delay
 * [ ] protocol.Reader, Writer should not hold their own buffers, should
   implement something similar to io.ReaderFrom and io.WriterTo
+  - may want to just have Command, Response, Message have ReadFrom and WriteTo methods
+  - then we can add Batch
 
 
 # maybe later
