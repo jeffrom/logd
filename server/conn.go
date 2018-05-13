@@ -51,6 +51,7 @@ func (cs connState) String() string {
 	return fmt.Sprintf("UNKNOWN(%+v)", uint8(cs))
 }
 
+// Conn is a wrapped net.Conn
 type Conn struct {
 	net.Conn
 
@@ -61,6 +62,7 @@ type Conn struct {
 	pr           *protocol.Reader
 	readTimeout  time.Duration
 	writeTimeout time.Duration
+	br           *bufio.Reader
 	bw           *bufio.Writer
 
 	state connState
@@ -79,6 +81,7 @@ func newServerConn(c net.Conn, conf *config.Config) *Conn {
 		Conn:         c,
 		pr:           protocol.NewReader(conf),
 		readTimeout:  timeout,
+		br:           bufio.NewReader(c),
 		bw:           bufio.NewWriter(c),
 		writeTimeout: timeout,
 		done:         make(chan struct{}, 10),
@@ -122,9 +125,18 @@ func (c *Conn) write(bufs ...[]byte) (int64, error) {
 	return n, err
 }
 
+func (c *Conn) Write(p []byte) (int, error) {
+	return c.bw.Write(p)
+}
+
+// Flush sends all pending data over the connection
 func (c *Conn) Flush() error {
 	internal.Debugf(c.config, "%s: flush()", c.RemoteAddr())
 	return c.bw.Flush()
+}
+
+func (c *Conn) Read(p []byte) (int, error) {
+	return c.br.Read(p)
 }
 
 func (c *Conn) readFrom(r io.Reader) (int64, error) {
@@ -195,4 +207,10 @@ func (c *Conn) setWaitForCmdDeadline() error {
 
 func (c *Conn) setWriteDeadline() error {
 	return c.Conn.SetWriteDeadline(time.Now().Add(c.writeTimeout))
+}
+
+var defaultErrResp = []byte("ERR\r\n")
+
+func (c *Conn) sendDefaultError() (int, error) {
+	return c.Write(defaultErrResp)
 }

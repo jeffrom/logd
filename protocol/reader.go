@@ -40,16 +40,51 @@ func (r *Reader) CommandFrom(rdr io.Reader) (int, *Command, error) {
 	}
 	internal.Debugf(r.config, "read(raw): %q", line)
 
-	line, cmdBytes, err := readWord(line)
+	line, cmdBytes, err := parseWord(line)
 	if err != nil {
 		return 0, nil, err
 	}
 
 	name := cmdNamefromBytes(cmdBytes)
-	_, numArgs, err := readInt(line)
+	_, numArgs, err := parseInt(line)
 	// fmt.Printf("readInt: %d %q %+v\n", numArgs, line, err)
 	if err != nil {
 		return 0, nil, err
+	}
+
+	if name == CmdBatch {
+		batch := NewBatch(r.config)
+		bline, word, berr := parseWord(line)
+		if err != nil {
+			return 0, nil, berr
+		}
+
+		var n uint64
+		n, berr = asciiToUint(word[:len(word)-1])
+		if berr != nil {
+			return 0, nil, berr
+		}
+		batch.messages = int(n)
+
+		_, word, berr = parseWord(bline)
+		if berr != nil {
+			return 0, nil, berr
+		}
+
+		n, berr = asciiToUint(word[:len(word)-2])
+		if berr != nil {
+			return 0, nil, berr
+		}
+		batch.size = n
+
+		_, berr = batch.readData(r.Br)
+		if berr != nil {
+			return 0, nil, berr
+		}
+
+		cmd := NewCommand(r.config, name)
+		cmd.Batch = batch
+		return 0, cmd, nil
 	}
 
 	args := make([][]byte, int(numArgs))
@@ -61,7 +96,7 @@ func (r *Reader) CommandFrom(rdr io.Reader) (int, *Command, error) {
 		internal.Debugf(r.config, "read arg(raw): %q", internal.Prettybuf(line))
 
 		var arglen uint64
-		line, arglen, err = readUint(line)
+		line, arglen, err = parseUint(line)
 		if err != nil {
 			return 0, nil, errors.New("Badly formatted argument length")
 		}

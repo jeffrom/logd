@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -16,6 +17,20 @@ import (
 	"github.com/jeffrom/logd/internal"
 	"github.com/jeffrom/logd/protocol"
 )
+
+var v2Requests = [][]byte{
+	[]byte("BATCH "),
+}
+
+// TODO remove this when all commands have been migrated to requests
+func isV2Request(b []byte) bool {
+	for _, prefix := range v2Requests {
+		if bytes.HasPrefix(b, prefix) {
+			return true
+		}
+	}
+	return false
+}
 
 // Socket handles socket connections
 type Socket struct {
@@ -306,8 +321,43 @@ func (s *Socket) handleConnection(conn *Conn) {
 			log.Printf("%s error: %+v", conn.RemoteAddr(), err)
 			return
 		}
+		// wait for a new request. continue along if there isn't one. All
+		// requests will be handled in this block, and after all commands have
+		// been migrated, this will be the whole loop
+		if req, err := s.waitForRequest(conn); req != nil && err == nil {
+			if _, rerr := req.ReadFrom(conn.br); rerr != nil {
+				// conn.Flush()
+				log.Printf("%s read error: %+v", conn.RemoteAddr(), rerr)
+				return
+			}
+			resp, rerr := s.q.PushRequest(ctx, req)
+			if rerr != nil {
+				conn.Flush()
+				log.Printf("%s error: %+v", conn.RemoteAddr(), rerr)
+				return
+			}
 
-		// wait for a command
+			if _, rerr := s.sendResponse(conn, resp); rerr != nil {
+				conn.Flush()
+				log.Printf("%s response error: %+v", conn.RemoteAddr(), rerr)
+				return
+			}
+
+			conn.Flush()
+			continue
+		} else if terr, ok := err.(net.Error); ok && terr.Timeout() {
+			log.Printf("%s timeout, so passing through to legacy command handler: %+v", conn.RemoteAddr(), terr)
+			// pass through to the old command
+		} else if err != nil {
+			log.Printf("%s wait error: %+v", conn.RemoteAddr(), err)
+			return
+		}
+
+		// wait for a command (old flow)
+		if err := conn.setWaitForCmdDeadline(); err != nil {
+			log.Printf("%s error: %+v", conn.RemoteAddr(), err)
+			return
+		}
 		cmd, err := s.readCommand(conn)
 		if cerr := handleConnErr(s.config, err, conn); cerr != nil {
 			return
@@ -342,6 +392,46 @@ func (s *Socket) handleConnection(conn *Conn) {
 		// subscriber mode
 		s.finishCommand(ctx, conn, cmd, resp)
 	}
+}
+
+// TODO should this take context and wait for ctx.Done()?
+func (s *Socket) waitForRequest(conn *Conn) (*protocol.Request, error) {
+	// PING\r\n (6 bytes) is the shortest possible valid request
+	buf, err := conn.br.Peek(6)
+	if err != nil {
+		return nil, err
+	}
+	if isV2Request(buf) {
+		return protocol.NewRequest(s.config), nil
+	}
+	return nil, nil
+}
+
+func (s *Socket) sendResponse(conn *Conn, resp *protocol.ResponseV2) (int, error) {
+	var r io.Reader
+	var err error
+	var total int
+	var readOne bool
+	for {
+		r, err = resp.ScanReader()
+		if err != nil || r == nil {
+			break
+		}
+
+		readOne = true
+
+		n, serr := conn.readFrom(r)
+		total += int(n)
+		if serr != nil {
+			return total, serr
+		}
+	}
+
+	if !readOne {
+		log.Printf("%s: no readers in Response", conn.RemoteAddr())
+		return conn.sendDefaultError()
+	}
+	return total, err
 }
 
 func (s *Socket) readCommand(conn *Conn) (*protocol.Command, error) {

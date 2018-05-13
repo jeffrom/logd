@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"bytes"
+	"io"
 
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/internal"
@@ -134,4 +135,55 @@ func (r *Response) SendEOF() {
 	r.eofbuf.Reset(b)
 	r.ReaderC <- NewPartReader(r.eofbuf)
 	r.ReaderC <- &PartDone{}
+}
+
+// response v2
+
+const maxReaderPerResp = 50
+
+// ResponseV2 is a response the conn can use to send bytes back to the client.
+// can returns bytes as well as *os.File-s
+type ResponseV2 struct {
+	conf       *config.Config
+	readers    []io.Reader
+	numReaders int
+	numScanned int
+}
+
+// NewResponseV2 returns a new response
+func NewResponseV2(conf *config.Config) *ResponseV2 {
+	return &ResponseV2{
+		conf:    conf,
+		readers: make([]io.Reader, maxReaderPerResp),
+	}
+}
+
+// Reset sets the response to its initial values
+func (r *ResponseV2) Reset() {
+	for i := 0; i < r.numReaders; i++ {
+		r.readers[i] = nil
+	}
+	r.numReaders = 0
+	r.numScanned = 0
+}
+
+// AddReader adds a reader for the server to send back over the conn
+func (r *ResponseV2) AddReader(rdr io.Reader) error {
+	if r.numReaders > maxReaderPerResp {
+		return errors.New("too many readers on this response")
+	}
+	r.readers[r.numReaders] = rdr
+	r.numReaders++
+	return nil
+}
+
+// ScanReader returns the next reader, or io.EOF if they've all been scanned
+func (r *ResponseV2) ScanReader() (io.Reader, error) {
+	if r.numScanned > r.numReaders {
+		return nil, io.EOF
+	}
+
+	rdr := r.readers[r.numScanned]
+	r.numScanned++
+	return rdr, nil
 }

@@ -31,12 +31,13 @@ import (
 
 // EventQ manages the receiving, processing, and responding to events.
 type EventQ struct {
-	config *config.Config
-	currID uint64
-	in     chan *protocol.Command
-	close  chan struct{}
-	log    logger.Logger
-	Stats  *internal.Stats
+	config    *config.Config
+	currID    uint64
+	in        chan *protocol.Command
+	requestIn chan *protocol.Request
+	close     chan struct{}
+	log       logger.Logger
+	Stats     *internal.Stats
 }
 
 // NewEventQ creates a new instance of an EventQ
@@ -44,11 +45,12 @@ func NewEventQ(conf *config.Config) *EventQ {
 	log := logger.New(conf)
 
 	q := &EventQ{
-		config: conf,
-		in:     make(chan *protocol.Command, 1000),
-		close:  make(chan struct{}),
-		log:    log,
-		Stats:  internal.NewStats(),
+		config:    conf,
+		in:        make(chan *protocol.Command, 1000),
+		requestIn: make(chan *protocol.Request, 1000),
+		close:     make(chan struct{}),
+		log:       log,
+		Stats:     internal.NewStats(),
 	}
 
 	return q
@@ -77,6 +79,25 @@ func (q *EventQ) loop() {
 		internal.Debugf(q.config, "waiting for event")
 
 		select {
+		// new flow for handling requests passed in from servers
+		case req := <-q.requestIn:
+			var resp *protocol.ResponseV2
+			var err error
+			internal.Debugf(q.config, "request: %s", &req.Name)
+
+			switch req.Name {
+			case protocol.CmdBatch:
+				resp, err = q.handleBatch(req)
+			default:
+				log.Printf("unhandled request type passed: %v", req.Name)
+				continue
+			}
+
+			if err != nil {
+				log.Printf("error handling %s request: %+v", &req.Name, err)
+			}
+			req.Respond(resp)
+
 		case cmd := <-q.in:
 			internal.Debugf(q.config, "event: %s(%q)", cmd, cmd.Args)
 
@@ -162,6 +183,40 @@ func (q *EventQ) handleMsg(cmd *protocol.Command) {
 	resp := protocol.NewResponse(q.config, protocol.RespOK)
 	resp.ID = id
 	cmd.Respond(resp)
+}
+
+func (q *EventQ) handleBatch(req *protocol.Request) (*protocol.ResponseV2, error) {
+	resp := protocol.NewResponseV2(q.config)
+	batch, err := protocol.NewBatch(q.config).FromRequest(req)
+	if err != nil {
+		return resp, err
+	}
+
+	if verr := batch.Validate(); verr != nil {
+		return resp, err
+	}
+
+	// write the requests raw bytes (req.Bytes()) directly into the log
+	batchResp := protocol.NewBatchResponse(q.config)
+	batchResp.SetPartition(0)
+	batchResp.SetOffset(0)
+
+	b := &bytes.Buffer{}
+	_, err = batchResp.WriteTo(b)
+	if err != nil {
+		return resp, err
+	}
+
+	err = resp.AddReader(b)
+	if err != nil {
+		return resp, err
+	}
+
+	return resp, nil
+}
+
+func (q *EventQ) parseBatch(req *protocol.Request) (*protocol.Batch, error) {
+	return nil, nil
 }
 
 func (q *EventQ) handleRead(cmd *protocol.Command) {
@@ -305,6 +360,13 @@ func (q *EventQ) sendChunk(lf logger.LogReadableFile, readerC chan protocol.Read
 
 var errInvalidFormat = errors.New("Invalid command format")
 
+// func (q *EventQ) parseBatch(cmd *protocol.Command) error {
+// 	if cmd.Batch == nil {
+// 		return errors.New("missing batch")
+// 	}
+// 	return nil
+// }
+
 func (q *EventQ) parseRead(cmd *protocol.Command) (uint64, uint64, error) {
 	if len(cmd.Args) != 2 {
 		// cmd.Respond(protocol.NewResponse(respErr))
@@ -401,7 +463,7 @@ func (q *EventQ) HandleShutdown(cmd *protocol.Command) error {
 	return nil
 }
 
-// PushCommand adds an event to the queue
+// PushCommand adds an event to the queue. Called by socket connection goroutines.
 func (q *EventQ) PushCommand(ctx context.Context, cmd *protocol.Command) (*protocol.Response, error) {
 	select {
 	case q.in <- cmd:
@@ -413,6 +475,25 @@ func (q *EventQ) PushCommand(ctx context.Context, cmd *protocol.Command) (*proto
 	select {
 	case resp := <-cmd.RespC:
 		return resp, nil
+	}
+}
+
+// PushRequest adds a request event to the queue, and waits for a response.
+// Called by server conn goroutines.
+func (q *EventQ) PushRequest(ctx context.Context, req *protocol.Request) (*protocol.ResponseV2, error) {
+	select {
+	case q.requestIn <- req:
+	case <-ctx.Done():
+		internal.Debugf(q.config, "request %s cancelled", req)
+		return nil, errors.New("request cancelled")
+	}
+
+	select {
+	case resp := <-req.Responded():
+		return resp, nil
+	case <-ctx.Done():
+		internal.Debugf(q.config, "request %s cancelled while waiting for a response", req)
+		return nil, errors.New("request cancelled")
 	}
 }
 

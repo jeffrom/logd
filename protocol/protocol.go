@@ -41,6 +41,7 @@ import (
 const termLen = 2
 
 var errInvalidFirstByte = errors.New("invalid first byte")
+var errInvalidNumArgs = errors.New("invalid number of arguments")
 var errReadStopped = errors.New("read stopped by other side")
 var errInvalidProtocolLine = errors.New("invalid protocol line")
 var errInvalidBodyLength = errors.New("invalid body length")
@@ -48,6 +49,12 @@ var errCrcChecksumMismatch = errors.New("crc checksum mismatch")
 var errRangeNotFound = errors.New("id range not found")
 
 var crcTable = crc32.MakeTable(crc32.Koopman)
+
+var bnewLine = []byte("\r\n")
+var bspace = []byte(" ")
+var bmsgStart = []byte("MSG ")
+var bbatchStart = []byte("BATCH ")
+var bok = []byte("OK")
 
 // ReadLine reads a line from a bufio.Reader
 // NOTE the line data will be overwritten the next time the bufio.Reader is
@@ -97,16 +104,28 @@ func trimNewline(line []byte) []byte {
 	return line
 }
 
-func readWord(line []byte) ([]byte, []byte, error) {
+func parseWord(line []byte) ([]byte, []byte, error) {
 	n := bytes.IndexAny(line, " \n")
 	if n < 0 {
 		return line, nil, errors.New("invalid bytes")
 	}
 	word := line[:n]
 	if word[n-1] == '\r' {
-		word = line[:n]
+		word = line[:n-1]
 	}
 	return line[n+1:], word, nil
+}
+
+func readWordFromBuf(r *bufio.Reader) (int64, []byte, []byte, error) {
+	word, err := r.ReadSlice(' ')
+	total := int64(len(word))
+	return total, word[:len(word)-1], word, err
+}
+
+func readLineFromBuf(r *bufio.Reader) (int64, []byte, []byte, error) {
+	word, err := r.ReadSlice('\n')
+	total := int64(len(word))
+	return total, word[:len(word)-2], word, err
 }
 
 func isDigits(b []byte) bool {
@@ -121,7 +140,7 @@ func isDigits(b []byte) bool {
 	return true
 }
 
-func readInt(line []byte) ([]byte, int64, error) {
+func parseInt(line []byte) ([]byte, int64, error) {
 	if line == nil || len(line) == 0 {
 		return nil, 0, errors.New("invalid bytes")
 	}
@@ -143,7 +162,7 @@ func readInt(line []byte) ([]byte, int64, error) {
 	return line[n+1:], num, err
 }
 
-func readUint(line []byte) ([]byte, uint64, error) {
+func parseUint(line []byte) ([]byte, uint64, error) {
 	if line == nil || len(line) == 0 {
 		return nil, 0, errors.New("invalid bytes")
 	}
@@ -189,6 +208,7 @@ func asciiToInt(tok []byte) (int64, error) {
 	return n, nil
 }
 
+// XXX this is broken
 func intToASCII(n int64, b *[32]byte) int {
 	i := 31
 	if n < 0 {
@@ -216,4 +236,22 @@ func uintToASCII(n uint64, b *[32]byte) int {
 	i--
 
 	return i + 1
+}
+
+func readNewLine(r *bufio.Reader) (int, error) {
+	ch, err := r.ReadByte()
+	if err != nil {
+		return 0, err
+	}
+	if ch != '\r' {
+		return 1, errors.Errorf("invalid first newline char: %q", ch)
+	}
+	ch, err = r.ReadByte()
+	if err != nil {
+		return 1, err
+	}
+	if ch != '\n' {
+		return 2, errors.Errorf("invalid second newline char: %q", ch)
+	}
+	return 2, nil
 }

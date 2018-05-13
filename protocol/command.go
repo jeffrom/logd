@@ -22,6 +22,9 @@ const (
 	// CmdMessage is a message command type.
 	CmdMessage
 
+	// CmdBatch is a batch command type.
+	CmdBatch
+
 	// CmdRead is a read command type.
 	CmdRead
 
@@ -53,6 +56,8 @@ func (cmd *CmdType) String() string {
 	switch *cmd {
 	case CmdMessage:
 		return "MSG"
+	case CmdBatch:
+		return "BATCH"
 	case CmdRead:
 		return "READ"
 	case CmdTail:
@@ -73,10 +78,13 @@ func (cmd *CmdType) String() string {
 	return fmt.Sprintf("<unknown_command %q>", *cmd)
 }
 
+// Bytes returns a byte representation of a command
 func (cmd *CmdType) Bytes() []byte {
 	switch *cmd {
 	case CmdMessage:
 		return []byte("MSG")
+	case CmdBatch:
+		return []byte("BATCH")
 	case CmdRead:
 		return []byte("READ")
 	case CmdTail:
@@ -100,6 +108,9 @@ func (cmd *CmdType) Bytes() []byte {
 func cmdNamefromBytes(b []byte) CmdType {
 	if bytes.Equal(b, []byte("MSG")) {
 		return CmdMessage
+	}
+	if bytes.Equal(b, []byte("BATCH")) {
+		return CmdBatch
 	}
 	if bytes.Equal(b, []byte("READ")) {
 		return CmdRead
@@ -128,6 +139,21 @@ func cmdNamefromBytes(b []byte) CmdType {
 	return 0
 }
 
+var argLens = map[CmdType]int{
+	CmdMessage:  2,
+	CmdBatch:    2,
+	CmdRead:     2,
+	CmdTail:     2,
+	CmdHead:     0,
+	CmdStats:    0,
+	CmdPing:     0,
+	CmdClose:    0,
+	CmdSleep:    1,
+	CmdShutdown: 0,
+}
+
+const maxArgs = 2
+
 // Command is an input received by a caller
 type Command struct {
 	config *config.Config
@@ -135,6 +161,7 @@ type Command struct {
 	Name   CmdType
 	Args   [][]byte
 	RespC  chan *Response
+	Batch  *Batch
 
 	ready chan struct{}
 	Wake  chan struct{}
@@ -155,6 +182,7 @@ func NewCommand(conf *config.Config, name CmdType, args ...[]byte) *Command {
 	return c
 }
 
+// NewCloseCommand returns a close command struct
 func NewCloseCommand(conf *config.Config, respC chan *Response) *Command {
 	return &Command{
 		config: conf,
@@ -238,7 +266,7 @@ func (cmd *Command) WriteTo(w io.Writer) (int64, error) {
 	return total, nil
 }
 
-// Fill fills a buffer with a commands bytes
+// Respond sends a command's response back over the command's channel
 func (cmd *Command) Respond(resp *Response) {
 	internal.Debugf(cmd.config, "<-response: %q", resp)
 	select {
@@ -249,11 +277,13 @@ func (cmd *Command) Respond(resp *Response) {
 	// cmd.RespC = nil
 }
 
+// SignalReady signals that the command is ready for read response bytes
 func (cmd *Command) SignalReady() {
 	internal.Debugf(cmd.config, "signalling command %s readiness", cmd)
 	cmd.ready <- struct{}{}
 }
 
+// WaitForReady blocks until the ready signal is received
 func (cmd *Command) WaitForReady() {
 	internal.Debugf(cmd.config, "waiting for command %s to be ready", cmd)
 	select {
@@ -265,10 +295,12 @@ func (cmd *Command) WaitForReady() {
 	internal.Debugf(cmd.config, "command %s ready", cmd)
 }
 
+// CancelSleep wakes a sleep command
 func (cmd *Command) CancelSleep() {
 	cmd.Wake <- struct{}{}
 }
 
+// IsRead returns true if the command is a read command
 func (cmd *Command) IsRead() bool {
 	return cmd.Name == CmdRead || cmd.Name == CmdTail
 }
