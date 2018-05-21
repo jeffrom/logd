@@ -179,6 +179,7 @@ func (r *ResponseV2) AddReader(rdr io.Reader) error {
 }
 
 // ScanReader returns the next reader, or io.EOF if they've all been scanned
+// TODO this should return an io.ReadCloser
 func (r *ResponseV2) ScanReader() (io.Reader, error) {
 	if r.numScanned > r.numReaders {
 		return nil, io.EOF

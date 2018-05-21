@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -47,6 +48,7 @@ type Partitioner interface {
 type Partitions struct {
 	conf       *config.Config
 	partitions []Partitioner
+	tmpDir     string
 }
 
 // NewPartitions returns an instance of Partitions
@@ -57,6 +59,10 @@ func NewPartitions(conf *config.Config) *Partitions {
 	}
 }
 
+func (p *Partitions) reset() {
+	p.tmpDir = ""
+}
+
 // Create implements PartitionManager. TODO may not be needed. Writer can create them.
 func (p *Partitions) Create(off uint64) (Partitioner, error) {
 	return nil, nil
@@ -64,12 +70,24 @@ func (p *Partitions) Create(off uint64) (Partitioner, error) {
 
 // Uncirculate implements PartitionManager
 func (p *Partitions) Uncirculate(off uint64) error {
-	return nil
+	if p.tmpDir == "" {
+		tmpDir, err := ioutil.TempDir("", "logd-uncirculated")
+		if err != nil {
+			return err
+		}
+		p.tmpDir = tmpDir
+	}
+
+	fname := p.filePath(off)
+	return os.Rename(filepath.Join(p.conf.LogFile, fname), filepath.Join(p.tmpDir, fname))
 }
 
 // Remove implements PartitionManager
 func (p *Partitions) Remove(off uint64) error {
-	return nil
+	if p.tmpDir == "" {
+		return errors.New("Partitions.Remove: temp dir not set")
+	}
+	return os.Remove(filepath.Join(p.tmpDir, p.filePath(off)))
 }
 
 // Get implements PartitionManager
@@ -104,6 +122,19 @@ func (p *Partitions) List() ([]Partitioner, error) {
 	sort.Sort(p)
 
 	return parts, nil
+}
+
+// Shutdown implements internal.LifecycleManager
+func (p *Partitions) Shutdown() error {
+	if p.tmpDir != "" {
+		// TODO log any remaining uncirculated files
+		return os.Remove(p.tmpDir)
+	}
+	return nil
+}
+
+func (p *Partitions) filePath(off uint64) string {
+	return strconv.FormatUint(off, 10) + ".log"
 }
 
 func (p *Partitions) extractOffset(filename string) (uint64, error) {

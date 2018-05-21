@@ -79,6 +79,18 @@ func (q *EventQ) Start() error {
 	}
 	q.currID = head + 1
 
+	// V2 setup
+	if lc, ok := q.logp.(internal.LifecycleManager); ok {
+		if err := lc.Setup(); err != nil {
+			return err
+		}
+	}
+	if lc, ok := q.logw.(internal.LifecycleManager); ok {
+		if err := lc.Setup(); err != nil {
+			return err
+		}
+	}
+
 	if err := q.setupPartitions(); err != nil {
 		return err
 	}
@@ -511,6 +523,21 @@ func (q *EventQ) HandleShutdown(cmd *protocol.Command) error {
 	// work here
 	if manager, ok := q.log.(logger.LogManager); ok {
 		if err := manager.Shutdown(); err != nil {
+			return err
+		}
+	}
+
+	// V2
+	// TODO try all shutdowns or give up after the first error?
+	// TODO refactor socket to register LifecycleManagers with events so events
+	// can control shutdown order of loggers AND servers
+	if lc, ok := q.logw.(internal.LifecycleManager); ok {
+		if err := lc.Shutdown(); err != nil {
+			return err
+		}
+	}
+	if lc, ok := q.logp.(internal.LifecycleManager); ok {
+		if err := lc.Shutdown(); err != nil {
 			return err
 		}
 	}

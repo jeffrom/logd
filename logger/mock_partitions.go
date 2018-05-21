@@ -139,6 +139,11 @@ func (m *MockPartitions) List() ([]uint64, error) {
 	return m.idsBuf[:m.nparts], nil
 }
 
+// Shutdown implements PartitionManager
+func (m *MockPartitions) Shutdown() error {
+	return nil
+}
+
 // SetNextError sets an error to be returned from the next call
 func (m *MockPartitions) SetNextError(err error) *MockPartitions {
 	m.nextErr = err

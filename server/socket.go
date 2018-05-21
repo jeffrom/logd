@@ -109,7 +109,7 @@ func (s *Socket) listenAndServe(wait bool) error {
 		case <-s.stopC:
 			log.Printf("Shutting down server at %s", s.ln.Addr())
 			s.logConns()
-			return s.shutdown()
+			return s.Shutdown()
 		case conn := <-s.connIn:
 			go s.handleConnection(conn)
 		}
@@ -174,8 +174,8 @@ func (s *Socket) GoServe() {
 	s.ready()
 }
 
-// shutdown shuts down the server
-func (s *Socket) shutdown() error {
+// Shutdown implements internal.LifecycleManager, shutting down the server
+func (s *Socket) Shutdown() error {
 	defer func() {
 		select {
 		case s.shutdownC <- struct{}{}:
@@ -426,6 +426,8 @@ func (s *Socket) sendResponse(conn *Conn, resp *protocol.ResponseV2) (int, error
 		if serr != nil {
 			return total, serr
 		}
+
+		// TODO close all readers as soon as readFrom completes
 	}
 
 	if !readOne {

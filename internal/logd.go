@@ -13,6 +13,13 @@ import (
 	"github.com/jeffrom/logd/config"
 )
 
+// LifecycleManager handles application startup / shutdown for loggers and
+// servers.
+type LifecycleManager interface {
+	Setup() error
+	Shutdown() error
+}
+
 func init() {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 	log.SetOutput(os.Stdout)
