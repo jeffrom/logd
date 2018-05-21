@@ -85,6 +85,11 @@ func (m *MockPartitions) Create(offset uint64) (Partitioner, error) {
 	return p, nil
 }
 
+// Uncirculate implements PartitionManager
+func (m *MockPartitions) Uncirculate(offset uint64) error {
+	return nil
+}
+
 // Remove implements PartitionManager
 func (m *MockPartitions) Remove(offset uint64) error {
 	if m.nremoveCalls < 0 {

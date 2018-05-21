@@ -21,6 +21,10 @@ type PartitionManager interface {
 	// Create creates a new partition. If the partition already exists, return
 	// an error
 	Create(off uint64) (Partitioner, error)
+	// Uncirculate makes a partition unavailable to subsequent requests.
+	// Intended for allowing current reads to complete before permanent
+	// removal.
+	Uncirculate(off uint64) error
 	// Remove removes a partition. If the partition doesn't exist, return an
 	// error
 	Remove(off uint64) error
@@ -56,6 +60,11 @@ func NewPartitions(conf *config.Config) *Partitions {
 // Create implements PartitionManager. TODO may not be needed. Writer can create them.
 func (p *Partitions) Create(off uint64) (Partitioner, error) {
 	return nil, nil
+}
+
+// Uncirculate implements PartitionManager
+func (p *Partitions) Uncirculate(off uint64) error {
+	return nil
 }
 
 // Remove implements PartitionManager
