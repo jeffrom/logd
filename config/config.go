@@ -15,7 +15,7 @@ type Config struct {
 	GracefulShutdownTimeout uint   `json:"graceful_shutdown_timeout"`
 	LogFile                 string `json:"log_file"`
 	LogFileMode             int    `json:"log_file_mode"`
-	MaxChunkSize            int    `json:"max_chunk_size"`
+	MaxBatchSize            int    `json:"max_batch_size"`
 	PartitionSize           int    `json:"partition_size"`
 	MaxPartitions           int    `json:"max_partitions"`
 	PartitionDeleteHook     string `json:"partition_delete_hook"`
@@ -51,9 +51,9 @@ func init() {
 	DefaultConfig = NewConfig()
 	DefaultConfig.ServerTimeout = 500
 	DefaultConfig.GracefulShutdownTimeout = 500
-	DefaultConfig.LogFile = "__log"
+	DefaultConfig.LogFile = "__"
 	DefaultConfig.LogFileMode = 0644
-	DefaultConfig.MaxChunkSize = 1024 * 1024 * 2
+	DefaultConfig.MaxBatchSize = 1024 * 1024 * 2
 	DefaultConfig.PartitionSize = 1024 * 50
 	// DefaultConfig.PartitionSize = 1024 * 1024 * 2000
 	DefaultConfig.MaxPartitions = 5

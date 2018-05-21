@@ -37,7 +37,7 @@ func DefaultTestConfig(verbose bool) *config.Config {
 		GracefulShutdownTimeout: 1000,
 		LogFileMode:             0644,
 		LogFile:                 TmpLog(),
-		MaxChunkSize:            1024 * 1024 * 2,
+		MaxBatchSize:            1024 * 1024 * 2,
 		PartitionSize:           1024 * 1024 * 2,
 		IndexCursorSize:         100,
 		MaxPartitions:           5,
@@ -57,6 +57,10 @@ func CheckGoldenFile(filename string, b []byte, golden bool) {
 	expected, err := ioutil.ReadFile(goldenFile)
 	CheckError(err)
 	if !bytes.Equal(b, expected) {
+		if len(b) < 1000 && len(expected) < 1000 {
+			log.Printf("golden file %s doesn't match fixture:\n\nexpected:\n\n\t%q\n\n\nactual:\n\n\t%q", filename, expected, b)
+		}
+
 		ioutil.WriteFile(goldenActual, b, 0644)
 		log.Panicf("Golden files didn't match: wrote output to %s", goldenActual)
 	}

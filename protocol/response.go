@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"bufio"
 	"bytes"
 	"io"
 
@@ -186,4 +187,107 @@ func (r *ResponseV2) ScanReader() (io.Reader, error) {
 	rdr := r.readers[r.numScanned]
 	r.numScanned++
 	return rdr, nil
+}
+
+// NumReaders returns the number of io.Readers available
+func (r *ResponseV2) NumReaders() int {
+	return r.numReaders
+}
+
+// ClientResponse is the response clients receive after making a request.  V2.
+// Handles responses to all requests except READ, which responds with BATCH.
+// OK <offset>\r\n
+// MOK <size>\r\n<body>\r\n
+// ERR <reason>\r\n
+type ClientResponse struct {
+	conf     *config.Config
+	raw      []byte
+	offset   uint64
+	digitbuf [32]byte
+}
+
+// NewClientResponse creates a new instance of *ClientResponse
+func NewClientResponse(conf *config.Config) *ClientResponse {
+	return &ClientResponse{
+		conf: conf,
+	}
+}
+
+// Reset sets ClientResponse to initial values
+func (cr *ClientResponse) Reset() {
+	cr.offset = 0
+}
+
+// SetOffset sets the offset number for a batch response
+func (cr *ClientResponse) SetOffset(off uint64) {
+	cr.offset = off
+}
+
+// Offset returns the response offset. It will panic if the response type isn't
+// for a batch.
+func (cr *ClientResponse) Offset() uint64 {
+	return cr.offset
+}
+
+// WriteTo implements io.WriterTo
+func (cr *ClientResponse) WriteTo(w io.Writer) (int64, error) {
+	var total int64
+	n, err := w.Write(bok)
+	total += int64(n)
+	if err != nil {
+		return total, err
+	}
+
+	n, err = w.Write(bspace)
+	total += int64(n)
+	if err != nil {
+		return total, err
+	}
+
+	l := uintToASCII(uint64(cr.offset), &cr.digitbuf)
+	n, err = w.Write(cr.digitbuf[l:])
+	total += int64(n)
+	if err != nil {
+		return total, err
+	}
+
+	n, err = w.Write(bnewLine)
+	total += int64(n)
+	if err != nil {
+		return total, err
+	}
+
+	return total, nil
+}
+
+// ReadFrom implements io.ReaderFrom
+func (cr *ClientResponse) ReadFrom(r io.Reader) (int64, error) {
+	return cr.readFromBuf(r.(*bufio.Reader))
+}
+
+func (cr *ClientResponse) readFromBuf(r *bufio.Reader) (int64, error) {
+	var total int64
+
+	word, err := r.ReadSlice(' ')
+	total += int64(len(word))
+	if err != nil {
+		return total, err
+	}
+
+	if !bytes.HasPrefix(word, bokStart) {
+		return total, errInvalidProtocolLine
+	}
+
+	word, err = r.ReadSlice('\n')
+	total += int64(len(word))
+	if err != nil {
+		return total, err
+	}
+	n, err := asciiToUint(word[:len(word)-termLen])
+	if err != nil {
+		return total, err
+	}
+	cr.offset = n
+
+	return total, err
 }

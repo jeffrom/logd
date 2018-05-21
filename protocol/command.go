@@ -28,6 +28,9 @@ const (
 	// CmdRead is a read command type.
 	CmdRead
 
+	// CmdReadV2 is the new read request type
+	CmdReadV2
+
 	// CmdTail is a read command type. While similar to Read, in the case where
 	// the caller supplies an id lower than the tail of the log, Tail starts
 	// from the beginning of the log.
@@ -60,6 +63,8 @@ func (cmd *CmdType) String() string {
 		return "BATCH"
 	case CmdRead:
 		return "READ"
+	case CmdReadV2:
+		return "READV2"
 	case CmdTail:
 		return "TAIL"
 	case CmdHead:
@@ -87,6 +92,8 @@ func (cmd *CmdType) Bytes() []byte {
 		return []byte("BATCH")
 	case CmdRead:
 		return []byte("READ")
+	case CmdReadV2:
+		return []byte("READV2")
 	case CmdTail:
 		return []byte("TAIL")
 	case CmdHead:
@@ -114,6 +121,9 @@ func cmdNamefromBytes(b []byte) CmdType {
 	}
 	if bytes.Equal(b, []byte("READ")) {
 		return CmdRead
+	}
+	if bytes.Equal(b, []byte("READV2")) {
+		return CmdReadV2
 	}
 	if bytes.Equal(b, []byte("TAIL")) {
 		return CmdTail
@@ -143,6 +153,7 @@ var argLens = map[CmdType]int{
 	CmdMessage:  2,
 	CmdBatch:    2,
 	CmdRead:     2,
+	CmdReadV2:   2,
 	CmdTail:     2,
 	CmdHead:     0,
 	CmdStats:    0,

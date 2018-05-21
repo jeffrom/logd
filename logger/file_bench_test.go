@@ -13,7 +13,7 @@ var someMessage = []byte("cool, reasonably-sized message. something about the le
 
 func fileLoggerBenchConfig() *config.Config {
 	config := testhelper.TestConfig(testing.Verbose())
-	config.MaxChunkSize = 1024 * 10
+	config.MaxBatchSize = 1024 * 10
 	config.PartitionSize = 1024 * 1024 * 500
 	config.IndexCursorSize = 100
 	config.LogFile = testhelper.TmpLog()

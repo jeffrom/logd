@@ -64,7 +64,7 @@ func (r *Reader) CommandFrom(rdr io.Reader) (int, *Command, error) {
 		if berr != nil {
 			return 0, nil, berr
 		}
-		batch.messages = int(n)
+		batch.NumMessages = int(n)
 
 		_, word, berr = parseWord(bline)
 		if berr != nil {
@@ -75,7 +75,7 @@ func (r *Reader) CommandFrom(rdr io.Reader) (int, *Command, error) {
 		if berr != nil {
 			return 0, nil, berr
 		}
-		batch.size = n
+		batch.Size = n
 
 		_, berr = batch.readData(r.Br)
 		if berr != nil {

@@ -19,8 +19,32 @@ func TestWriteBatch(t *testing.T) {
 	if _, err := batch.WriteTo(b); err != nil {
 		t.Fatalf("unexpected error writing batch: %v", err)
 	}
-
 	testhelper.CheckGoldenFile("batch.small", b.Bytes(), testhelper.Golden)
+
+	batch.Reset()
+	batch.Append([]byte("hi"))
+	batch.Append([]byte("hallo"))
+	batch.Append([]byte("sup"))
+
+	b.Reset()
+
+	if _, err := batch.WriteTo(b); err != nil {
+		t.Fatalf("unexpected error writing batch: %v", err)
+	}
+	testhelper.CheckGoldenFile("batch.small", b.Bytes(), testhelper.Golden)
+}
+
+func TestWriteBatchSmallest(t *testing.T) {
+	conf := testhelper.TestConfig(testing.Verbose())
+	batch := NewBatch(conf)
+	batch.AppendMessage(newTestMessage(conf, "0"))
+
+	b := &bytes.Buffer{}
+	if _, err := batch.WriteTo(b); err != nil {
+		t.Fatalf("unexpected error writing batch: %v", err)
+	}
+
+	testhelper.CheckGoldenFile("batch.smallest", b.Bytes(), testhelper.Golden)
 }
 
 func TestReadBatch(t *testing.T) {
@@ -30,7 +54,7 @@ func TestReadBatch(t *testing.T) {
 	b := &bytes.Buffer{}
 	b.Write(fixture)
 	br := bufio.NewReader(b)
-	if _, err := batch.readFromBuf(br); err != nil {
+	if _, err := batch.ReadFrom(br); err != nil {
 		t.Fatalf("unexpected error reading batch: %v", err)
 	}
 
@@ -40,25 +64,5 @@ func TestReadBatch(t *testing.T) {
 	}
 
 	actual := b.Bytes()
-	if !bytes.Equal(actual, fixture) {
-		t.Fatalf("resulting batch doesn't match fixture:\n\nexpected:\n\n\t%q\n\n\nactual:\n\n\t%q", fixture, actual)
-	}
-}
-
-func TestWriteBatchResponse(t *testing.T) {
-	conf := testhelper.TestConfig(testing.Verbose())
-	resp := NewBatchResponse(conf)
-	resp.SetOffset(10)
-	resp.SetPartition(1)
-	fixture := testhelper.LoadFixture("batch_response.simple")
-	b := &bytes.Buffer{}
-
-	if _, err := resp.WriteTo(b); err != nil {
-		t.Fatalf("unexpected error writing response: %+v", err)
-	}
-
-	actual := b.Bytes()
-	if !bytes.Equal(actual, fixture) {
-		t.Fatalf("resulting batch response doesn't match fixture:\n\nexpected:\n\n\t%q\n\n\nactual:\n\n\t%q", fixture, actual)
-	}
+	testhelper.CheckGoldenFile("batch.small", actual, testhelper.Golden)
 }

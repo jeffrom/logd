@@ -52,9 +52,11 @@ var crcTable = crc32.MakeTable(crc32.Koopman)
 
 var bnewLine = []byte("\r\n")
 var bspace = []byte(" ")
+var bmsg = []byte("MSG")
 var bmsgStart = []byte("MSG ")
 var bbatchStart = []byte("BATCH ")
 var bok = []byte("OK")
+var bokStart = []byte("OK ")
 
 // ReadLine reads a line from a bufio.Reader
 // NOTE the line data will be overwritten the next time the bufio.Reader is
@@ -114,6 +116,20 @@ func parseWord(line []byte) ([]byte, []byte, error) {
 		word = line[:n-1]
 	}
 	return line[n+1:], word, nil
+}
+
+// same as parseWord, but returns the number of bytes read instead of the rest
+// of the slice
+func parseWordN(line []byte) (int, []byte, error) {
+	n := bytes.IndexAny(line, " \n")
+	if n < 0 {
+		return 0, nil, errors.New("invalid bytes")
+	}
+	word := line[:n]
+	if word[n-1] == '\r' {
+		word = line[:n-1]
+	}
+	return n + 1, word, nil
 }
 
 func readWordFromBuf(r *bufio.Reader) (int64, []byte, []byte, error) {

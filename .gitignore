@@ -1,7 +1,9 @@
 vendor/
 
 # ignore any logs created in development
-__log*
+*.log
+__*.[0-9]*
+__*.index
 
 # files generated in tests to compare to golden files
 *.actual.golden

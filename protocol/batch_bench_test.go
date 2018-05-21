@@ -9,7 +9,7 @@ import (
 	"github.com/jeffrom/logd/testhelper"
 )
 
-func BenchmarkBatchWrite(b *testing.B) {
+func BenchmarkBatchWriteV2(b *testing.B) {
 	conf := protocolBenchConfig()
 
 	batch := NewBatch(conf)
@@ -22,12 +22,12 @@ func BenchmarkBatchWrite(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		if _, err := batch.WriteTo(w); err != nil {
-			panic(err)
+			b.Fatal(err)
 		}
 	}
 }
 
-func BenchmarkBatchRead(b *testing.B) {
+func BenchmarkBatchReadV2(b *testing.B) {
 	conf := protocolBenchConfig()
 	batch := NewBatch(conf)
 	fixture := testhelper.LoadFixture("batch.medium")
@@ -37,27 +37,12 @@ func BenchmarkBatchRead(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		if _, err := batch.ReadFrom(br); err != nil {
-			panic(err)
+			b.Fatal(err)
 		}
 
 		batch.Reset()
 		buf.Reset()
 		buf.Write(fixture)
 		br.Reset(buf)
-	}
-}
-
-func BenchmarkBatchResponseWrite(b *testing.B) {
-	conf := protocolBenchConfig()
-	batchResp := NewBatchResponse(conf)
-	batchResp.SetOffset(1000)
-	batchResp.SetPartition(10)
-	w := ioutil.Discard
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		if _, err := batchResp.WriteTo(w); err != nil {
-			panic(err)
-		}
 	}
 }

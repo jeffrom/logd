@@ -10,33 +10,41 @@ import (
 
 // Batch represents a collection of Messages
 // BATCH <size> <messages>\r\n<data>\r\n
+// TODO add crc
 type Batch struct {
-	config   *config.Config
-	buf      []byte
-	size     uint64
-	messages int
-	// firstOffset uint64
-	digitbuf [32]byte
-	msgBuf   *bytes.Buffer
+	conf        *config.Config
+	Size        uint64
+	NumMessages int
+	messages    []*MessageV2
+	buf         []byte
+	digitbuf    [32]byte
+	msgBuf      *bytes.Buffer
+	firstOff    uint64
+	wasRead     bool
 }
 
 // NewBatch returns a new instance of a batch
 func NewBatch(conf *config.Config) *Batch {
-	return &Batch{
-		config: conf,
-		msgBuf: &bytes.Buffer{},
+	b := &Batch{
+		conf:     conf,
+		msgBuf:   &bytes.Buffer{},
+		messages: make([]*MessageV2, 1000),
 	}
+
+	return b
 }
 
 // Reset puts a batch in an initial state so it can be reused
 func (b *Batch) Reset() {
-	b.size = 0
-	b.messages = 0
+	b.Size = 0
+	b.NumMessages = 0
+	b.firstOff = 0
+	b.wasRead = false
 }
 
 func (b *Batch) ensureBuf() {
 	if b.buf == nil {
-		b.buf = make([]byte, b.config.MaxChunkSize)
+		b.buf = make([]byte, b.conf.MaxBatchSize)
 	}
 }
 
@@ -52,15 +60,17 @@ func (b *Batch) FromRequest(req *Request) (*Batch, error) {
 	if err != nil {
 		return b, err
 	}
-	b.size = n
+	b.Size = n
 
 	n, err = asciiToUint(req.args[1])
 	if err != nil {
 		return b, err
 	}
-	b.messages = int(n)
+	b.NumMessages = int(n)
 
 	b.buf = req.body[:req.bodysize]
+
+	b.firstOff = uint64(len(req.envelope) + termLen)
 	return b, nil
 }
 
@@ -76,32 +86,110 @@ func (b *Batch) Bytes() []byte {
 	if b.buf == nil {
 		return nil
 	}
-	return b.buf[:b.size]
+	return b.buf[:b.Size]
 }
 
-// AppendMessage adds a new messages bytes to the batch
-func (b *Batch) AppendMessage(m *MessageV2) error {
-	b.msgBuf.Reset()
-	_, err := m.WriteTo(b.msgBuf)
-	if err != nil {
-		return err
+// Append adds a new message's bytes to the batch
+func (b *Batch) Append(p []byte) error {
+	if b.messages[b.NumMessages] == nil {
+		b.messages[b.NumMessages] = NewMessageV2(b.conf)
 	}
-
-	b.ensureBuf()
-	n := copy(b.buf[b.size:], b.msgBuf.Bytes())
-	b.size += uint64(n)
-	b.messages++
+	msg := b.messages[b.NumMessages]
+	msg.Body = p
+	msg.Size = len(p)
+	b.NumMessages++
 	return nil
+}
+
+// AppendMessage adds a new message to the batch
+func (b *Batch) AppendMessage(m *MessageV2) error {
+	// m.offsetDelta = uint64(b.firstOffset()) + b.Size
+	// m.firstOffset = b.firstOffset()
+
+	// b.msgBuf.Reset()
+	// _, err := m.WriteTo(b.msgBuf)
+	// if err != nil {
+	// 	return err
+	// }
+
+	// b.ensureBuf()
+	// n := copy(b.buf[b.Size:], b.msgBuf.Bytes())
+	// b.Size += uint64(n)
+	b.messages[b.NumMessages] = m
+	b.NumMessages++
+	return nil
+}
+
+// SetMessages sets all messages in a batch
+func (b *Batch) SetMessages(msgs []*MessageV2) {
+	b.messages = msgs
+	b.NumMessages = len(msgs)
 }
 
 // MessageBytes returns a byte slice of the batch of messages.
 func (b *Batch) MessageBytes() []byte {
+	return b.buf[:b.Size]
+}
+
+// Annotate adds firstOffset and offsetDelta information to each message in the
+// batch
+func (b *Batch) Annotate() error {
+	b.firstOff = b.calculateFirstOffset()
+
+	var n uint64
+	for i := 0; i < b.NumMessages; i++ {
+		m := b.messages[i]
+		m.firstOffset = b.firstOff
+		m.offsetDelta = b.firstOff + n
+		msgSize, err := b.messageFullSize(m)
+		if err != nil {
+			return err
+		}
+		n += uint64(msgSize)
+	}
+
+	return nil
+}
+
+func (b *Batch) buildBodyBytes() error {
+	b.msgBuf.Reset()
+	for i := 0; i < b.NumMessages; i++ {
+		m := b.messages[i]
+		n, err := m.WriteTo(b.msgBuf)
+		if err != nil {
+			return err
+		}
+
+		m.fullSize = int(n)
+	}
+
+	l := b.msgBuf.Len()
+	b.Size = uint64(l)
 	b.ensureBuf()
-	return b.buf[:b.size]
+	copy(b.buf[:b.Size], b.msgBuf.Bytes())
+
+	return nil
+}
+
+func (b *Batch) messageFullSize(m *MessageV2) (int, error) {
+	if m.fullSize > 0 {
+		return m.fullSize, nil
+	}
+
+	b.msgBuf.Reset()
+	n, err := m.WriteTo(b.msgBuf)
+	m.fullSize = int(n)
+	return m.fullSize, err
 }
 
 // WriteTo implements io.WriterTo.
 func (b *Batch) WriteTo(w io.Writer) (int64, error) {
+	if !b.wasRead {
+		if err := b.buildBodyBytes(); err != nil {
+			return 0, err
+		}
+	}
+
 	var total int64
 	n, err := w.Write(bbatchStart)
 	total += int64(n)
@@ -109,7 +197,7 @@ func (b *Batch) WriteTo(w io.Writer) (int64, error) {
 		return total, err
 	}
 
-	l := uintToASCII(uint64(b.size), &b.digitbuf)
+	l := uintToASCII(uint64(b.Size), &b.digitbuf)
 	n, err = w.Write(b.digitbuf[l:])
 	total += int64(n)
 	if err != nil {
@@ -122,7 +210,7 @@ func (b *Batch) WriteTo(w io.Writer) (int64, error) {
 		return total, err
 	}
 
-	l = uintToASCII(uint64(b.messages), &b.digitbuf)
+	l = uintToASCII(uint64(b.NumMessages), &b.digitbuf)
 	n, err = w.Write(b.digitbuf[l:])
 	total += int64(n)
 	if err != nil {
@@ -146,7 +234,20 @@ func (b *Batch) WriteTo(w io.Writer) (int64, error) {
 
 // ReadFrom implements io.ReaderFrom
 func (b *Batch) ReadFrom(r io.Reader) (int64, error) {
-	return b.readFromBuf(r.(*bufio.Reader))
+	n, err := b.readFromBuf(r.(*bufio.Reader))
+	if err != nil {
+		return n, err
+	}
+	b.wasRead = true
+	return n, err
+}
+
+// FirstOffset returns the offset delta of the first message
+func (b *Batch) FirstOffset() uint64 {
+	if b.firstOff == 0 {
+		b.firstOff = b.calculateFirstOffset()
+	}
+	return b.firstOff
 }
 
 // readFromBuf reads a batch from a *bufio.Reader
@@ -186,7 +287,7 @@ func (b *Batch) readEnvelope(r *bufio.Reader) (int64, error) {
 	if err != nil {
 		return total, err
 	}
-	b.size = n
+	b.Size = n
 
 	word, err = r.ReadSlice('\n')
 	total += int64(len(word))
@@ -197,7 +298,7 @@ func (b *Batch) readEnvelope(r *bufio.Reader) (int64, error) {
 	if err != nil {
 		return total, err
 	}
-	b.messages = int(n)
+	b.NumMessages = int(n)
 	return total, err
 }
 
@@ -206,87 +307,34 @@ func (b *Batch) readData(r *bufio.Reader) (int64, error) {
 	var total int64
 
 	b.ensureBuf()
-	n, err := io.ReadFull(r, b.buf[:b.size])
+	n, err := io.ReadFull(r, b.buf[:b.Size])
 	total += int64(n)
+
 	return total, err
 }
 
-// BatchResponse is used to build a ResponseV2 io.Reader
-type BatchResponse struct {
-	conf      *config.Config
-	partition int64
-	offset    int64
-	digitbuf  [32]byte
+func (b *Batch) makeMessages() error {
+	msgBytesRead := 0
+	for i := 0; i < b.NumMessages; i++ {
+		m := NewMessageV2(b.conf)
+
+		x, berr := m.FromBytes(b.buf[msgBytesRead:b.Size])
+		if berr != nil {
+			return berr
+		}
+		msgBytesRead += x
+
+		b.messages[i] = m
+	}
+	return nil
 }
 
-// NewBatchResponse returns a new instance of BatchResponse
-// OK <partition> <offset>\r\n
-func NewBatchResponse(conf *config.Config) *BatchResponse {
-	br := &BatchResponse{conf: conf}
-	br.reset()
+func (b *Batch) calculateFirstOffset() uint64 {
+	n := uint64(len(bbatchStart) +
+		uintToASCII(b.Size, &b.digitbuf) +
+		len(bspace) +
+		uintToASCII(uint64(b.NumMessages), &b.digitbuf) +
+		termLen)
 
-	return br
-}
-
-func (br *BatchResponse) reset() {
-	br.partition = -1
-	br.offset = -1
-}
-
-// SetPartition sets the partition number for a batch response
-func (br *BatchResponse) SetPartition(part int64) {
-	br.partition = part
-}
-
-// SetOffset sets the offset number for a batch response
-func (br *BatchResponse) SetOffset(offset int64) {
-	br.offset = offset
-}
-
-// WriteTo implements io.WriterTo
-func (br *BatchResponse) WriteTo(w io.Writer) (int64, error) {
-	if br.partition < 0 || br.offset < 0 {
-		panic("partition / offset not set when writing batch response")
-	}
-
-	var total int64
-	n, err := w.Write(bok)
-	total += int64(n)
-	if err != nil {
-		return total, err
-	}
-
-	n, err = w.Write(bspace)
-	total += int64(n)
-	if err != nil {
-		return total, err
-	}
-
-	l := uintToASCII(uint64(br.partition), &br.digitbuf)
-	n, err = w.Write(br.digitbuf[l:])
-	total += int64(n)
-	if err != nil {
-		return total, err
-	}
-
-	n, err = w.Write(bspace)
-	total += int64(n)
-	if err != nil {
-		return total, err
-	}
-
-	l = uintToASCII(uint64(br.offset), &br.digitbuf)
-	n, err = w.Write(br.digitbuf[l:])
-	total += int64(n)
-	if err != nil {
-		return total, err
-	}
-
-	n, err = w.Write(bnewLine)
-	total += int64(n)
-	if err != nil {
-		return total, err
-	}
-
-	return total, nil
+	return n
 }

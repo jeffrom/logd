@@ -3,7 +3,7 @@ package protocol
 import (
 	"bufio"
 	"bytes"
-	"hash/crc32"
+	"fmt"
 	"io"
 
 	"github.com/jeffrom/logd/config"
@@ -111,44 +111,45 @@ func msgFromLogReader(r *bufio.Reader) (int, *Message, error) {
 
 // MessageV2 is a new message type
 type MessageV2 struct {
-	Offset        uint64
-	Body          []byte
 	conf          *config.Config
+	Offset        uint64 // firstOffset + offsetDelta
+	Body          []byte
+	Size          int // size of the message, not including \r\n
+	fullSize      int
+	firstOffset   uint64 // the offset of the beginning of the batch
+	offsetDelta   uint64 // the the offset of the message from firstOffset
 	partition     uint64
-	checksum      uint32 // crc of Body
-	Size          int    // size of the message, not including \r\n
 	read          int64
 	completedRead bool
 	digitbuf      [32]byte
 }
 
 // NewMessageV2 returns a MessageV2
-// MSG <size> <crc>\r\n<body>\r\n
+// MSG <size>\r\n<body>\r\n
 func NewMessageV2(conf *config.Config) *MessageV2 {
 	return &MessageV2{
 		conf: conf,
-		Body: make([]byte, conf.MaxChunkSize),
+		Body: make([]byte, conf.MaxBatchSize), // TODO MaxMessageSize
 	}
 }
 
 func (m *MessageV2) reset() {
 	m.Offset = 0
 	m.partition = 0
-	m.checksum = 0
 	m.Size = 0
+	m.fullSize = 0
 	m.read = 0
 	m.completedRead = false
+}
+
+func (m *MessageV2) String() string {
+	return fmt.Sprintf("%+v", *m)
 }
 
 // SetBody sets the body of a message
 func (m *MessageV2) SetBody(b []byte) {
 	n := copy(m.Body, b)
 	m.Size = n
-	m.setChecksum()
-}
-
-func (m *MessageV2) setChecksum() {
-	m.checksum = crc32.Checksum(m.Body[:m.Size], crcTable)
 }
 
 // ReadFrom implements io.ReaderFrom
@@ -175,17 +176,6 @@ func (m *MessageV2) readFromBuf(r *bufio.Reader) (int64, error) {
 		return total, errInvalidProtocolLine
 	}
 
-	word, err = r.ReadSlice(' ')
-	total += int64(len(word))
-	if err != nil {
-		return total, err
-	}
-	n, err = asciiToUint(word[:len(word)-1])
-	if err != nil {
-		return total, err
-	}
-	m.Size = int(n)
-
 	word, err = r.ReadSlice('\n')
 	total += int64(len(word))
 	if err != nil {
@@ -195,7 +185,7 @@ func (m *MessageV2) readFromBuf(r *bufio.Reader) (int64, error) {
 	if err != nil {
 		return total, err
 	}
-	m.checksum = uint32(n)
+	m.Size = int(n)
 
 	bodyRead, err := io.ReadFull(r, m.Body[:m.Size])
 	total += int64(bodyRead)
@@ -213,6 +203,42 @@ func (m *MessageV2) readFromBuf(r *bufio.Reader) (int64, error) {
 	return total, nil
 }
 
+// FromBytes populates a MessageV2 from a byte slice, returning bytes read and
+// an error, if any
+func (m *MessageV2) FromBytes(b []byte) (int, error) {
+	var total int
+	// fmt.Printf("FromBytes(%q)\n", b)
+
+	n, word, err := parseWordN(b)
+	total += n
+	if err != nil {
+		return total, err
+	}
+
+	if !bytes.Equal(word, bmsg) {
+		return total, errInvalidProtocolLine
+	}
+
+	n, word, err = parseWordN(b[total:])
+	total += n
+	if err != nil {
+		return total, err
+	}
+	x, err := asciiToUint(word)
+	if err != nil {
+		return total, err
+	}
+	m.Size = int(x)
+
+	// fmt.Printf("rest of slice: %q\n", b[total:])
+	m.Body = b[total : total+m.Size]
+	total += m.Size
+	total += termLen
+
+	// fmt.Println("parsed", m)
+	return total, err
+}
+
 // WriteTo implements io.WriterTo
 func (m *MessageV2) WriteTo(w io.Writer) (int64, error) {
 	var total int64
@@ -224,19 +250,6 @@ func (m *MessageV2) WriteTo(w io.Writer) (int64, error) {
 	}
 
 	l := uintToASCII(uint64(m.Size), &m.digitbuf)
-	n, err = w.Write(m.digitbuf[l:])
-	total += int64(n)
-	if err != nil {
-		return total, err
-	}
-
-	n, err = w.Write(bspace)
-	total += int64(n)
-	if err != nil {
-		return total, err
-	}
-
-	l = uintToASCII(uint64(m.checksum), &m.digitbuf)
 	n, err = w.Write(m.digitbuf[l:])
 	total += int64(n)
 	if err != nil {

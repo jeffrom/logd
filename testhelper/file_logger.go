@@ -31,7 +31,7 @@ func init() {
 // TmpLog creates a temporary directory for testing purposes
 func TmpLog() string {
 	tmpdir := getTempdir()
-	return path.Join(tmpdir, "__log")
+	return path.Join(tmpdir, "__")
 }
 
 func getTempdir() string {

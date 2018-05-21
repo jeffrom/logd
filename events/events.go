@@ -37,20 +37,29 @@ type EventQ struct {
 	requestIn chan *protocol.Request
 	close     chan struct{}
 	log       logger.Logger
-	Stats     *internal.Stats
+	parts     *partitions
+
+	logw logger.LogWriterV2
+	logp logger.PartitionManager
+
+	Stats *internal.Stats
 }
 
 // NewEventQ creates a new instance of an EventQ
 func NewEventQ(conf *config.Config) *EventQ {
-	log := logger.New(conf)
-
 	q := &EventQ{
 		config:    conf,
 		in:        make(chan *protocol.Command, 1000),
 		requestIn: make(chan *protocol.Request, 1000),
 		close:     make(chan struct{}),
-		log:       log,
-		Stats:     internal.NewStats(),
+		parts:     newPartitions(conf),
+		// old logger
+		log: logger.New(conf),
+		// new loggers
+		logw: logger.NewWriter(conf),
+		logp: logger.NewPartitions(conf),
+
+		Stats: internal.NewStats(),
 	}
 
 	return q
@@ -70,7 +79,30 @@ func (q *EventQ) Start() error {
 	}
 	q.currID = head + 1
 
+	if err := q.setupPartitions(); err != nil {
+		return err
+	}
+
 	go q.loop()
+	return nil
+}
+
+func (q *EventQ) setupPartitions() error {
+	parts, err := q.logp.List()
+	if err != nil {
+		return err
+	}
+
+	for _, part := range parts {
+		q.parts.add(part.Offset(), part.Size())
+	}
+
+	head := q.parts.head
+	if serr := q.logw.SetPartition(head.startOffset); serr != nil {
+		return serr
+	}
+
+	log.Printf("Starting at %d (partition %d, delta %d)", q.parts.headOffset(), head.startOffset, head.size)
 	return nil
 }
 
@@ -88,6 +120,8 @@ func (q *EventQ) loop() {
 			switch req.Name {
 			case protocol.CmdBatch:
 				resp, err = q.handleBatch(req)
+			case protocol.CmdReadV2:
+				resp, err = q.handleReadV2(req)
 			default:
 				log.Printf("unhandled request type passed: %v", req.Name)
 				continue
@@ -196,18 +230,28 @@ func (q *EventQ) handleBatch(req *protocol.Request) (*protocol.ResponseV2, error
 		return resp, err
 	}
 
-	// write the requests raw bytes (req.Bytes()) directly into the log
-	batchResp := protocol.NewBatchResponse(q.config)
-	batchResp.SetPartition(0)
-	batchResp.SetOffset(0)
+	if q.parts.shouldRotate(req.FullSize()) {
+		nextStartOffset := q.parts.nextStartOffset()
+		if sperr := q.logw.SetPartition(nextStartOffset); sperr != nil {
+			return resp, sperr
+		}
+	}
 
-	b := &bytes.Buffer{}
-	_, err = batchResp.WriteTo(b)
+	_, err = q.logw.Write(req.Bytes())
 	if err != nil {
 		return resp, err
 	}
 
-	err = resp.AddReader(b)
+	respOffset := q.parts.nextStartOffset()
+	if respOffset != 0 {
+		respOffset++
+	}
+	q.parts.addBatch(batch, req.FullSize())
+
+	clientResp := protocol.NewClientResponse(q.config)
+	clientResp.SetOffset(respOffset)
+	_, err = req.WriteResponse(resp, clientResp)
+
 	if err != nil {
 		return resp, err
 	}
@@ -215,8 +259,18 @@ func (q *EventQ) handleBatch(req *protocol.Request) (*protocol.ResponseV2, error
 	return resp, nil
 }
 
-func (q *EventQ) parseBatch(req *protocol.Request) (*protocol.Batch, error) {
-	return nil, nil
+func (q *EventQ) handleReadV2(req *protocol.Request) (*protocol.ResponseV2, error) {
+	resp := protocol.NewResponseV2(q.config)
+	_, err := protocol.NewReadRequest(q.config).FromRequest(req)
+	if err != nil {
+		return resp, err
+	}
+
+	// get the offset/delta for range start
+	// get the offset/limit for range end
+	// partitions.Get the relevant partitions and add them to the client response
+
+	return resp, nil
 }
 
 func (q *EventQ) handleRead(cmd *protocol.Command) {

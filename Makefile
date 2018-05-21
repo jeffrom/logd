@@ -4,7 +4,7 @@ SHORT_PKGS ?= $(shell go list -f '{{.Name}}' ./... | grep -v main)
 PKG_DIRS ?= $(shell go list -f '{{.Dir}}' ./...)
 WITHOUT_APPTEST ?= $(shell go list -f '{{.Name}}' ./... | grep -v main | grep -v app$$)
 
-GENERATED_FILES ?= __log* testdata/*.actual.golden logd.test log-cli.test *.pprof
+GENERATED_FILES ?= __* testdata/*.actual.golden logd.test log-cli.test *.pprof
 
 .PHONY: all
 all: build
@@ -16,6 +16,7 @@ clean:
 	$(foreach pkg,$(PKG_DIRS),rm -f $(pkg)/testdata/*.actual.golden;)
 	$(foreach pkg,$(SHORT_PKGS),rm -f $(pkg).test;)
 	rm -rf integration_test/out/* report/*
+	rm -rf [0-9]*.log
 	rm -rf /tmp/logd-testdata*
 	rm -rf /tmp/logd-artifacts.log*
 	rm -rf /tmp/user/$(shell id -u)/logd-testdata*

@@ -8,7 +8,7 @@ import (
 	"github.com/jeffrom/logd/testhelper"
 )
 
-func BenchmarkRequestRead(b *testing.B) {
+func BenchmarkRequestReadV2(b *testing.B) {
 	conf := protocolBenchConfig()
 	req := NewRequest(conf)
 	fixture := testhelper.LoadFixture("batch.medium")
@@ -18,7 +18,7 @@ func BenchmarkRequestRead(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		if _, err := req.ReadFrom(br); err != nil {
-			panic(err)
+			b.Fatal(err)
 		}
 
 		req.reset()

@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"bufio"
+	"bytes"
 	"io"
 
 	"github.com/jeffrom/logd/config"
@@ -14,22 +15,25 @@ type Request struct {
 	Name      CmdType
 	responseC chan *ResponseV2
 
-	raw      []byte // the full request as raw bytes
-	read     int64
-	envelope []byte // slice of raw pointing to the first line of the request
-	args     [][]byte
-	nargs    int
-	body     []byte
-	bodysize int
+	respBuf *bytes.Buffer
+
+	raw      []byte   // the full request as raw bytes
+	read     int64    //
+	envelope []byte   // slice of raw pointing to the first line of the request
+	args     [][]byte // slices of raw pointing to the requests arguments
+	nargs    int      //
+	body     []byte   // slice of raw pointing to the body, if it exists
+	bodysize int      //
 }
 
 // NewRequest returns a new instance of *Request
 func NewRequest(conf *config.Config) *Request {
 	return &Request{
 		conf:      conf,
-		raw:       make([]byte, conf.MaxChunkSize),
+		raw:       make([]byte, conf.MaxBatchSize),
 		responseC: make(chan *ResponseV2),
 		args:      make([][]byte, maxArgs),
+		respBuf:   &bytes.Buffer{},
 	}
 }
 
@@ -40,6 +44,21 @@ func (req *Request) reset() {
 	req.nargs = 0
 	req.body = nil
 	req.bodysize = 0
+	req.respBuf.Reset()
+}
+
+func (req *Request) String() string {
+	return req.Name.String()
+}
+
+// Bytes returns the raw byte representation of the request
+func (req *Request) Bytes() []byte {
+	return req.raw[:req.read]
+}
+
+// FullSize returns the total byte size of the request
+func (req *Request) FullSize() int {
+	return int(req.read)
 }
 
 func (req *Request) parseType() ([]byte, error) {
@@ -146,4 +165,13 @@ func (req *Request) readFromBuf(r *bufio.Reader) (int64, error) {
 	}
 
 	return total, err
+}
+
+// WriteResponse is used by the event loop to write a single response. Should
+// be used for all commands except READ. It can be used for the READ response
+// envelope.
+func (req *Request) WriteResponse(resp *ResponseV2, cr *ClientResponse) (int64, error) {
+	n, err := cr.WriteTo(req.respBuf)
+	resp.AddReader(req.respBuf)
+	return n, err
 }

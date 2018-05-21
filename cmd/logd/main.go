@@ -66,7 +66,7 @@ func runApp(args []string) {
 			Name:        "log_file",
 			Usage:       "Log file name",
 			EnvVar:      "LOGD_FILE",
-			Value:       "__log",
+			Value:       "__",
 			Destination: &conf.LogFile,
 		}),
 		altsrc.NewIntFlag(cli.IntFlag{
@@ -77,11 +77,11 @@ func runApp(args []string) {
 			Destination: &conf.LogFileMode,
 		}),
 		altsrc.NewIntFlag(cli.IntFlag{
-			Name:        "max_chunk_size",
+			Name:        "max_batch_size",
 			Usage:       "Size, in bytes, of maximum chunk length",
 			EnvVar:      "LOGD_MAX_CHUNK_SIZE",
 			Value:       1024 * 1024 * 2,
-			Destination: &conf.MaxChunkSize,
+			Destination: &conf.MaxBatchSize,
 		}),
 		altsrc.NewIntFlag(cli.IntFlag{
 			Name:   "partition_size",

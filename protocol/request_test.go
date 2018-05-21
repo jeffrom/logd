@@ -22,7 +22,5 @@ func TestReadRequest(t *testing.T) {
 	}
 
 	actual := req.raw[:req.read]
-	if !bytes.Equal(actual, fixture) {
-		t.Fatalf("resulting request raw bytes don't match fixture:\n\nexpected:\n\n\t%q\n\n\nactual:\n\n\t%q", fixture, actual)
-	}
+	testhelper.CheckGoldenFile("batch.small", actual, testhelper.Golden)
 }
