@@ -17,6 +17,7 @@ clean:
 	$(foreach pkg,$(SHORT_PKGS),rm -f $(pkg).test;)
 	rm -rf integration_test/out/* report/*
 	rm -rf [0-9]*.log
+	rm -rf *.pprof
 	rm -rf /tmp/logd-testdata*
 	rm -rf /tmp/logd-artifacts.log*
 	rm -rf /tmp/user/$(shell id -u)/logd-testdata*

@@ -8,8 +8,9 @@ __*.index
 # files generated in tests to compare to golden files
 *.actual.golden
 
-# files outputting by tools
+# files output by tools
 *.out
+*.pprof
 
 # test binaries
 log*.test

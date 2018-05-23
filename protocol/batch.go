@@ -3,33 +3,36 @@ package protocol
 import (
 	"bufio"
 	"bytes"
+	"hash/crc32"
 	"io"
 
 	"github.com/jeffrom/logd/config"
+	"github.com/pkg/errors"
 )
 
 // Batch represents a collection of Messages
-// BATCH <size> <messages>\r\n<data>
+// BATCH <size> <checksum> <messages>\r\n<data>
 // NOTE no trailing newline after the data
 // TODO add crc
 type Batch struct {
-	conf        *config.Config
-	Size        uint64
-	NumMessages int
-	messages    []*MessageV2
-	buf         []byte
-	digitbuf    [32]byte
-	msgBuf      *bytes.Buffer
-	firstOff    uint64
-	wasRead     bool
+	conf     *config.Config
+	Size     uint64
+	Checksum uint32
+	Messages int
+	msgs     []*MessageV2
+	body     []byte
+	digitbuf [32]byte
+	msgBuf   *bytes.Buffer
+	firstOff uint64
+	wasRead  bool
 }
 
 // NewBatch returns a new instance of a batch
 func NewBatch(conf *config.Config) *Batch {
 	b := &Batch{
-		conf:     conf,
-		msgBuf:   &bytes.Buffer{},
-		messages: make([]*MessageV2, 1000),
+		conf:   conf,
+		msgBuf: &bytes.Buffer{},
+		msgs:   make([]*MessageV2, 1000),
 	}
 
 	return b
@@ -38,14 +41,14 @@ func NewBatch(conf *config.Config) *Batch {
 // Reset puts a batch in an initial state so it can be reused
 func (b *Batch) Reset() {
 	b.Size = 0
-	b.NumMessages = 0
+	b.Messages = 0
 	b.firstOff = 0
 	b.wasRead = false
 }
 
 func (b *Batch) ensureBuf() {
-	if b.buf == nil {
-		b.buf = make([]byte, b.conf.MaxBatchSize)
+	if b.body == nil {
+		b.body = make([]byte, b.conf.MaxBatchSize)
 	}
 }
 
@@ -67,9 +70,15 @@ func (b *Batch) FromRequest(req *Request) (*Batch, error) {
 	if err != nil {
 		return b, err
 	}
-	b.NumMessages = int(n)
+	b.Checksum = uint32(n)
 
-	b.buf = req.body[:req.bodysize]
+	n, err = asciiToUint(req.args[2])
+	if err != nil {
+		return b, err
+	}
+	b.Messages = int(n)
+
+	b.body = req.body[:req.bodysize]
 
 	b.firstOff = uint64(len(req.envelope) + termLen)
 	return b, nil
@@ -79,58 +88,52 @@ func (b *Batch) FromRequest(req *Request) (*Batch, error) {
 // TODO checksum
 func (b *Batch) Validate() error {
 	// if size > MaxBatchSize || crc doesn't match
+	if b.Size > uint64(b.conf.MaxBatchSize) {
+		return errors.New("batch too large")
+	}
+	if b.Checksum != b.calculateChecksum() {
+		return errors.New("checksum didn't match")
+	}
 	return nil
 }
 
 // Bytes returns a slice of raw bytes. Used by EventQ to write directly to the
 // log.
 func (b *Batch) Bytes() []byte {
-	if b.buf == nil {
+	if b.body == nil {
 		return nil
 	}
-	return b.buf[:b.Size]
+	return b.body[:b.Size]
 }
 
 // Append adds a new message's bytes to the batch
 func (b *Batch) Append(p []byte) error {
-	if b.messages[b.NumMessages] == nil {
-		b.messages[b.NumMessages] = NewMessageV2(b.conf)
+	if b.msgs[b.Messages] == nil {
+		b.msgs[b.Messages] = NewMessageV2(b.conf)
 	}
-	msg := b.messages[b.NumMessages]
+	msg := b.msgs[b.Messages]
 	msg.Body = p
 	msg.Size = len(p)
-	b.NumMessages++
+	b.Messages++
 	return nil
 }
 
 // AppendMessage adds a new message to the batch
 func (b *Batch) AppendMessage(m *MessageV2) error {
-	// m.offsetDelta = uint64(b.firstOffset()) + b.Size
-	// m.firstOffset = b.firstOffset()
-
-	// b.msgBuf.Reset()
-	// _, err := m.WriteTo(b.msgBuf)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// b.ensureBuf()
-	// n := copy(b.buf[b.Size:], b.msgBuf.Bytes())
-	// b.Size += uint64(n)
-	b.messages[b.NumMessages] = m
-	b.NumMessages++
+	b.msgs[b.Messages] = m
+	b.Messages++
 	return nil
 }
 
 // SetMessages sets all messages in a batch
 func (b *Batch) SetMessages(msgs []*MessageV2) {
-	b.messages = msgs
-	b.NumMessages = len(msgs)
+	b.msgs = msgs
+	b.Messages = len(msgs)
 }
 
 // MessageBytes returns a byte slice of the batch of messages.
 func (b *Batch) MessageBytes() []byte {
-	return b.buf[:b.Size]
+	return b.body[:b.Size]
 }
 
 // Annotate adds firstOffset and offsetDelta information to each message in the
@@ -139,8 +142,8 @@ func (b *Batch) Annotate() error {
 	b.firstOff = b.calculateFirstOffset()
 
 	var n uint64
-	for i := 0; i < b.NumMessages; i++ {
-		m := b.messages[i]
+	for i := 0; i < b.Messages; i++ {
+		m := b.msgs[i]
 		m.firstOffset = b.firstOff
 		m.offsetDelta = b.firstOff + n
 		msgSize, err := b.messageFullSize(m)
@@ -153,10 +156,19 @@ func (b *Batch) Annotate() error {
 	return nil
 }
 
+// SetChecksum sets the batch's crc32
+func (b *Batch) SetChecksum() {
+	b.Checksum = b.calculateChecksum()
+}
+
+func (b *Batch) calculateChecksum() uint32 {
+	return crc32.Checksum(b.Bytes(), crcTable)
+}
+
 func (b *Batch) buildBodyBytes() error {
 	b.msgBuf.Reset()
-	for i := 0; i < b.NumMessages; i++ {
-		m := b.messages[i]
+	for i := 0; i < b.Messages; i++ {
+		m := b.msgs[i]
 		n, err := m.WriteTo(b.msgBuf)
 		if err != nil {
 			return err
@@ -168,7 +180,7 @@ func (b *Batch) buildBodyBytes() error {
 	l := b.msgBuf.Len()
 	b.Size = uint64(l)
 	b.ensureBuf()
-	copy(b.buf[:b.Size], b.msgBuf.Bytes())
+	copy(b.body[:b.Size], b.msgBuf.Bytes())
 
 	return nil
 }
@@ -190,6 +202,8 @@ func (b *Batch) WriteTo(w io.Writer) (int64, error) {
 		if err := b.buildBodyBytes(); err != nil {
 			return 0, err
 		}
+
+		b.SetChecksum()
 	}
 
 	var total int64
@@ -212,7 +226,20 @@ func (b *Batch) WriteTo(w io.Writer) (int64, error) {
 		return total, err
 	}
 
-	l = uintToASCII(uint64(b.NumMessages), &b.digitbuf)
+	l = uintToASCII(uint64(b.Checksum), &b.digitbuf)
+	n, err = w.Write(b.digitbuf[l:])
+	total += int64(n)
+	if err != nil {
+		return total, err
+	}
+
+	n, err = w.Write(bspace)
+	total += int64(n)
+	if err != nil {
+		return total, err
+	}
+
+	l = uintToASCII(uint64(b.Messages), &b.digitbuf)
 	n, err = w.Write(b.digitbuf[l:])
 	total += int64(n)
 	if err != nil {
@@ -291,6 +318,18 @@ func (b *Batch) readEnvelope(r *bufio.Reader) (int64, error) {
 	}
 	b.Size = n
 
+	word, err = r.ReadSlice(' ')
+	total += int64(len(word))
+	if err != nil {
+		return total, err
+	}
+
+	n, err = asciiToUint(word[:len(word)-1])
+	if err != nil {
+		return total, err
+	}
+	b.Checksum = uint32(n)
+
 	word, err = r.ReadSlice('\n')
 	total += int64(len(word))
 	if err != nil {
@@ -300,7 +339,7 @@ func (b *Batch) readEnvelope(r *bufio.Reader) (int64, error) {
 	if err != nil {
 		return total, err
 	}
-	b.NumMessages = int(n)
+	b.Messages = int(n)
 	return total, err
 }
 
@@ -309,7 +348,7 @@ func (b *Batch) readData(r *bufio.Reader) (int64, error) {
 	var total int64
 
 	b.ensureBuf()
-	n, err := io.ReadFull(r, b.buf[:b.Size])
+	n, err := io.ReadFull(r, b.body[:b.Size])
 	total += int64(n)
 
 	return total, err
@@ -317,16 +356,16 @@ func (b *Batch) readData(r *bufio.Reader) (int64, error) {
 
 func (b *Batch) makeMessages() error {
 	msgBytesRead := 0
-	for i := 0; i < b.NumMessages; i++ {
+	for i := 0; i < b.Messages; i++ {
 		m := NewMessageV2(b.conf)
 
-		x, berr := m.FromBytes(b.buf[msgBytesRead:b.Size])
+		x, berr := m.FromBytes(b.body[msgBytesRead:b.Size])
 		if berr != nil {
 			return berr
 		}
 		msgBytesRead += x
 
-		b.messages[i] = m
+		b.msgs[i] = m
 	}
 	return nil
 }
@@ -335,7 +374,7 @@ func (b *Batch) calculateFirstOffset() uint64 {
 	n := uint64(len(bbatchStart) +
 		uintToASCII(b.Size, &b.digitbuf) +
 		len(bspace) +
-		uintToASCII(uint64(b.NumMessages), &b.digitbuf) +
+		uintToASCII(uint64(b.Messages), &b.digitbuf) +
 		termLen)
 
 	return n

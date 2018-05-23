@@ -151,7 +151,7 @@ func cmdNamefromBytes(b []byte) CmdType {
 
 var argLens = map[CmdType]int{
 	CmdMessage:  2,
-	CmdBatch:    2,
+	CmdBatch:    3,
 	CmdRead:     2,
 	CmdReadV2:   2,
 	CmdTail:     2,
@@ -163,7 +163,7 @@ var argLens = map[CmdType]int{
 	CmdShutdown: 0,
 }
 
-const maxArgs = 2
+const maxArgs = 3
 
 // Command is an input received by a caller
 type Command struct {

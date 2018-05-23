@@ -2,7 +2,6 @@ package events
 
 import (
 	"context"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"runtime/debug"
@@ -126,7 +125,6 @@ func BenchmarkEventQReadOne(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		fmt.Println(i)
 		cmd := protocol.NewCommand(config, protocol.CmdRead, []byte("1"), []byte("1"))
 		resp, _ := q.PushCommand(context.Background(), cmd)
 		cmd.SignalReady()

@@ -239,7 +239,7 @@ func (q *EventQ) handleBatch(req *protocol.Request) (*protocol.ResponseV2, error
 	}
 
 	if verr := batch.Validate(); verr != nil {
-		return resp, err
+		return resp, verr
 	}
 
 	if q.parts.shouldRotate(req.FullSize()) {
