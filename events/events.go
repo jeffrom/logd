@@ -31,7 +31,7 @@ import (
 
 // EventQ manages the receiving, processing, and responding to events.
 type EventQ struct {
-	config    *config.Config
+	conf      *config.Config
 	currID    uint64
 	in        chan *protocol.Command
 	requestIn chan *protocol.Request
@@ -48,7 +48,7 @@ type EventQ struct {
 // NewEventQ creates a new instance of an EventQ
 func NewEventQ(conf *config.Config) *EventQ {
 	q := &EventQ{
-		config:    conf,
+		conf:      conf,
 		in:        make(chan *protocol.Command, 1000),
 		requestIn: make(chan *protocol.Request, 1000),
 		close:     make(chan struct{}),
@@ -120,14 +120,14 @@ func (q *EventQ) setupPartitions() error {
 
 func (q *EventQ) loop() {
 	for {
-		internal.Debugf(q.config, "waiting for event")
+		internal.Debugf(q.conf, "waiting for event")
 
 		select {
 		// new flow for handling requests passed in from servers
 		case req := <-q.requestIn:
 			var resp *protocol.ResponseV2
 			var err error
-			internal.Debugf(q.config, "request: %s", &req.Name)
+			internal.Debugf(q.conf, "request: %s", &req.Name)
 
 			switch req.Name {
 			case protocol.CmdBatch:
@@ -145,7 +145,7 @@ func (q *EventQ) loop() {
 			req.Respond(resp)
 
 		case cmd := <-q.in:
-			internal.Debugf(q.config, "event: %s(%q)", cmd, cmd.Args)
+			internal.Debugf(q.conf, "event: %s(%q)", cmd, cmd.Args)
 
 			switch cmd.Name {
 			case protocol.CmdMessage:
@@ -166,14 +166,14 @@ func (q *EventQ) loop() {
 				q.handleSleep(cmd)
 			case protocol.CmdShutdown:
 				if err := q.HandleShutdown(cmd); err != nil {
-					cmd.Respond(protocol.NewResponse(q.config, protocol.RespErr))
+					cmd.Respond(protocol.NewResponse(q.conf, protocol.RespErr))
 				} else {
-					cmd.Respond(protocol.NewResponse(q.config, protocol.RespOK))
+					cmd.Respond(protocol.NewResponse(q.conf, protocol.RespOK))
 					// close(q.close)
 					// close(q.in)
 				}
 			default:
-				cmd.Respond(protocol.NewResponse(q.config, protocol.RespErr))
+				cmd.Respond(protocol.NewResponse(q.conf, protocol.RespErr))
 			}
 		case <-q.close:
 			return
@@ -197,7 +197,7 @@ func (q *EventQ) handleMsg(cmd *protocol.Command) {
 	id := q.currID - 1
 
 	if len(cmd.Args) == 0 {
-		cmd.Respond(protocol.NewClientErrResponse(q.config, protocol.ErrRespNoArguments))
+		cmd.Respond(protocol.NewClientErrResponse(q.conf, protocol.ErrRespNoArguments))
 		return
 	}
 
@@ -206,7 +206,7 @@ func (q *EventQ) handleMsg(cmd *protocol.Command) {
 	// TODO if any messages are invalid, throw out the whole bunch
 	for _, msg := range cmd.Args {
 		if len(msg) == 0 {
-			cmd.Respond(protocol.NewClientErrResponse(q.config, protocol.ErrRespEmptyMessage))
+			cmd.Respond(protocol.NewClientErrResponse(q.conf, protocol.ErrRespEmptyMessage))
 			return
 		}
 
@@ -218,7 +218,7 @@ func (q *EventQ) handleMsg(cmd *protocol.Command) {
 		_, err := q.log.Write(msgb)
 		if err != nil {
 			log.Printf("Error: %+v", err)
-			cmd.Respond(protocol.NewResponse(q.config, protocol.RespErr))
+			cmd.Respond(protocol.NewResponse(q.conf, protocol.RespErr))
 			return
 		}
 	}
@@ -226,14 +226,14 @@ func (q *EventQ) handleMsg(cmd *protocol.Command) {
 
 	q.Stats.Incr("total_writes")
 
-	resp := protocol.NewResponse(q.config, protocol.RespOK)
+	resp := protocol.NewResponse(q.conf, protocol.RespOK)
 	resp.ID = id
 	cmd.Respond(resp)
 }
 
 func (q *EventQ) handleBatch(req *protocol.Request) (*protocol.ResponseV2, error) {
-	resp := protocol.NewResponseV2(q.config)
-	batch, err := protocol.NewBatch(q.config).FromRequest(req)
+	resp := protocol.NewResponseV2(q.conf)
+	batch, err := protocol.NewBatch(q.conf).FromRequest(req)
 	if err != nil {
 		return resp, err
 	}
@@ -260,8 +260,7 @@ func (q *EventQ) handleBatch(req *protocol.Request) (*protocol.ResponseV2, error
 	}
 	q.parts.addBatch(batch, req.FullSize())
 
-	clientResp := protocol.NewClientResponse(q.config)
-	clientResp.SetOffset(respOffset)
+	clientResp := protocol.NewClientBatchResponse(q.conf, respOffset)
 	_, err = req.WriteResponse(resp, clientResp)
 
 	if err != nil {
@@ -272,8 +271,8 @@ func (q *EventQ) handleBatch(req *protocol.Request) (*protocol.ResponseV2, error
 }
 
 func (q *EventQ) handleReadV2(req *protocol.Request) (*protocol.ResponseV2, error) {
-	resp := protocol.NewResponseV2(q.config)
-	_, err := protocol.NewReadRequest(q.config).FromRequest(req)
+	resp := protocol.NewResponseV2(q.conf)
+	_, err := protocol.NewReadRequest(q.conf).FromRequest(req)
 	if err != nil {
 		return resp, err
 	}
@@ -288,20 +287,20 @@ func (q *EventQ) handleReadV2(req *protocol.Request) (*protocol.ResponseV2, erro
 func (q *EventQ) handleRead(cmd *protocol.Command) {
 	startID, limit, err := q.parseRead(cmd)
 	if err != nil {
-		internal.Debugf(q.config, "invalid: %v", err)
-		cmd.Respond(protocol.NewClientErrResponse(q.config, protocol.ErrRespInvalid))
+		internal.Debugf(q.conf, "invalid: %v", err)
+		cmd.Respond(protocol.NewClientErrResponse(q.conf, protocol.ErrRespInvalid))
 		return
 	}
 
 	head, err := q.log.Head()
 	if err != nil {
 		log.Printf("error getting log head: %+v", err)
-		cmd.Respond(protocol.NewErrResponse(q.config, protocol.ErrRespServer))
+		cmd.Respond(protocol.NewErrResponse(q.conf, protocol.ErrRespServer))
 		return
 	}
 
 	if startID > head {
-		cmd.Respond(protocol.NewClientErrResponse(q.config, protocol.ErrRespNotFound))
+		cmd.Respond(protocol.NewClientErrResponse(q.conf, protocol.ErrRespNotFound))
 		return
 	}
 
@@ -315,10 +314,10 @@ func (q *EventQ) handleRead(cmd *protocol.Command) {
 	iterator, err := q.log.Range(startID, end)
 	if err != nil {
 		if errors.Cause(err) == protocol.ErrNotFound {
-			cmd.Respond(protocol.NewErrResponse(q.config, protocol.ErrRespNotFound))
-			internal.Debugf(q.config, "id %d not found", startID)
+			cmd.Respond(protocol.NewErrResponse(q.conf, protocol.ErrRespNotFound))
+			internal.Debugf(q.conf, "id %d not found", startID)
 		} else {
-			cmd.Respond(protocol.NewErrResponse(q.config, protocol.ErrRespServer))
+			cmd.Respond(protocol.NewErrResponse(q.conf, protocol.ErrRespServer))
 			log.Printf("failed to handle read command: %+v", err)
 		}
 		return
@@ -331,20 +330,20 @@ func (q *EventQ) handleRead(cmd *protocol.Command) {
 func (q *EventQ) handleTail(cmd *protocol.Command) {
 	startID, limit, err := q.parseRead(cmd)
 	if err != nil {
-		internal.Debugf(q.config, "invalid: %v", err)
-		cmd.Respond(protocol.NewClientErrResponse(q.config, protocol.ErrRespInvalid))
+		internal.Debugf(q.conf, "invalid: %v", err)
+		cmd.Respond(protocol.NewClientErrResponse(q.conf, protocol.ErrRespInvalid))
 		return
 	}
 
 	head, err := q.log.Head()
 	if err != nil {
 		log.Printf("error getting log head: %+v", err)
-		cmd.Respond(protocol.NewErrResponse(q.config, protocol.ErrRespServer))
+		cmd.Respond(protocol.NewErrResponse(q.conf, protocol.ErrRespServer))
 		return
 	}
 
 	if startID > head {
-		cmd.Respond(protocol.NewClientErrResponse(q.config, protocol.ErrRespNotFound))
+		cmd.Respond(protocol.NewClientErrResponse(q.conf, protocol.ErrRespNotFound))
 		return
 	}
 
@@ -356,12 +355,12 @@ func (q *EventQ) handleTail(cmd *protocol.Command) {
 	iterator, err := q.log.Range(startID, end)
 	if err != nil {
 		if errors.Cause(err) == protocol.ErrNotFound {
-			internal.Debugf(q.config, "id not found, reading from tail")
+			internal.Debugf(q.conf, "id not found, reading from tail")
 
 			tailID, terr := q.log.Tail()
 			if terr != nil {
 				log.Printf("failed to get log tail id: %+v", terr)
-				cmd.Respond(protocol.NewErrResponse(q.config, protocol.ErrRespServer))
+				cmd.Respond(protocol.NewErrResponse(q.conf, protocol.ErrRespServer))
 				return
 			}
 
@@ -371,14 +370,14 @@ func (q *EventQ) handleTail(cmd *protocol.Command) {
 			iterator, err = q.log.Range(tailID, end)
 			if err != nil {
 				log.Printf("failed to read range from tail: %+v", err)
-				cmd.Respond(protocol.NewErrResponse(q.config, protocol.ErrRespServer))
+				cmd.Respond(protocol.NewErrResponse(q.conf, protocol.ErrRespServer))
 				return
 			}
 
 			q.Stats.Incr("total_reads")
 			q.doRead(cmd, iterator)
 		} else {
-			cmd.Respond(protocol.NewErrResponse(q.config, []byte("")))
+			cmd.Respond(protocol.NewErrResponse(q.conf, []byte("")))
 			log.Printf("failed to handle read command: %+v", err)
 		}
 		return
@@ -389,7 +388,7 @@ func (q *EventQ) handleTail(cmd *protocol.Command) {
 }
 
 func (q *EventQ) doRead(cmd *protocol.Command, iterator logger.LogRangeIterator) {
-	resp := protocol.NewResponse(q.config, protocol.RespOK)
+	resp := protocol.NewResponse(q.conf, protocol.RespOK)
 	cmd.Respond(resp)
 	cmd.WaitForReady()
 
@@ -421,7 +420,7 @@ func (q *EventQ) sendChunk(lf logger.LogReadableFile, readerC chan protocol.Read
 	readerC <- protocol.NewPartReader(bytes.NewReader([]byte(fmt.Sprintf("+%d\r\n", buflen))))
 	readerC <- protocol.NewPartReader(io.LimitReader(f, buflen))
 
-	internal.Debugf(q.config, "readerC <-%s: %d bytes", f.Name(), buflen)
+	internal.Debugf(q.conf, "readerC <-%s: %d bytes", f.Name(), buflen)
 }
 
 var errInvalidFormat = errors.New("Invalid command format")
@@ -453,14 +452,14 @@ func (q *EventQ) parseRead(cmd *protocol.Command) (uint64, uint64, error) {
 
 func (q *EventQ) handleHead(cmd *protocol.Command) {
 	if len(cmd.Args) != 0 {
-		cmd.Respond(protocol.NewClientErrResponse(q.config, protocol.ErrRespInvalid))
+		cmd.Respond(protocol.NewClientErrResponse(q.conf, protocol.ErrRespInvalid))
 		return
 	}
 
 	if id, err := q.log.Head(); err != nil {
-		cmd.Respond(protocol.NewResponse(q.config, protocol.RespErr))
+		cmd.Respond(protocol.NewResponse(q.conf, protocol.RespErr))
 	} else {
-		resp := protocol.NewResponse(q.config, protocol.RespOK)
+		resp := protocol.NewResponse(q.conf, protocol.RespOK)
 		resp.ID = id
 		cmd.Respond(resp)
 	}
@@ -468,11 +467,11 @@ func (q *EventQ) handleHead(cmd *protocol.Command) {
 
 func (q *EventQ) handleStats(cmd *protocol.Command) {
 	if len(cmd.Args) != 0 {
-		cmd.Respond(protocol.NewClientErrResponse(q.config, protocol.ErrRespInvalid))
+		cmd.Respond(protocol.NewClientErrResponse(q.conf, protocol.ErrRespInvalid))
 		return
 	}
 
-	resp := protocol.NewResponse(q.config, protocol.RespOK)
+	resp := protocol.NewResponse(q.conf, protocol.RespOK)
 	resp.Body = q.Stats.Bytes()
 
 	cmd.Respond(resp)
@@ -480,32 +479,32 @@ func (q *EventQ) handleStats(cmd *protocol.Command) {
 
 func (q *EventQ) handlePing(cmd *protocol.Command) {
 	if len(cmd.Args) != 0 {
-		cmd.Respond(protocol.NewClientErrResponse(q.config, protocol.ErrRespInvalid))
+		cmd.Respond(protocol.NewClientErrResponse(q.conf, protocol.ErrRespInvalid))
 		return
 	}
 
-	cmd.Respond(protocol.NewResponse(q.config, protocol.RespOK))
+	cmd.Respond(protocol.NewResponse(q.conf, protocol.RespOK))
 }
 
 func (q *EventQ) handleClose(cmd *protocol.Command) {
 	if len(cmd.Args) != 0 {
-		cmd.Respond(protocol.NewClientErrResponse(q.config, protocol.ErrRespInvalid))
+		cmd.Respond(protocol.NewClientErrResponse(q.conf, protocol.ErrRespInvalid))
 		return
 	}
 
-	cmd.Respond(protocol.NewResponse(q.config, protocol.RespOK))
+	cmd.Respond(protocol.NewResponse(q.conf, protocol.RespOK))
 }
 
 func (q *EventQ) handleSleep(cmd *protocol.Command) {
 	if len(cmd.Args) != 1 {
-		cmd.Respond(protocol.NewClientErrResponse(q.config, protocol.ErrRespInvalid))
+		cmd.Respond(protocol.NewClientErrResponse(q.conf, protocol.ErrRespInvalid))
 		return
 	}
 
 	var msecs int
 	_, err := fmt.Sscanf(string(cmd.Args[0]), "%d", &msecs)
 	if err != nil {
-		cmd.Respond(protocol.NewClientErrResponse(q.config, protocol.ErrRespInvalid))
+		cmd.Respond(protocol.NewClientErrResponse(q.conf, protocol.ErrRespInvalid))
 		return
 	}
 
@@ -514,7 +513,7 @@ func (q *EventQ) handleSleep(cmd *protocol.Command) {
 	case <-cmd.Wake:
 	}
 
-	cmd.Respond(protocol.NewResponse(q.config, protocol.RespOK))
+	cmd.Respond(protocol.NewResponse(q.conf, protocol.RespOK))
 }
 
 // HandleShutdown handles a shutdown request
@@ -549,7 +548,7 @@ func (q *EventQ) PushCommand(ctx context.Context, cmd *protocol.Command) (*proto
 	select {
 	case q.in <- cmd:
 	case <-ctx.Done():
-		internal.Debugf(q.config, "command %s cancelled", cmd)
+		internal.Debugf(q.conf, "command %s cancelled", cmd)
 		return nil, errors.New("command cancelled")
 	}
 
@@ -565,7 +564,7 @@ func (q *EventQ) PushRequest(ctx context.Context, req *protocol.Request) (*proto
 	select {
 	case q.requestIn <- req:
 	case <-ctx.Done():
-		internal.Debugf(q.config, "request %s cancelled", req)
+		internal.Debugf(q.conf, "request %s cancelled", req)
 		return nil, errors.New("request cancelled")
 	}
 
@@ -573,7 +572,7 @@ func (q *EventQ) PushRequest(ctx context.Context, req *protocol.Request) (*proto
 	case resp := <-req.Responded():
 		return resp, nil
 	case <-ctx.Done():
-		internal.Debugf(q.config, "request %s cancelled while waiting for a response", req)
+		internal.Debugf(q.conf, "request %s cancelled while waiting for a response", req)
 		return nil, errors.New("request cancelled")
 	}
 }

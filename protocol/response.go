@@ -214,6 +214,13 @@ func NewClientResponse(conf *config.Config) *ClientResponse {
 	}
 }
 
+// NewClientBatchResponse returns a successful batch *ClientResponse
+func NewClientBatchResponse(conf *config.Config, off uint64) *ClientResponse {
+	cr := NewClientResponse(conf)
+	cr.SetOffset(off)
+	return cr
+}
+
 // Reset sets ClientResponse to initial values
 func (cr *ClientResponse) Reset() {
 	cr.offset = 0

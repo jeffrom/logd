@@ -55,6 +55,7 @@ var bspace = []byte(" ")
 var bmsg = []byte("MSG")
 var bmsgStart = []byte("MSG ")
 var bbatchStart = []byte("BATCH ")
+var breadStart = []byte("READ ")
 var bok = []byte("OK")
 var bokStart = []byte("OK ")
 

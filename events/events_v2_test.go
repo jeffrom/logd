@@ -40,12 +40,7 @@ func TestEventQBatchV2(t *testing.T) {
 	actual := parts[0].Bytes()
 	testhelper.CheckGoldenFile("batch.small", actual, testhelper.Golden)
 
-	n := (conf.PartitionSize / len(fixture)) * (conf.MaxPartitions + 5)
-	interval := 10
-	if testing.Short() {
-		n = 2
-		interval = 1
-	}
+	n, interval := partitionIterations(conf, len(fixture))
 
 	q.logw = logger.NewDiscardWriter(conf)
 
@@ -62,7 +57,7 @@ func TestEventQBatchV2(t *testing.T) {
 	}
 }
 
-func TestQLifecycle(t *testing.T) {
+func TestQLifecycleV2(t *testing.T) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
 	q := NewEventQ(conf)
 	mw := logger.NewMockWriter(conf)
@@ -71,24 +66,31 @@ func TestQLifecycle(t *testing.T) {
 		t.Fatalf("%+v", err)
 	}
 
-	ctx := context.Background()
 	fixture := testhelper.LoadFixture("batch.small")
-	req := newRequest(t, conf, fixture)
 
-	resp, err := q.PushRequest(ctx, req)
-	if err != nil {
-		t.Fatalf("%+v", err)
-	}
+	n, interval := partitionIterations(conf, len(fixture))
 
-	checkBatchResp(t, conf, resp)
+	x := 1
+	for i := 0; i < n; i += interval {
+		ctx := context.Background()
+		req := newRequest(t, conf, fixture)
 
-	testhelper.CheckError(q.Stop())
-	testhelper.CheckError(q.Start())
+		resp, err := q.PushRequest(ctx, req)
+		if err != nil {
+			t.Fatalf("%+v", err)
+		}
 
-	expected := uint64(len(fixture))
-	actual := q.parts.headOffset()
-	if actual != expected {
-		t.Fatalf("expected head offset to be %d but was %d", expected, actual)
+		checkBatchResp(t, conf, resp)
+
+		testhelper.CheckError(q.Stop())
+		testhelper.CheckError(q.Start())
+
+		expected := uint64(len(fixture) * x)
+		actual := q.parts.headOffset()
+		if actual != expected {
+			t.Fatalf("expected head offset to be %d but was %d", expected, actual)
+		}
+		x++
 	}
 }
 
@@ -117,4 +119,14 @@ func checkBatchResp(t testing.TB, conf *config.Config, resp *protocol.ResponseV2
 		t.Fatalf("%+v", rerr)
 	}
 	return cr
+}
+
+func partitionIterations(conf *config.Config, fixtureLen int) (int, int) {
+	n := (conf.PartitionSize / fixtureLen) * (conf.MaxPartitions + 5)
+	interval := 1
+	if testing.Short() {
+		n = 2
+		interval = 1
+	}
+	return n, interval
 }

@@ -37,7 +37,7 @@ func NewConfig() *Config {
 }
 
 func (c *Config) String() string {
-	b, err := json.Marshal(c)
+	b, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
 		b = append(b, []byte(err.Error())...)
 	}
