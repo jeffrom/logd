@@ -27,31 +27,33 @@ import (
 
 // EventQ manages the receiving, processing, and responding to events.
 type EventQ struct {
-	conf       *config.Config
-	currID     uint64
-	in         chan *protocol.Command
-	requestIn  chan *protocol.Request
-	close      chan struct{}
-	log        logger.Logger
-	parts      *partitions
-	partArgBuf *partitionArgList
-	logw       logger.LogWriterV2
-	Stats      *internal.Stats
+	conf         *config.Config
+	currID       uint64
+	in           chan *protocol.Command
+	requestIn    chan *protocol.Request
+	close        chan struct{}
+	log          logger.Logger
+	parts        *partitions
+	partArgBuf   *partitionArgList
+	logw         logger.LogWriterV2
+	batchScanner *protocol.BatchScanner
+	Stats        *internal.Stats
 }
 
 // NewEventQ creates a new instance of an EventQ
 func NewEventQ(conf *config.Config) *EventQ {
 	logp := logger.NewPartitions(conf)
 	q := &EventQ{
-		conf:       conf,
-		Stats:      internal.NewStats(),
-		in:         make(chan *protocol.Command, 1000),
-		requestIn:  make(chan *protocol.Request, 1000),
-		close:      make(chan struct{}),
-		log:        logger.New(conf),          // old logger
-		parts:      newPartitions(conf, logp), // partition state manager
-		partArgBuf: newPartitionArgList(conf), // partition arguments buffer
-		logw:       logger.NewWriter(conf),    // new logger.Writer
+		conf:         conf,
+		Stats:        internal.NewStats(),
+		in:           make(chan *protocol.Command, 1000),
+		requestIn:    make(chan *protocol.Request, 1000),
+		close:        make(chan struct{}),
+		log:          logger.New(conf),          // old logger
+		parts:        newPartitions(conf, logp), // partition state manager
+		partArgBuf:   newPartitionArgList(conf), // partition arguments buffer
+		logw:         logger.NewWriter(conf),    // new logger.Writer
+		batchScanner: protocol.NewBatchScanner(conf, nil),
 	}
 
 	return q
@@ -309,7 +311,7 @@ func (q *EventQ) gatherReadArgs(offset uint64, messages int) (*partitionArgList,
 	}
 
 	q.partArgBuf.reset()
-	scanner := protocol.NewBatchScanner(q.conf, nil)
+	scanner := q.batchScanner
 	n := 0
 	currstart := soff
 Loop:
