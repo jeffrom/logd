@@ -6,16 +6,28 @@ import (
 	"context"
 	"testing"
 
+	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/logger"
 	"github.com/jeffrom/logd/protocol"
 	"github.com/jeffrom/logd/testhelper"
 )
 
-func BenchmarkBatchV2(b *testing.B) {
+func BenchmarkBatchDiscardV2(b *testing.B) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
-	q := NewEventQ(conf)
 	mw := logger.NewDiscardWriter(conf)
-	q.logw = mw
+	benchmarkBatch(b, conf, mw)
+}
+
+func BenchmarkBatchFileV2(b *testing.B) {
+	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	benchmarkBatch(b, conf, nil)
+}
+
+func benchmarkBatch(b *testing.B, conf *config.Config, logw logger.LogWriterV2) {
+	q := NewEventQ(conf)
+	if logw != nil {
+		q.logw = logw
+	}
 	if err := q.Start(); err != nil {
 		b.Fatalf("unexpected startup error: %+v", err)
 	}
@@ -26,14 +38,14 @@ func BenchmarkBatchV2(b *testing.B) {
 
 	_, err := req.ReadFrom(bufio.NewReader(bytes.NewBuffer(fixture)))
 	if err != nil {
-		b.Fatalf("%+v", err)
+		b.Fatalf("unexpected error building request: %+v", err)
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, err := q.PushRequest(ctx, req)
 		if err != nil {
-			b.Fatalf("%+v", err)
+			b.Fatalf("unexpected error writing batches: %+v", err)
 		}
 	}
 }
