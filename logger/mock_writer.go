@@ -79,6 +79,11 @@ func (w *MockWriter) SetPartition(off uint64) error {
 	return nil
 }
 
+// Close implements LogWriterV2
+func (w *MockWriter) Close() error {
+	return nil
+}
+
 func (w *MockWriter) rotate() {
 	parts := w.parts
 	if len(parts) <= 1 {

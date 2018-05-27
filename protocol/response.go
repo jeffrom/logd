@@ -3,6 +3,7 @@ package protocol
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io"
 
 	"github.com/jeffrom/logd/config"
@@ -37,7 +38,7 @@ const (
 var (
 	// ErrNotFound is returned when the log id is above the logs head or has been
 	// deleted.
-	ErrNotFound = errors.New("id not found")
+	ErrNotFound = errors.New("offset not found")
 )
 
 var (
@@ -140,8 +141,6 @@ func (r *Response) SendEOF() {
 
 // response v2
 
-const maxReaderPerResp = 50
-
 // ResponseV2 is a response the conn can use to send bytes back to the client.
 // can returns bytes as well as *os.File-s
 type ResponseV2 struct {
@@ -155,7 +154,7 @@ type ResponseV2 struct {
 func NewResponseV2(conf *config.Config) *ResponseV2 {
 	return &ResponseV2{
 		conf:    conf,
-		readers: make([]io.Reader, maxReaderPerResp),
+		readers: make([]io.Reader, conf.MaxPartitions+1),
 	}
 }
 
@@ -170,8 +169,8 @@ func (r *ResponseV2) Reset() {
 
 // AddReader adds a reader for the server to send back over the conn
 func (r *ResponseV2) AddReader(rdr io.Reader) error {
-	if r.numReaders > maxReaderPerResp {
-		return errors.New("too many readers on this response")
+	if r.numReaders > r.conf.MaxPartitions+1 {
+		panic("too many readers")
 	}
 	r.readers[r.numReaders] = rdr
 	r.numReaders++
@@ -219,6 +218,10 @@ func NewClientBatchResponse(conf *config.Config, off uint64) *ClientResponse {
 	cr := NewClientResponse(conf)
 	cr.SetOffset(off)
 	return cr
+}
+
+func (cr *ClientResponse) String() string {
+	return fmt.Sprintf("ClientResponse<offset: %d>", cr.offset)
 }
 
 // Reset sets ClientResponse to initial values

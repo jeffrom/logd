@@ -10,7 +10,7 @@ import (
 
 // LogWriterV2 is the new log writer interface
 type LogWriterV2 interface {
-	io.Writer
+	io.WriteCloser
 	Flush() error
 	SetPartition(off uint64) error
 }
@@ -39,13 +39,16 @@ func (w *Writer) Flush() error {
 
 // SetPartition implements LogWriterV2 interface
 func (w *Writer) SetPartition(off uint64) error {
-	if w.f != nil {
-		if err := w.f.Close(); err != nil {
-			return err
-		}
-	}
 	s := strconv.FormatUint(off, 10)
 	f, err := os.OpenFile(w.conf.LogFile+s+".log", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0600)
 	w.f = f
 	return err
+}
+
+// Close implements LogWriterV2 interface
+func (w *Writer) Close() error {
+	if w.f != nil {
+		return w.f.Close()
+	}
+	return nil
 }

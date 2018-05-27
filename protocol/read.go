@@ -7,7 +7,7 @@ import (
 )
 
 // Read represents a read request
-// READ <offset> <messages>\r\n
+// READV2 <offset> <messages>\r\n
 type Read struct {
 	conf     *config.Config
 	Offset   uint64
@@ -42,7 +42,7 @@ func (r *Read) FromRequest(req *Request) (*Read, error) {
 	}
 	r.Offset = n
 
-	n, err = asciiToUint(req.args[0])
+	n, err = asciiToUint(req.args[1])
 	if err != nil {
 		return r, err
 	}

@@ -1,7 +1,10 @@
 package events
 
 import (
+	"fmt"
+
 	"github.com/jeffrom/logd/config"
+	"github.com/jeffrom/logd/logger"
 	"github.com/jeffrom/logd/protocol"
 )
 
@@ -10,15 +13,17 @@ const reasonableBatchSize = 4096 * 100
 
 type partitions struct {
 	conf   *config.Config
+	logp   logger.PartitionManager
 	head   *partition
 	parts  []*partition
 	nparts int
 }
 
-func newPartitions(conf *config.Config) *partitions {
+func newPartitions(conf *config.Config, logp logger.PartitionManager) *partitions {
 	p := &partitions{
 		conf:  conf,
 		parts: make([]*partition, conf.MaxPartitions),
+		logp:  logp,
 	}
 
 	for i := 0; i < len(p.parts); i++ {
@@ -69,13 +74,14 @@ func (p *partitions) shouldRotate(size int) bool {
 	return size > p.conf.PartitionSize-p.head.size
 }
 
-func (p *partitions) nextStartOffset() uint64 {
-	return p.head.startOffset + uint64(p.head.size)
+func (p *partitions) nextOffset() uint64 {
+	next := p.head.startOffset + uint64(p.head.size)
+	return next
 }
 
 func (p *partitions) addBatch(b *protocol.Batch, size int) {
 	if p.shouldRotate(size) {
-		p.add(p.nextStartOffset(), 0)
+		p.add(p.nextOffset(), 0)
 	}
 	p.head.addBatch(b, size)
 }
@@ -84,12 +90,26 @@ func (p *partitions) headOffset() uint64 {
 	return p.head.startOffset + uint64(p.head.size)
 }
 
-// addBatch is used as batches come in from clients
-// func (p *partitions) addBatch(offset uint64, firstOffset uint64, size int, fullSize int) {
-// 	part := p.head
-// 	// TODO if fullSize + partition.written > conf.MaxBatchSize, swap out the partition
-// 	part.addBatch(offset, firstOffset, size, fullSize)
-// }
+// getStartOffset gets the start offset from a global offset
+func (p *partitions) getStartOffset(off uint64) (uint64, error) {
+	for i := 0; i < p.nparts; i++ {
+		part := p.parts[i]
+		if off >= part.startOffset {
+			return part.startOffset, nil
+		}
+	}
+	return 0, protocol.ErrNotFound
+}
+
+func (p *partitions) lookup(off uint64) (uint64, int, error) {
+	for i := 0; i < p.nparts; i++ {
+		part := p.parts[i]
+		if off >= part.startOffset {
+			return part.startOffset, int(off - part.startOffset), nil
+		}
+	}
+	return 0, 0, protocol.ErrNotFound
+}
 
 type partition struct {
 	conf        *config.Config
@@ -167,4 +187,44 @@ func (b *batch) reset() {
 	b.size = 0
 	b.fullSize = 0
 	b.nmessages = 0
+}
+
+type partitionArgList struct {
+	conf   *config.Config
+	parts  []partitionArgs
+	nparts int
+}
+
+type partitionArgs struct {
+	offset uint64
+	delta  int
+	limit  int
+}
+
+func (pa partitionArgs) String() string {
+	return fmt.Sprintf("partitionArgs<offset: %d, delta: %d, limit: %d>", pa.offset, pa.delta, pa.limit)
+}
+
+func newPartitionArgList(conf *config.Config) *partitionArgList {
+	pl := &partitionArgList{
+		conf:  conf,
+		parts: make([]partitionArgs, conf.MaxPartitions),
+	}
+
+	return pl
+}
+
+func (pl *partitionArgList) reset() {
+	pl.nparts = 0
+}
+
+func (pl *partitionArgList) add(soff uint64, delta int, limit int) {
+	if pl.nparts >= pl.conf.MaxPartitions {
+		panic("appended too many partitions")
+	}
+	pl.parts[pl.nparts].offset = soff
+	pl.parts[pl.nparts].delta = delta
+	pl.parts[pl.nparts].limit = limit
+
+	pl.nparts++
 }

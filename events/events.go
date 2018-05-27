@@ -19,11 +19,7 @@ import (
 // this file contains the core logic of the program. Commands come from the
 // various inputs. They are handled and a response is given. For example, a
 // message is received, it is written to a backend, and a log id is returned to
-// the caller. Or, a tail command is received, and the caller receives a log
-// stream.
-
-// TODO use an array of send close <- struct{}{} functions to run on shutdown
-// instead of doing each one manually
+// the caller.
 
 //
 // abstract error types
@@ -31,35 +27,31 @@ import (
 
 // EventQ manages the receiving, processing, and responding to events.
 type EventQ struct {
-	conf      *config.Config
-	currID    uint64
-	in        chan *protocol.Command
-	requestIn chan *protocol.Request
-	close     chan struct{}
-	log       logger.Logger
-	parts     *partitions
-
-	logw logger.LogWriterV2
-	logp logger.PartitionManager
-
-	Stats *internal.Stats
+	conf       *config.Config
+	currID     uint64
+	in         chan *protocol.Command
+	requestIn  chan *protocol.Request
+	close      chan struct{}
+	log        logger.Logger
+	parts      *partitions
+	partArgBuf *partitionArgList
+	logw       logger.LogWriterV2
+	Stats      *internal.Stats
 }
 
 // NewEventQ creates a new instance of an EventQ
 func NewEventQ(conf *config.Config) *EventQ {
+	logp := logger.NewPartitions(conf)
 	q := &EventQ{
-		conf:      conf,
-		in:        make(chan *protocol.Command, 1000),
-		requestIn: make(chan *protocol.Request, 1000),
-		close:     make(chan struct{}),
-		parts:     newPartitions(conf),
-		// old logger
-		log: logger.New(conf),
-		// new loggers
-		logw: logger.NewWriter(conf),
-		logp: logger.NewPartitions(conf),
-
-		Stats: internal.NewStats(),
+		conf:       conf,
+		Stats:      internal.NewStats(),
+		in:         make(chan *protocol.Command, 1000),
+		requestIn:  make(chan *protocol.Request, 1000),
+		close:      make(chan struct{}),
+		log:        logger.New(conf),          // old logger
+		parts:      newPartitions(conf, logp), // partition state manager
+		partArgBuf: newPartitionArgList(conf), // partition arguments buffer
+		logw:       logger.NewWriter(conf),    // new logger.Writer
 	}
 
 	return q
@@ -80,19 +72,21 @@ func (q *EventQ) Start() error {
 	q.currID = head + 1
 
 	// V2 setup
-	if lc, ok := q.logp.(internal.LifecycleManager); ok {
+	// TODO refactor socket to register LifecycleManagers with events so events
+	// can control shutdown order of loggers AND servers
+	if lc, ok := q.parts.logp.(internal.LifecycleManager); ok {
 		if err := lc.Setup(); err != nil {
 			return err
 		}
 	}
+	if err := q.setupPartitions(); err != nil {
+		return err
+	}
+
 	if lc, ok := q.logw.(internal.LifecycleManager); ok {
 		if err := lc.Setup(); err != nil {
 			return err
 		}
-	}
-
-	if err := q.setupPartitions(); err != nil {
-		return err
 	}
 
 	go q.loop()
@@ -100,7 +94,7 @@ func (q *EventQ) Start() error {
 }
 
 func (q *EventQ) setupPartitions() error {
-	parts, err := q.logp.List()
+	parts, err := q.parts.logp.List()
 	if err != nil {
 		return err
 	}
@@ -112,6 +106,10 @@ func (q *EventQ) setupPartitions() error {
 	head := q.parts.head
 	if serr := q.logw.SetPartition(head.startOffset); serr != nil {
 		return serr
+	}
+
+	if len(parts) == 0 {
+		q.parts.add(0, 0)
 	}
 
 	log.Printf("Starting at %d (partition %d, delta %d)", q.parts.headOffset(), head.startOffset, head.size)
@@ -242,27 +240,27 @@ func (q *EventQ) handleBatch(req *protocol.Request) (*protocol.ResponseV2, error
 		return resp, verr
 	}
 
+	// rotate to next partition if needed
 	if q.parts.shouldRotate(req.FullSize()) {
-		nextStartOffset := q.parts.nextStartOffset()
+		nextStartOffset := q.parts.nextOffset()
 		if sperr := q.logw.SetPartition(nextStartOffset); sperr != nil {
 			return resp, sperr
 		}
 	}
 
+	// write the log
 	_, err = q.logw.Write(req.Bytes())
 	if err != nil {
 		return resp, err
 	}
 
-	respOffset := q.parts.nextStartOffset()
-	if respOffset != 0 {
-		respOffset++
-	}
+	// update log state
+	respOffset := q.parts.nextOffset()
 	q.parts.addBatch(batch, req.FullSize())
 
+	// respond
 	clientResp := protocol.NewClientBatchResponse(q.conf, respOffset)
 	_, err = req.WriteResponse(resp, clientResp)
-
 	if err != nil {
 		return resp, err
 	}
@@ -272,16 +270,83 @@ func (q *EventQ) handleBatch(req *protocol.Request) (*protocol.ResponseV2, error
 
 func (q *EventQ) handleReadV2(req *protocol.Request) (*protocol.ResponseV2, error) {
 	resp := protocol.NewResponseV2(q.conf)
-	_, err := protocol.NewReadRequest(q.conf).FromRequest(req)
+	readreq, err := protocol.NewRead(q.conf).FromRequest(req)
 	if err != nil {
 		return resp, err
 	}
 
-	// get the offset/delta for range start
-	// get the offset/limit for range end
-	// partitions.Get the relevant partitions and add them to the client response
+	if verr := readreq.Validate(); verr != nil {
+		return resp, verr
+	}
+
+	partArgs, err := q.gatherReadArgs(readreq.Offset, readreq.Messages)
+	if err != nil {
+		return resp, err
+	}
+
+	for i := 0; i < partArgs.nparts; i++ {
+		args := partArgs.parts[i]
+		p, gerr := q.parts.logp.Get(args.offset, args.delta, args.limit)
+		if gerr != nil {
+			return resp, gerr
+		}
+
+		if aerr := resp.AddReader(p); aerr != nil {
+			return resp, aerr
+		}
+	}
 
 	return resp, nil
+}
+
+func (q *EventQ) gatherReadArgs(offset uint64, messages int) (*partitionArgList, error) {
+	// check the offset/delta for range start
+	// get the offset/limit for range end
+	// partitions.Get the relevant partitions and add them to the client response
+	soff, delta, err := q.parts.lookup(offset)
+	if err != nil {
+		return nil, err
+	}
+
+	q.partArgBuf.reset()
+	scanner := protocol.NewBatchScanner(q.conf, nil)
+	n := 0
+	currstart := soff
+Loop:
+	for n < messages {
+		p, gerr := q.parts.logp.Get(currstart, delta, 0)
+		if gerr != nil {
+			// if we've successfully read anything, we've read the last
+			// partition by now
+			if q.partArgBuf.nparts > 0 {
+				return q.partArgBuf, nil
+			}
+			return nil, gerr
+		}
+
+		scanner.Reset(p)
+		for scanner.Scan() {
+			b := scanner.Batch()
+			n += b.Messages
+			if n >= messages {
+				q.partArgBuf.add(currstart, delta, scanner.Scanned())
+				p.Close()
+				break Loop
+			}
+		}
+
+		serr := scanner.Error()
+		p.Close()
+		if serr == io.EOF {
+			q.partArgBuf.add(currstart, delta, p.Size())
+			currstart = p.Offset() + uint64(p.Size()+1)
+			delta = 0
+		} else if serr != nil {
+			return nil, serr
+		}
+	}
+
+	return q.partArgBuf, nil
 }
 
 func (q *EventQ) handleRead(cmd *protocol.Command) {
@@ -528,14 +593,12 @@ func (q *EventQ) HandleShutdown(cmd *protocol.Command) error {
 
 	// V2
 	// TODO try all shutdowns or give up after the first error?
-	// TODO refactor socket to register LifecycleManagers with events so events
-	// can control shutdown order of loggers AND servers
 	if lc, ok := q.logw.(internal.LifecycleManager); ok {
 		if err := lc.Shutdown(); err != nil {
 			return err
 		}
 	}
-	if lc, ok := q.logp.(internal.LifecycleManager); ok {
+	if lc, ok := q.parts.logp.(internal.LifecycleManager); ok {
 		if err := lc.Shutdown(); err != nil {
 			return err
 		}

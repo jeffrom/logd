@@ -22,8 +22,7 @@ type RemoveCall struct {
 // GetCall contains the arguments passed to a call to Get
 type GetCall struct {
 	offset uint64
-	delta  int64
-	limit  int64
+	delta  int
 }
 
 // MockPartitions can be used for testing purposes
@@ -104,11 +103,11 @@ func (m *MockPartitions) Remove(offset uint64) error {
 }
 
 // Get implements PartitionManager
-func (m *MockPartitions) Get(offset uint64, delta int64, limit int64) (io.Reader, error) {
+func (m *MockPartitions) Get(offset uint64, delta int, limit int) (Partitioner, error) {
 	if m.ngetCalls < 0 {
 		m.ngetCalls = 0
 	}
-	m.getCalls[m.ngetCalls] = GetCall{offset, delta, limit}
+	m.getCalls[m.ngetCalls] = GetCall{offset, delta}
 	m.ngetCalls++
 	if m.nextErr != nil && m.ngetCalls > m.failGetAfter {
 		return nil, m.nextErr
@@ -117,7 +116,7 @@ func (m *MockPartitions) Get(offset uint64, delta int64, limit int64) (io.Reader
 	for i := 0; i < m.nparts; i++ {
 		p := m.partitions[i]
 		if p.Offset() == offset {
-			return p.Reader(), nil
+			return p, nil
 		}
 	}
 	return nil, ErrNotFound
@@ -231,13 +230,17 @@ func (p *MockPartition) Offset() uint64 {
 }
 
 // Reader implements Partitioner
-func (p *MockPartition) Reader() io.ReadCloser {
+func (p *MockPartition) Reader() io.Reader {
 	if p.reader == nil && p.data != nil {
 		p.buf.Reset()
 		p.buf.Write(p.data)
 		return p.buf
 	}
 	return p.reader
+}
+
+func (p *MockPartition) Read(b []byte) (int, error) {
+	return 0, nil
 }
 
 // Close implements Partitioner

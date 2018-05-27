@@ -3,6 +3,7 @@ package protocol
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"hash/crc32"
 	"io"
 
@@ -36,6 +37,10 @@ func NewBatch(conf *config.Config) *Batch {
 	}
 
 	return b
+}
+
+func (b *Batch) String() string {
+	return fmt.Sprintf("Batch<Messages: %d>", b.Messages)
 }
 
 // Reset puts a batch in an initial state so it can be reused
@@ -301,8 +306,9 @@ func (b *Batch) readEnvelope(r *bufio.Reader) (int64, error) {
 		return total, err
 	}
 
+	// fmt.Printf("readEnvelope: %q\n", word)
 	if !bytes.Equal(word, bbatchStart) {
-		return total, errInvalidProtocolLine
+		return total, errors.Wrap(errInvalidProtocolLine, "batch envelope didn't start with BATCH")
 	}
 
 	word, err = r.ReadSlice(' ')

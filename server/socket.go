@@ -20,7 +20,7 @@ import (
 
 var v2Requests = [][]byte{
 	[]byte("BATCH "),
-	[]byte("READV2 "),
+	[]byte("READV2"),
 }
 
 // TODO remove this when all commands have been migrated to requests
