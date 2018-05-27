@@ -12,16 +12,51 @@ import (
 	"github.com/jeffrom/logd/testhelper"
 )
 
-func BenchmarkReadV2(b *testing.B) {
+func BenchmarkReadHeadV2(b *testing.B) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
 	q := NewEventQ(conf)
+	startQV2(b, q)
+	offs := writeBatches(b, conf, q)
+	benchmarkRead(b, conf, q, offs[len(offs)-1:])
+}
+
+func BenchmarkReadTailV2(b *testing.B) {
+	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	q := NewEventQ(conf)
+	startQV2(b, q)
+	offs := writeBatches(b, conf, q)
+	benchmarkRead(b, conf, q, offs[:1])
+}
+
+func BenchmarkReadAllV2(b *testing.B) {
+	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	q := NewEventQ(conf)
+	startQV2(b, q)
+	offs := writeBatches(b, conf, q)
+	benchmarkRead(b, conf, q, offs)
+}
+
+func startQV2(b testing.TB, q *EventQ) {
 	if err := q.Start(); err != nil {
 		b.Fatalf("unexpected error starting event queue: %+v", err)
 	}
-	offsets := writeBatches(b, conf, q)
-	offset := offsets[len(offsets)-1]
-	buf := []byte(fmt.Sprintf("READV2 %d %d\r\n", offset, 3))
-	req := newRequest(b, conf, buf)
+}
+
+func benchmarkRead(b *testing.B, conf *config.Config, q *EventQ, offs []uint64) {
+	var bufs [][]byte
+	for _, off := range offs {
+		buf := []byte(fmt.Sprintf("READV2 %d %d\r\n", off, 3))
+		bufs = append(bufs, buf)
+	}
+	// b.Logf("%d read commands prepared", len(bufs))
+
+	n := 0
+	buf := bufs[n]
+	bbuf := bytes.NewBuffer(buf)
+	// if it's too small, resets mutate the underlying buffer
+	br := bufio.NewReaderSize(bbuf, len(bufs[len(bufs)-1])*2)
+	req := protocol.NewRequest(conf)
+	requestSet(b, conf, req, buf, bbuf, br)
 	ctx := context.Background()
 
 	b.ResetTimer()
@@ -29,6 +64,15 @@ func BenchmarkReadV2(b *testing.B) {
 		_, err := q.PushRequest(ctx, req)
 		if err != nil {
 			b.Fatalf("unexpected error doing read: %+v", err)
+		}
+
+		if len(offs) > 1 {
+			n++
+			if n >= len(offs) {
+				n = 0
+			}
+
+			requestSet(b, conf, req, buf, bbuf, br)
 		}
 	}
 }

@@ -119,6 +119,22 @@ func newRequest(t testing.TB, conf *config.Config, p []byte) *protocol.Request {
 	return req
 }
 
+func requestSet(t testing.TB, conf *config.Config, req *protocol.Request, buf []byte, b *bytes.Buffer, br *bufio.Reader) {
+	b.Reset()
+	// fmt.Printf("%q\n", buf)
+	if _, err := b.Write(buf); err != nil {
+		t.Fatalf("failed to write request into buffer: %+v", err)
+	}
+	// *bufio.Reader resets can cause the underlying buffer to be mutated
+	// br.Reset(nil)
+	br.Reset(b)
+
+	req.Reset()
+	if _, err := req.ReadFrom(br); err != nil {
+		t.Fatalf("failed to read request from buffer: %+v", err)
+	}
+}
+
 func checkBatchResp(t testing.TB, conf *config.Config, resp *protocol.ResponseV2) *protocol.ClientResponse {
 	if resp.NumReaders() != 1 {
 		t.Fatalf("expected 1 reader but got %d", resp.NumReaders())

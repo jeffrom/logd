@@ -21,7 +21,7 @@ func BenchmarkRequestReadV2(b *testing.B) {
 			b.Fatal(err)
 		}
 
-		req.reset()
+		req.Reset()
 		buf.Reset()
 		buf.Write(fixture)
 		br.Reset(buf)

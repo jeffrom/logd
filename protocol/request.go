@@ -37,10 +37,11 @@ func NewRequest(conf *config.Config) *Request {
 	}
 }
 
-func (req *Request) reset() {
+// Reset sets the request to its initial values
+func (req *Request) Reset() {
 	req.Name = 0
-	req.envelope = nil
 	req.read = 0
+	req.envelope = nil
 	req.nargs = 0
 	req.body = nil
 	req.bodysize = 0
