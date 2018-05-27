@@ -103,13 +103,13 @@ func (q *EventQ) setupPartitions() error {
 		q.parts.add(part.Offset(), part.Size())
 	}
 
+	if len(parts) == 0 {
+		q.parts.add(0, 0)
+	}
+
 	head := q.parts.head
 	if serr := q.logw.SetPartition(head.startOffset); serr != nil {
 		return serr
-	}
-
-	if len(parts) == 0 {
-		q.parts.add(0, 0)
 	}
 
 	log.Printf("Starting at %d (partition %d, delta %d)", q.parts.headOffset(), head.startOffset, head.size)

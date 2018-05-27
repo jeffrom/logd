@@ -6,6 +6,7 @@ import (
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/logger"
 	"github.com/jeffrom/logd/protocol"
+	"github.com/pkg/errors"
 )
 
 // NOTE keep this updated when protocol changes
@@ -33,6 +34,10 @@ func newPartitions(conf *config.Config, logp logger.PartitionManager) *partition
 	return p
 }
 
+func (p *partitions) String() string {
+	return fmt.Sprint(p.parts)
+}
+
 func (p *partitions) reset() {
 	p.nparts = 0
 	p.head = p.parts[0]
@@ -40,17 +45,15 @@ func (p *partitions) reset() {
 
 // add is used when loading the log from disk
 func (p *partitions) add(offset uint64, size int) {
-	if p.nparts == p.conf.MaxPartitions-1 {
-		p.rotate()
-	}
-
 	part := p.parts[p.nparts]
 	part.reset()
 	part.startOffset = offset
 	part.size = size
 	p.head = part
 
-	if p.nparts < p.conf.MaxPartitions-1 {
+	if p.nparts+1 == p.conf.MaxPartitions {
+		p.rotate()
+	} else if p.nparts+1 < p.conf.MaxPartitions {
 		p.nparts++
 	}
 }
@@ -61,7 +64,7 @@ func (p *partitions) rotate() {
 		return
 	}
 
-	for i := len(parts) - 2; i >= 0; i-- {
+	for i := 0; i < len(parts)-1; i++ {
 		parts[i], parts[i+1] = parts[i+1], parts[i]
 	}
 }
@@ -71,7 +74,7 @@ func (p *partitions) available() int {
 }
 
 func (p *partitions) shouldRotate(size int) bool {
-	return size > p.conf.PartitionSize-p.head.size
+	return size >= p.conf.PartitionSize-p.head.size
 }
 
 func (p *partitions) nextOffset() uint64 {
@@ -102,7 +105,10 @@ func (p *partitions) getStartOffset(off uint64) (uint64, error) {
 }
 
 func (p *partitions) lookup(off uint64) (uint64, int, error) {
-	for i := 0; i < p.nparts; i++ {
+	if p.nparts <= 0 {
+		return 0, 0, errors.New("no partitions loaded")
+	}
+	for i := p.nparts - 1; i >= 0; i-- {
 		part := p.parts[i]
 		if off >= part.startOffset {
 			return part.startOffset, int(off - part.startOffset), nil
@@ -119,19 +125,16 @@ type partition struct {
 }
 
 func newPartition(conf *config.Config) *partition {
-	// nAllocatedBatches := conf.PartitionSize / reasonableBatchSize
-	// if nAllocatedBatches < 50 {
-	// 	nAllocatedBatches = 50
-	// }
 	p := &partition{
 		conf: conf,
 	}
 
-	// for i := 0; i < nAllocatedBatches; i++ {
-	// 	p.batches[i] = newBatch()
-	// }
-
 	return p
+}
+
+func (p *partition) String() string {
+	// return fmt.Sprintf("partition<startOffset: %d, size: %d>", p.startOffset, p.size)
+	return fmt.Sprintf("%d", p.startOffset)
 }
 
 func (p *partition) reset() {

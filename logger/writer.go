@@ -52,3 +52,8 @@ func (w *Writer) Close() error {
 	}
 	return nil
 }
+
+// Shutdown implements LifecycleManager interface
+func (w *Writer) Shutdown() error {
+	return w.Close()
+}

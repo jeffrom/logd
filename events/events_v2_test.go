@@ -58,43 +58,54 @@ func TestEventQBatchV2(t *testing.T) {
 	}
 }
 
-func TestQLifecycleV2(t *testing.T) {
-	// mockWriter can't keep track of partitions, do this later
-	t.SkipNow()
+func TestQFileLoggerV2(t *testing.T) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	t.Log(conf)
 	q := NewEventQ(conf)
-	mw := logger.NewMockWriter(conf)
-	q.logw = mw
 	if err := q.Start(); err != nil {
 		t.Fatalf("%+v", err)
 	}
 
 	fixture := testhelper.LoadFixture("batch.small")
-
 	n, interval := partitionIterations(conf, len(fixture))
-
-	x := 1
+	ctx := context.Background()
 	for i := 0; i < n; i += interval {
-		ctx := context.Background()
 		req := newRequest(t, conf, fixture)
-
 		resp, err := q.PushRequest(ctx, req)
 		if err != nil {
 			t.Fatalf("%+v", err)
 		}
-
 		cr := checkBatchResp(t, conf, resp)
-		fmt.Println(cr)
+		b := []byte(fmt.Sprintf("READV2 %d %d\r\n", cr.Offset(), 3))
+		req = newRequest(t, conf, b)
+		resp, err = q.PushRequest(ctx, req)
+		if err != nil {
+			t.Fatalf("%+v", err)
+		}
+		respb := checkReadResp(t, conf, resp)
+		if !bytes.Equal(respb, fixture) {
+			t.Fatalf("expected:\n\t%q\nbut got\n\t%q", fixture, respb)
+		}
 
 		testhelper.CheckError(q.Stop())
 		testhelper.CheckError(q.Start())
 
-		expected := uint64(len(fixture) * x)
-		actual := q.parts.headOffset()
-		if actual != expected {
-			t.Fatalf("expected head offset to be %d but was %d", expected, actual)
+		req = newRequest(t, conf, fixture)
+		resp, err = q.PushRequest(ctx, req)
+		if err != nil {
+			t.Fatalf("%+v", err)
 		}
-		x++
+		cr = checkBatchResp(t, conf, resp)
+		b = []byte(fmt.Sprintf("READV2 %d %d\r\n", cr.Offset(), 3))
+		req = newRequest(t, conf, b)
+		resp, err = q.PushRequest(ctx, req)
+		if err != nil {
+			t.Fatalf("%+v", err)
+		}
+		respb = checkReadResp(t, conf, resp)
+		if !bytes.Equal(respb, fixture) {
+			t.Fatalf("expected:\n\t%q\nbut got\n\t%q", fixture, respb)
+		}
 	}
 }
 
@@ -115,14 +126,29 @@ func checkBatchResp(t testing.TB, conf *config.Config, resp *protocol.ResponseV2
 
 	r, err := resp.ScanReader()
 	if err != nil {
-		t.Fatalf("%+v", err)
+		t.Fatalf("unexpected error scanning response reader: %+v", err)
 	}
 
 	cr := protocol.NewClientResponse(conf)
 	if _, rerr := cr.ReadFrom(bufio.NewReader(r)); rerr != nil {
-		t.Fatalf("%+v", rerr)
+		t.Fatalf("unexpected error reading batch: %+v", rerr)
 	}
 	return cr
+}
+
+func checkReadResp(t testing.TB, conf *config.Config, resp *protocol.ResponseV2) []byte {
+	if resp.NumReaders() != 1 {
+		t.Fatalf("expected 1 reader but got %d", resp.NumReaders())
+	}
+	r, err := resp.ScanReader()
+	if err != nil {
+		t.Fatalf("unexpected error scanning response reader: %+v", err)
+	}
+	b := &bytes.Buffer{}
+	if _, err := b.ReadFrom(r); err != nil {
+		t.Fatalf("unexpected error reading batch: %+v", err)
+	}
+	return b.Bytes()
 }
 
 func partitionIterations(conf *config.Config, fixtureLen int) (int, int) {

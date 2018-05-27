@@ -90,7 +90,7 @@ func (w *MockWriter) rotate() {
 		return
 	}
 
-	for i := len(parts) - 2; i >= 0; i-- {
+	for i := 0; i < len(parts)-1; i++ {
 		parts[i], parts[i+1] = parts[i+1], parts[i]
 	}
 }
