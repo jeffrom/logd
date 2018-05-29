@@ -16,10 +16,7 @@ clean:
 	$(foreach pkg,$(PKG_DIRS),rm -f $(pkg)/testdata/*.actual.golden;)
 	$(foreach pkg,$(SHORT_PKGS),rm -f $(pkg).test;)
 	rm -rf __[0-9]*.log
-	rm -rf /tmp/logd-testdata*
-	rm -rf /tmp/logd-artifacts.log*
-	rm -rf /tmp/user/$(shell id -u)/logd-testdata*
-	rm -rf /tmp/user/$(shell id -u)/logd-artifacts.log*
+	rm -rf /${TMPDIR}/logd-testdata*
 	rm -rf ./tmp
 
 .PHONY: clean.reports
