@@ -46,6 +46,13 @@ func TestPartitionV2(t *testing.T) {
 	}
 
 	checkList(t, p, 0, []uint64{})
+	tmpParts, err = p.listTempDir()
+	if err != nil {
+		t.Fatalf("error listing temp partitions: %+v", err)
+	}
+	if len(tmpParts) != 0 {
+		t.Fatalf("expected 0 temp partition but got %d", len(tmpParts))
+	}
 }
 
 func checkList(t testing.TB, p PartitionManager, l int, offs []uint64) []Partitioner {
