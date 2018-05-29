@@ -6,8 +6,6 @@ import (
 	"log"
 	"runtime/debug"
 	"time"
-
-	"github.com/jeffrom/logd/config"
 )
 
 var Golden bool
@@ -26,24 +24,6 @@ var BenjaminLines = [][]byte{
 	[]byte("There is no muse of philosophy, nor is there one of translation."),
 	[]byte("A religion may be discerned in capitalism—that is to say, capitalism serves essentially to allay the same anxieties, torments, and disturbances to which the so-called religions offered answers."),
 	[]byte("Capitalism is presumably the first case of a blaming, rather than a repenting cult. ... An enormous feeling of guilt not itself knowing how to repent, grasps at the cult, not in order to repent for this guilt, but to make it universal, to hammer it into consciousness and finally and above all to include God himself in this guilt."),
-}
-
-func DefaultTestConfig(verbose bool) *config.Config {
-
-	return &config.Config{
-		Verbose:                 verbose,
-		ServerTimeout:           1000,
-		ClientTimeout:           1000,
-		GracefulShutdownTimeout: 1000,
-		LogFileMode:             0644,
-		LogFile:                 TmpLog(),
-		// MaxBatchSize:            1024 * 1024 * 2,
-		// PartitionSize:           1024 * 1024 * 2,
-		MaxBatchSize:    1024 * 2,
-		PartitionSize:   1024 * 5,
-		IndexCursorSize: 100,
-		MaxPartitions:   5,
-	}
 }
 
 func CheckGoldenFile(filename string, b []byte, golden bool) {

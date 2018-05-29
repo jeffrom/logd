@@ -3,14 +3,12 @@ package events
 import (
 	"fmt"
 
+	"github.com/pkg/errors"
+
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/logger"
 	"github.com/jeffrom/logd/protocol"
-	"github.com/pkg/errors"
 )
-
-// NOTE keep this updated when protocol changes
-const reasonableBatchSize = 4096 * 100
 
 type partitions struct {
 	conf   *config.Config
@@ -44,18 +42,25 @@ func (p *partitions) reset() {
 }
 
 // add is used when loading the log from disk
-func (p *partitions) add(offset uint64, size int) {
+func (p *partitions) add(offset uint64, size int) error {
+	last := p.parts[p.nparts]
+	if p.nparts == p.conf.MaxPartitions-1 && last.startOffset != 0 {
+		if err := p.logp.Remove(p.parts[0].startOffset); err != nil {
+			return err
+		}
+		p.rotate()
+	}
+
 	part := p.parts[p.nparts]
 	part.reset()
 	part.startOffset = offset
 	part.size = size
 	p.head = part
 
-	if p.nparts+1 == p.conf.MaxPartitions {
-		p.rotate()
-	} else if p.nparts+1 < p.conf.MaxPartitions {
+	if p.nparts < p.conf.MaxPartitions-1 {
 		p.nparts++
 	}
+	return nil
 }
 
 func (p *partitions) rotate() {
@@ -82,11 +87,14 @@ func (p *partitions) nextOffset() uint64 {
 	return next
 }
 
-func (p *partitions) addBatch(b *protocol.Batch, size int) {
+func (p *partitions) addBatch(b *protocol.Batch, size int) error {
 	if p.shouldRotate(size) {
-		p.add(p.nextOffset(), 0)
+		if err := p.add(p.nextOffset(), 0); err != nil {
+			return err
+		}
 	}
 	p.head.addBatch(b, size)
+	return nil
 }
 
 func (p *partitions) headOffset() uint64 {
@@ -108,7 +116,11 @@ func (p *partitions) lookup(off uint64) (uint64, int, error) {
 	if p.nparts <= 0 {
 		return 0, 0, errors.New("no partitions loaded")
 	}
-	for i := p.nparts - 1; i >= 0; i-- {
+	for i := p.nparts; i >= 0; i-- {
+		// skip if the newest partition hasn't been set yet
+		if i == p.nparts && p.nparts > 0 && p.parts[i].startOffset == 0 {
+			continue
+		}
 		part := p.parts[i]
 		if off >= part.startOffset {
 			return part.startOffset, int(off - part.startOffset), nil

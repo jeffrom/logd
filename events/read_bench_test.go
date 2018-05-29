@@ -36,12 +36,6 @@ func BenchmarkReadAllV2(b *testing.B) {
 	benchmarkRead(b, conf, q, offs)
 }
 
-func startQV2(b testing.TB, q *EventQ) {
-	if err := q.Start(); err != nil {
-		b.Fatalf("unexpected error starting event queue: %+v", err)
-	}
-}
-
 func benchmarkRead(b *testing.B, conf *config.Config, q *EventQ, offs []uint64) {
 	var bufs [][]byte
 	for _, off := range offs {

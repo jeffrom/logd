@@ -18,6 +18,8 @@ log*.test
 # tool output directory
 report/
 
+tmp/
+
 /integration_test/out
 
 ./build/*

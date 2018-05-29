@@ -96,6 +96,7 @@ func (q *EventQ) Start() error {
 }
 
 func (q *EventQ) setupPartitions() error {
+	q.parts.reset()
 	parts, err := q.parts.logp.List()
 	if err != nil {
 		return err
@@ -242,14 +243,13 @@ func (q *EventQ) handleBatch(req *protocol.Request) (*protocol.ResponseV2, error
 		return resp, verr
 	}
 
-	// rotate to next partition if needed
+	// set next write partition if needed
 	if q.parts.shouldRotate(req.FullSize()) {
 		nextStartOffset := q.parts.nextOffset()
 		if sperr := q.logw.SetPartition(nextStartOffset); sperr != nil {
 			return resp, sperr
 		}
 	}
-
 	// write the log
 	_, err = q.logw.Write(req.Bytes())
 	if err != nil {
@@ -258,7 +258,9 @@ func (q *EventQ) handleBatch(req *protocol.Request) (*protocol.ResponseV2, error
 
 	// update log state
 	respOffset := q.parts.nextOffset()
-	q.parts.addBatch(batch, req.FullSize())
+	if aerr := q.parts.addBatch(batch, req.FullSize()); aerr != nil {
+		return resp, aerr
+	}
 
 	// respond
 	clientResp := protocol.NewClientBatchResponse(q.conf, respOffset)

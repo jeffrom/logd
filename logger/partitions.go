@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/jeffrom/logd/config"
 )
@@ -22,7 +24,7 @@ type PartitionManager interface {
 	// Uncirculate makes a partition unavailable to subsequent requests.
 	// Intended for allowing current reads to complete before permanent
 	// removal.
-	Uncirculate(off uint64) error
+	// Uncirculate(off uint64) error
 	// Remove removes a partition. If the partition doesn't exist, or
 	// Uncirculate was not previously called on the partition, return an error.
 	Remove(off uint64) error
@@ -46,7 +48,9 @@ type Partitioner interface {
 type Partitions struct {
 	conf       *config.Config
 	partitions []Partitioner
-	tmpDir     string
+	tempDir    string
+	refs       map[uint64]int
+	mu         sync.Mutex
 }
 
 // NewPartitions returns an instance of Partitions
@@ -54,33 +58,63 @@ func NewPartitions(conf *config.Config) *Partitions {
 	return &Partitions{
 		conf:       conf,
 		partitions: make([]Partitioner, conf.MaxPartitions),
+		refs:       make(map[uint64]int),
 	}
 }
 
 func (p *Partitions) reset() {
-	p.tmpDir = ""
+	p.tempDir = ""
 }
 
-// Uncirculate implements PartitionManager
-func (p *Partitions) Uncirculate(off uint64) error {
-	if p.tmpDir == "" {
-		tmpDir, err := ioutil.TempDir("", "logd-uncirculated")
+// Setup implements internal.LifecycleManager
+func (p *Partitions) Setup() error {
+	return p.ensureTempDir()
+}
+
+func (p *Partitions) ensureTempDir() error {
+	if p.tempDir == "" {
+		// TODO config for tempdir location, file mode
+		tpath := "./tmp"
+		if strings.HasPrefix(p.conf.LogFile, os.TempDir()) {
+			tdir, _ := filepath.Split(p.conf.LogFile)
+			tpath = filepath.Join(tdir, "removed")
+		}
+		dir, perr := filepath.Abs(tpath)
+		if perr != nil {
+			return perr
+		}
+
+		if dir != "" {
+			if _, err := os.Stat(dir); os.IsNotExist(err) {
+				if err := os.Mkdir(dir, 0700); err != nil {
+					return err
+				}
+			}
+		}
+		tmpDir, err := ioutil.TempDir(dir, "logd-uncirculated")
 		if err != nil {
 			return err
 		}
-		p.tmpDir = tmpDir
+		p.tempDir = tmpDir
 	}
-
-	fname := p.filePath(off)
-	return os.Rename(filepath.Join(p.conf.LogFile, fname), filepath.Join(p.tmpDir, fname))
+	return nil
 }
 
 // Remove implements PartitionManager
 func (p *Partitions) Remove(off uint64) error {
-	if p.tmpDir == "" {
-		return errors.New("Partitions.Remove: temp dir not set")
+	if err := p.ensureTempDir(); err != nil {
+		return err
 	}
-	return os.Remove(filepath.Join(p.tmpDir, p.filePath(off)))
+
+	fname := partitionPath(p.conf, off)
+	if err := os.Rename(partitionFullPath(p.conf, off), filepath.Join(p.tempDir, fname)); err != nil {
+		return err
+	}
+
+	if p.getRefs(off) <= 0 {
+		return p.removeFile(off)
+	}
+	return nil
 }
 
 // Get implements PartitionManager
@@ -105,17 +139,36 @@ func (p *Partitions) Get(off uint64, delta int, limit int) (Partitioner, error) 
 		limit = size
 	}
 
-	r := NewPartition(p.conf, off, size)
+	r := NewPartition(p.conf, off, size).withTmpDir(p.tempDir)
 	if err := r.setFile(f); err != nil {
 		return nil, err
 	}
+	r.wrapCloser(func(closer io.Closer) error {
+		if err := closer.Close(); err != nil {
+			log.Printf("error closing %d: %+v", off, err)
+		}
+		if p.decRefs(off) <= 0 {
+			return p.removeFile(off)
+		}
+		return nil
+	})
+	p.incRefs(off)
 	r.setReader(io.LimitReader(f, int64(limit)))
 	return r, nil
 }
 
 // List implements PartitionManager
 func (p *Partitions) List() ([]Partitioner, error) {
-	pat := p.conf.LogFile + "[0-9]*.log"
+	return p.list(p.conf.LogFile, false)
+}
+
+func (p *Partitions) listTempDir() ([]Partitioner, error) {
+	_, suf := filepath.Split(p.conf.LogFile)
+	return p.list(p.tempDir+"/"+suf, true)
+}
+
+func (p *Partitions) list(prefix string, tmp bool) ([]Partitioner, error) {
+	pat := prefix + "[0-9]*.log"
 	matches, err := filepath.Glob(pat)
 	if err != nil {
 		return nil, err
@@ -127,12 +180,12 @@ func (p *Partitions) List() ([]Partitioner, error) {
 			return nil, serr
 		}
 
-		off, perr := p.extractOffset(match)
+		off, perr := p.extractOffset(match, tmp)
 		if perr != nil {
 			return nil, perr
 		}
 
-		part := NewPartition(p.conf, off, int(info.Size()))
+		part := NewPartition(p.conf, off, int(info.Size())).withTmpDir(p.tempDir)
 		parts = append(parts, part)
 	}
 
@@ -144,21 +197,69 @@ func (p *Partitions) List() ([]Partitioner, error) {
 
 // Shutdown implements internal.LifecycleManager
 func (p *Partitions) Shutdown() error {
-	if p.tmpDir != "" {
+	if p.tempDir != "" {
 		// TODO log any remaining uncirculated files
-		return os.Remove(p.tmpDir)
+		return os.Remove(p.tempDir)
 	}
 	return nil
 }
 
-func (p *Partitions) filePath(off uint64) string {
-	return strconv.FormatUint(off, 10) + ".log"
+func (p *Partitions) incRefs(off uint64) {
+	p.mu.Lock()
+	if _, ok := p.refs[off]; !ok {
+		p.refs[off] = 1
+	} else {
+		p.refs[off]++
+	}
+	p.mu.Unlock()
 }
 
-func (p *Partitions) extractOffset(filename string) (uint64, error) {
-	s := strings.TrimPrefix(filename, p.conf.LogFile)
+func (p *Partitions) decRefs(off uint64) int {
+	p.mu.Lock()
+	p.refs[off]--
+	refs := p.refs[off]
+	p.mu.Unlock()
+	return refs
+}
+
+func (p *Partitions) getRefs(off uint64) int {
+	p.mu.Lock()
+	refs := p.refs[off]
+	p.mu.Unlock()
+	return refs
+}
+
+func (p *Partitions) withCloser(part *Partition) *Partition {
+	return part
+}
+
+func (p *Partitions) extractOffset(filename string, tmp bool) (uint64, error) {
+	logfname := p.conf.LogFile
+	if tmp {
+		logfname = p.tempDir + "/"
+	}
+	dir, suf := filepath.Split(logfname)
+	if tmp {
+		_, suf = filepath.Split(p.conf.LogFile)
+	}
+	s := strings.TrimPrefix(filename, dir)
+	s = strings.TrimPrefix(s, suf)
 	s = strings.TrimSuffix(s, ".log")
 	return strconv.ParseUint(s, 10, 64)
+}
+
+// removeFile deletes the file from the filesystem. Remove must have been called
+// first.
+func (p *Partitions) removeFile(off uint64) error {
+	if p.tempDir == "" {
+		return errors.New("Partitions.Remove: temp dir not set")
+	}
+
+	err := os.Remove(filepath.Join(p.tempDir, partitionPath(p.conf, off)))
+	if err != nil {
+		log.Printf("failed to delete %d: %+v", off, err)
+	}
+	return err
 }
 
 // Len implements sort.Interface
@@ -181,10 +282,27 @@ func (p *Partitions) Less(i, j int) bool {
 // Partition implements Partitioner
 type Partition struct {
 	conf   *config.Config
+	tmpDir string
 	offset uint64
 	size   int
 	reader io.Reader
 	closer io.Closer
+}
+
+type closeWrap struct {
+	closer func() error
+}
+
+func closeWrapper(orig io.Closer, f func(io.Closer) error) *closeWrap {
+	return &closeWrap{
+		closer: func() error {
+			return f(orig)
+		},
+	}
+}
+
+func (c *closeWrap) Close() error {
+	return c.closer()
 }
 
 // NewPartition returns a new instance of Partition
@@ -196,8 +314,20 @@ func NewPartition(conf *config.Config, offset uint64, size int) *Partition {
 	}
 }
 
+func (p *Partition) withTmpDir(tmpDir string) *Partition {
+	p.tmpDir = tmpDir
+	return p
+}
+
+func (p *Partition) wrapCloser(f func(io.Closer) error) *Partition {
+	orig := p.closer
+	p.closer = closeWrapper(orig, f)
+	return p
+}
+
 // Reset sets Partition to its initial params
 func (p *Partition) Reset() {
+	p.tmpDir = ""
 	p.offset = 0
 	p.size = 0
 }
@@ -264,4 +394,14 @@ func (p *Partition) Size() int {
 // so subsequent requests for deleted offsets return not found errors.
 type PartitionFile struct {
 	conf *config.Config
+}
+
+func partitionPath(conf *config.Config, off uint64) string {
+	_, prefix := filepath.Split(conf.LogFile)
+	return prefix + strconv.FormatUint(off, 10) + ".log"
+}
+
+func partitionFullPath(conf *config.Config, off uint64) string {
+	dir, _ := filepath.Split(conf.LogFile)
+	return filepath.Join(dir, partitionPath(conf, off))
 }

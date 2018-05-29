@@ -4,6 +4,24 @@ import (
 	"github.com/jeffrom/logd/config"
 )
 
+func DefaultTestConfig(verbose bool) *config.Config {
+
+	return &config.Config{
+		Verbose:                 verbose,
+		ServerTimeout:           1000,
+		ClientTimeout:           1000,
+		GracefulShutdownTimeout: 1000,
+		LogFileMode:             0644,
+		LogFile:                 TmpLog(),
+		// MaxBatchSize:            1024 * 1024 * 2,
+		// PartitionSize:           1024 * 1024 * 2,
+		MaxBatchSize:    1024 * 2,
+		PartitionSize:   1024 * 5,
+		IndexCursorSize: 100,
+		MaxPartitions:   5,
+	}
+}
+
 func TestConfig(verbose bool) *config.Config {
 	conf := config.NewConfig()
 	conf.ServerTimeout = 1000

@@ -15,13 +15,17 @@ clean:
 	rm -f $(GENERATED_FILES)
 	$(foreach pkg,$(PKG_DIRS),rm -f $(pkg)/testdata/*.actual.golden;)
 	$(foreach pkg,$(SHORT_PKGS),rm -f $(pkg).test;)
-	rm -rf integration_test/out/* report/*
-	rm -rf [0-9]*.log
-	rm -rf *.pprof
+	rm -rf __[0-9]*.log
 	rm -rf /tmp/logd-testdata*
 	rm -rf /tmp/logd-artifacts.log*
 	rm -rf /tmp/user/$(shell id -u)/logd-testdata*
 	rm -rf /tmp/user/$(shell id -u)/logd-artifacts.log*
+	rm -rf ./tmp
+
+.PHONY: clean.reports
+clean.reports:
+	rm -rf integration_test/out/* report/*
+	rm -rf *.pprof
 
 .PHONY: clean.docker
 clean.docker:

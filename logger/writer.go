@@ -39,6 +39,10 @@ func (w *Writer) Flush() error {
 
 // SetPartition implements LogWriterV2 interface
 func (w *Writer) SetPartition(off uint64) error {
+	if err := w.Close(); err != nil {
+		return err
+	}
+
 	s := strconv.FormatUint(off, 10)
 	f, err := os.OpenFile(w.conf.LogFile+s+".log", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0600)
 	w.f = f
