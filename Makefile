@@ -16,7 +16,7 @@ clean:
 	$(foreach pkg,$(PKG_DIRS),rm -f $(pkg)/testdata/*.actual.golden;)
 	$(foreach pkg,$(SHORT_PKGS),rm -f $(pkg).test;)
 	rm -rf __[0-9]*.log
-	rm -rf /${TMPDIR}/logd-testdata*
+	rm -rf ${TMPDIR-/tmp}/logd-testdata*
 	rm -rf ./tmp
 
 .PHONY: clean.reports
