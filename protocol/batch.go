@@ -14,7 +14,6 @@ import (
 // Batch represents a collection of Messages
 // BATCH <size> <checksum> <messages>\r\n<data>
 // NOTE no trailing newline after the data
-// TODO add crc
 type Batch struct {
 	conf     *config.Config
 	Size     uint64
@@ -91,7 +90,6 @@ func (b *Batch) FromRequest(req *Request) (*Batch, error) {
 }
 
 // Validate checks the batch's checksum
-// TODO checksum
 func (b *Batch) Validate() error {
 	// if size > MaxBatchSize || crc doesn't match
 	if b.Size > uint64(b.conf.MaxBatchSize) {

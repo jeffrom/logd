@@ -125,6 +125,7 @@ func checkBatchResp(t testing.TB, conf *config.Config, resp *protocol.ResponseV2
 	if err != nil {
 		log.Panicf("unexpected error scanning response reader: %+v", err)
 	}
+	defer r.Close()
 
 	cr := protocol.NewClientResponse(conf)
 	if _, rerr := cr.ReadFrom(bufio.NewReader(r)); rerr != nil {
@@ -141,6 +142,8 @@ func checkReadResp(t testing.TB, conf *config.Config, resp *protocol.ResponseV2)
 	if err != nil {
 		t.Fatalf("unexpected error scanning response reader: %+v", err)
 	}
+	defer r.Close()
+
 	b := &bytes.Buffer{}
 	if _, err := b.ReadFrom(r); err != nil {
 		t.Fatalf("unexpected error reading batch: %+v", err)

@@ -145,7 +145,7 @@ func (r *Response) SendEOF() {
 // can returns bytes as well as *os.File-s
 type ResponseV2 struct {
 	conf       *config.Config
-	readers    []io.Reader
+	readers    []io.ReadCloser
 	numReaders int
 	numScanned int
 }
@@ -154,7 +154,7 @@ type ResponseV2 struct {
 func NewResponseV2(conf *config.Config) *ResponseV2 {
 	return &ResponseV2{
 		conf:    conf,
-		readers: make([]io.Reader, conf.MaxPartitions+1),
+		readers: make([]io.ReadCloser, conf.MaxPartitions+1),
 	}
 }
 
@@ -168,7 +168,7 @@ func (r *ResponseV2) Reset() {
 }
 
 // AddReader adds a reader for the server to send back over the conn
-func (r *ResponseV2) AddReader(rdr io.Reader) error {
+func (r *ResponseV2) AddReader(rdr io.ReadCloser) error {
 	if r.numReaders > r.conf.MaxPartitions+1 {
 		panic("too many readers")
 	}
@@ -179,7 +179,7 @@ func (r *ResponseV2) AddReader(rdr io.Reader) error {
 
 // ScanReader returns the next reader, or io.EOF if they've all been scanned
 // TODO this should return an io.ReadCloser
-func (r *ResponseV2) ScanReader() (io.Reader, error) {
+func (r *ResponseV2) ScanReader() (io.ReadCloser, error) {
 	if r.numScanned > r.numReaders {
 		return nil, io.EOF
 	}

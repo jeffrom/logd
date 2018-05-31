@@ -15,7 +15,7 @@ type Request struct {
 	Name      CmdType
 	responseC chan *ResponseV2
 
-	respBuf *bytes.Buffer
+	respBuf *closingBuffer
 
 	raw      []byte   // the full request as raw bytes
 	read     int64    //
@@ -33,7 +33,7 @@ func NewRequest(conf *config.Config) *Request {
 		raw:       make([]byte, conf.MaxBatchSize),
 		responseC: make(chan *ResponseV2),
 		args:      make([][]byte, maxArgs),
-		respBuf:   &bytes.Buffer{},
+		respBuf:   newClosingBuffer(),
 	}
 }
 
@@ -175,4 +175,18 @@ func (req *Request) WriteResponse(resp *ResponseV2, cr *ClientResponse) (int64, 
 	n, err := cr.WriteTo(req.respBuf)
 	resp.AddReader(req.respBuf)
 	return n, err
+}
+
+type closingBuffer struct {
+	*bytes.Buffer
+}
+
+func newClosingBuffer() *closingBuffer {
+	return &closingBuffer{
+		Buffer: &bytes.Buffer{},
+	}
+}
+
+func (c *closingBuffer) Close() error {
+	return nil
 }

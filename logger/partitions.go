@@ -389,11 +389,11 @@ func (p *Partition) Size() int {
 
 // PartitionFile wraps a LimitReader(*os.File) so it can be unwrapped by the
 // socket and sendfile can be leveraged.
-// TODO PartitionFile should also be involved in deletions. each partition on
-// disk should have an associated reference count, and when it's slated for
-// deletion, it should wait until all references have been closed before
-// deleting the file from disk. It should move the file into a temp directory
-// so subsequent requests for deleted offsets return not found errors.
+// PartitionFile is also involved in deletions. each partition on disk should
+// have an associated reference count, and when it's slated for deletion, it
+// should wait until all references have been closed before deleting the file
+// from disk. It should move the file into a temp directory so subsequent
+// requests for deleted offsets return not found errors.
 type PartitionFile struct {
 	conf *config.Config
 }

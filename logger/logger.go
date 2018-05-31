@@ -24,9 +24,6 @@ type LogWriter interface {
 }
 
 // LogReader should implement everything needed to read a range of messages
-// TODO read methods should take a ReaderFrom instead of a []byte. Want to
-// be able to read the log file into the connection.
-// ReadFromID(rf io.ReaderFrom, id uint64, limit int) error
 type LogReader interface {
 	Head() (uint64, error)
 	Tail() (uint64, error)
