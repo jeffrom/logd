@@ -409,25 +409,26 @@ func (s *Socket) waitForRequest(conn *Conn) (*protocol.Request, error) {
 }
 
 func (s *Socket) sendResponse(conn *Conn, resp *protocol.ResponseV2) (int, error) {
-	var r io.Reader
+	var r io.ReadCloser
 	var err error
 	var total int
 	var readOne bool
 	for {
 		r, err = resp.ScanReader()
-		if err != nil || r == nil {
+		if err != nil {
 			break
 		}
 
 		readOne = true
 
 		n, serr := conn.readFrom(r)
+		if cerr := r.Close(); cerr != nil {
+			log.Printf("error closing reader %+v: %+v", r, cerr)
+		}
 		total += int(n)
 		if serr != nil {
 			return total, serr
 		}
-
-		// TODO close all readers as soon as readFrom completes
 	}
 
 	if !readOne {
