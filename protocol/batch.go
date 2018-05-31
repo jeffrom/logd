@@ -46,6 +46,7 @@ func (b *Batch) String() string {
 // Reset puts a batch in an initial state so it can be reused
 func (b *Batch) Reset() {
 	b.Size = 0
+	b.Checksum = 0
 	b.Messages = 0
 	b.firstOff = 0
 	b.wasRead = false
