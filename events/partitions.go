@@ -206,8 +206,12 @@ func (b *batch) reset() {
 
 type partitionArgList struct {
 	conf   *config.Config
-	parts  []partitionArgs
+	parts  []*partitionArgs
 	nparts int
+}
+
+func (pl *partitionArgList) String() string {
+	return fmt.Sprintf("%s", pl.parts[:pl.nparts])
 }
 
 type partitionArgs struct {
@@ -216,14 +220,18 @@ type partitionArgs struct {
 	limit  int
 }
 
-func (pa partitionArgs) String() string {
+func (pa *partitionArgs) String() string {
 	return fmt.Sprintf("partitionArgs<offset: %d, delta: %d, limit: %d>", pa.offset, pa.delta, pa.limit)
 }
 
 func newPartitionArgList(conf *config.Config) *partitionArgList {
 	pl := &partitionArgList{
 		conf:  conf,
-		parts: make([]partitionArgs, conf.MaxPartitions),
+		parts: make([]*partitionArgs, conf.MaxPartitions),
+	}
+
+	for i := 0; i < conf.MaxPartitions; i++ {
+		pl.parts[i] = &partitionArgs{}
 	}
 
 	return pl

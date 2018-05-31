@@ -255,7 +255,9 @@ func (p *Partitions) removeFile(off uint64) error {
 		return errors.New("Partitions.Remove: temp dir not set")
 	}
 
-	err := os.Remove(filepath.Join(p.tempDir, partitionPath(p.conf, off)))
+	ppath := partitionPath(p.conf, off)
+	fullpath := filepath.Join(p.tempDir, ppath)
+	err := os.Remove(fullpath)
 	if err != nil {
 		log.Printf("failed to delete %d: %+v", off, err)
 	}

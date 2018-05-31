@@ -194,6 +194,12 @@ func (r *ResponseV2) NumReaders() int {
 	return r.numReaders
 }
 
+var respBytes = map[error][]byte{
+	ErrNotFound:            []byte("not found"),
+	errCrcChecksumMismatch: []byte("checksum mismatch"),
+	errInvalidProtocolLine: []byte("invalid protocol"),
+}
+
 // ClientResponse is the response clients receive after making a request.  V2.
 // Handles responses to all requests except READ, which responds with BATCH.
 // OK <offset>\r\n
@@ -203,6 +209,7 @@ type ClientResponse struct {
 	conf     *config.Config
 	raw      []byte
 	offset   uint64
+	err      error
 	digitbuf [32]byte
 }
 
@@ -213,10 +220,17 @@ func NewClientResponse(conf *config.Config) *ClientResponse {
 	}
 }
 
-// NewClientBatchResponse returns a successful batch *ClientResponse
-func NewClientBatchResponse(conf *config.Config, off uint64) *ClientResponse {
+// NewClientBatchResponseV2 returns a successful batch *ClientResponse
+func NewClientBatchResponseV2(conf *config.Config, off uint64) *ClientResponse {
 	cr := NewClientResponse(conf)
 	cr.SetOffset(off)
+	return cr
+}
+
+// NewClientErrResponseV2 returns an error response
+func NewClientErrResponseV2(conf *config.Config, err error) *ClientResponse {
+	cr := NewClientResponse(conf)
+	cr.err = err
 	return cr
 }
 
@@ -242,6 +256,43 @@ func (cr *ClientResponse) Offset() uint64 {
 
 // WriteTo implements io.WriterTo
 func (cr *ClientResponse) WriteTo(w io.Writer) (int64, error) {
+	if cr.err != nil {
+		return cr.writeErr(w)
+	}
+	return cr.writeOK(w)
+}
+
+func (cr *ClientResponse) writeErr(w io.Writer) (int64, error) {
+	var total int64
+	n, err := w.Write(berr)
+	total += int64(n)
+	if err != nil {
+		return total, err
+	}
+
+	if p, ok := respBytes[cr.err]; ok {
+		n, err = w.Write(bspace)
+		total += int64(n)
+		if err != nil {
+			return total, err
+		}
+
+		n, err = w.Write(p)
+		total += int64(n)
+		if err != nil {
+			return total, err
+		}
+	}
+
+	n, err = w.Write(bnewLine)
+	total += int64(n)
+	if err != nil {
+		return total, err
+	}
+	return total, nil
+}
+
+func (cr *ClientResponse) writeOK(w io.Writer) (int64, error) {
 	var total int64
 	n, err := w.Write(bok)
 	total += int64(n)

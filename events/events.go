@@ -236,37 +236,37 @@ func (q *EventQ) handleBatch(req *protocol.Request) (*protocol.ResponseV2, error
 	resp := protocol.NewResponseV2(q.conf)
 	batch, err := protocol.NewBatch(q.conf).FromRequest(req)
 	if err != nil {
-		return resp, err
+		return errResponse(q.conf, req, resp, err)
 	}
 
 	if verr := batch.Validate(); verr != nil {
-		return resp, verr
+		return errResponse(q.conf, req, resp, verr)
 	}
 
 	// set next write partition if needed
 	if q.parts.shouldRotate(req.FullSize()) {
 		nextStartOffset := q.parts.nextOffset()
 		if sperr := q.logw.SetPartition(nextStartOffset); sperr != nil {
-			return resp, sperr
+			return errResponse(q.conf, req, resp, sperr)
 		}
 	}
 	// write the log
 	_, err = q.logw.Write(req.Bytes())
 	if err != nil {
-		return resp, err
+		return errResponse(q.conf, req, resp, err)
 	}
 
 	// update log state
 	respOffset := q.parts.nextOffset()
 	if aerr := q.parts.addBatch(batch, req.FullSize()); aerr != nil {
-		return resp, aerr
+		return errResponse(q.conf, req, resp, aerr)
 	}
 
 	// respond
-	clientResp := protocol.NewClientBatchResponse(q.conf, respOffset)
+	clientResp := protocol.NewClientBatchResponseV2(q.conf, respOffset)
 	_, err = req.WriteResponse(resp, clientResp)
 	if err != nil {
-		return resp, err
+		return errResponse(q.conf, req, resp, err)
 	}
 
 	return resp, nil
@@ -276,7 +276,7 @@ func (q *EventQ) handleReadV2(req *protocol.Request) (*protocol.ResponseV2, erro
 	resp := protocol.NewResponseV2(q.conf)
 	readreq, err := protocol.NewRead(q.conf).FromRequest(req)
 	if err != nil {
-		return resp, err
+		return errResponse(q.conf, req, resp, err)
 	}
 
 	if verr := readreq.Validate(); verr != nil {
@@ -285,18 +285,19 @@ func (q *EventQ) handleReadV2(req *protocol.Request) (*protocol.ResponseV2, erro
 
 	partArgs, err := q.gatherReadArgs(readreq.Offset, readreq.Messages)
 	if err != nil {
-		return resp, err
+		// fmt.Println(readreq.Offset, err)
+		return errResponse(q.conf, req, resp, err)
 	}
 
 	for i := 0; i < partArgs.nparts; i++ {
 		args := partArgs.parts[i]
 		p, gerr := q.parts.logp.Get(args.offset, args.delta, args.limit)
 		if gerr != nil {
-			return resp, gerr
+			return errResponse(q.conf, req, resp, gerr)
 		}
 
 		if aerr := resp.AddReader(p); aerr != nil {
-			return resp, aerr
+			return errResponse(q.conf, req, resp, aerr)
 		}
 	}
 
@@ -304,10 +305,8 @@ func (q *EventQ) handleReadV2(req *protocol.Request) (*protocol.ResponseV2, erro
 }
 
 func (q *EventQ) gatherReadArgs(offset uint64, messages int) (*partitionArgList, error) {
-	// check the offset/delta for range start
-	// get the offset/limit for range end
-	// partitions.Get the relevant partitions and add them to the client response
 	soff, delta, err := q.parts.lookup(offset)
+	// fmt.Println("gatherReadArgs", offset, soff, delta, err)
 	if err != nil {
 		return nil, err
 	}
@@ -327,6 +326,7 @@ Loop:
 			}
 			return nil, gerr
 		}
+		defer p.Close()
 
 		scanner.Reset(p)
 		for scanner.Scan() {
@@ -334,14 +334,14 @@ Loop:
 			n += b.Messages
 			if n >= messages {
 				q.partArgBuf.add(currstart, delta, scanner.Scanned())
-				p.Close()
 				break Loop
 			}
 		}
 
 		serr := scanner.Error()
-		p.Close()
-		if serr == io.EOF {
+		// if we've read a partition and and we haven't read any messages, it's
+		// an error. probably an incorrect offset near the end of the partition
+		if serr == io.EOF && q.partArgBuf.nparts > 0 {
 			q.partArgBuf.add(currstart, delta, p.Size())
 			currstart = p.Offset() + uint64(p.Size()+1)
 			delta = 0
@@ -642,6 +642,14 @@ func (q *EventQ) PushRequest(ctx context.Context, req *protocol.Request) (*proto
 		internal.Debugf(q.conf, "request %s cancelled while waiting for a response", req)
 		return nil, errors.New("request cancelled")
 	}
+}
+
+func errResponse(conf *config.Config, req *protocol.Request, resp *protocol.ResponseV2, err error) (*protocol.ResponseV2, error) {
+	clientResp := protocol.NewClientErrResponseV2(conf, err)
+	if _, werr := req.WriteResponse(resp, clientResp); werr != nil {
+		return resp, werr
+	}
+	return resp, err
 }
 
 // Subscription is used to tail logs

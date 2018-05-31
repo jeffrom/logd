@@ -62,6 +62,34 @@ func TestPartitionRemovalV2(t *testing.T) {
 	}
 }
 
+func TestReadNotFoundV2(t *testing.T) {
+	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	q := NewEventQ(conf)
+	startQV2(t, q)
+	defer shutdownQV2(t, q)
+
+	for i := 0; i < conf.MaxPartitions*3; i++ {
+		offs := fillPartition(t, q)
+		for _, off := range offs {
+			if off > 0 {
+				checkNotFound(t, conf, pushRead(t, q, off-1, 3))
+			}
+			if off > 10 {
+				checkNotFound(t, conf, pushRead(t, q, off-9, 3))
+			}
+			checkNotFound(t, conf, pushRead(t, q, off+1, 3))
+			checkNotFound(t, conf, pushRead(t, q, off+10, 3))
+			checkNotFound(t, conf, pushRead(t, q, off+100, 3))
+		}
+	}
+}
+
+func checkNotFound(t testing.TB, conf *config.Config, b []byte) {
+	if !bytes.HasPrefix(b, []byte("ERR")) {
+		log.Panicf("response was not an error: %q", b)
+	}
+}
+
 func newRequest(t testing.TB, conf *config.Config, p []byte) *protocol.Request {
 	req := protocol.NewRequest(conf)
 
@@ -122,7 +150,7 @@ func checkReadResp(t testing.TB, conf *config.Config, resp *protocol.ResponseV2)
 
 func startQV2(b testing.TB, q *EventQ) {
 	dir, _ := filepath.Split(q.conf.LogFile)
-	b.Logf("starting log dir: %s", dir)
+	log.Printf("starting log dir: %s", dir)
 	if err := q.Start(); err != nil {
 		b.Fatalf("unexpected error starting event queue: %+v", err)
 	}
@@ -139,13 +167,16 @@ func shutdownQV2(t testing.TB, q *EventQ) {
 }
 
 // writes a partition worth of batch requests into the q
-func fillPartition(t testing.TB, q *EventQ) {
+func fillPartition(t testing.TB, q *EventQ) []uint64 {
+	var offs []uint64
 	fixture := testhelper.LoadFixture("batch.small")
 	n := 0
 	for n+len(fixture) < q.conf.PartitionSize {
-		pushBatch(t, q, fixture)
+		cr := pushBatch(t, q, fixture)
+		offs = append(offs, cr.Offset())
 		n += len(fixture)
 	}
+	return offs
 }
 
 func pushBatch(t testing.TB, q *EventQ, fixture []byte) *protocol.ClientResponse {

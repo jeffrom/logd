@@ -16,6 +16,7 @@ func BenchmarkReadHeadV2(b *testing.B) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
 	q := NewEventQ(conf)
 	startQV2(b, q)
+	defer shutdownQV2(b, q)
 	offs := writeBatches(b, conf, q)
 	benchmarkRead(b, conf, q, offs[len(offs)-1:])
 }
@@ -24,6 +25,7 @@ func BenchmarkReadTailV2(b *testing.B) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
 	q := NewEventQ(conf)
 	startQV2(b, q)
+	defer shutdownQV2(b, q)
 	offs := writeBatches(b, conf, q)
 	benchmarkRead(b, conf, q, offs[:1])
 }
@@ -32,6 +34,7 @@ func BenchmarkReadAllV2(b *testing.B) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
 	q := NewEventQ(conf)
 	startQV2(b, q)
+	defer shutdownQV2(b, q)
 	offs := writeBatches(b, conf, q)
 	benchmarkRead(b, conf, q, offs)
 }
@@ -82,7 +85,8 @@ func writeBatches(b testing.TB, conf *config.Config, q *EventQ) []uint64 {
 	}
 
 	var offs []uint64
-	for i := 0; i < 1000; i++ {
+	n := conf.MaxPartitions * len(fixture)
+	for i := 0; i < n; i++ {
 		resp, err := q.PushRequest(ctx, req)
 		if err != nil {
 			b.Fatalf("unexpected error writing batches: %+v", err)

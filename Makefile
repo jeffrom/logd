@@ -1,4 +1,5 @@
 
+TMPDIR ?= /tmp
 PKGS ?= $(shell go list ./...)
 SHORT_PKGS ?= $(shell go list -f '{{.Name}}' ./... | grep -v main)
 PKG_DIRS ?= $(shell go list -f '{{.Dir}}' ./...)
@@ -16,7 +17,8 @@ clean:
 	$(foreach pkg,$(PKG_DIRS),rm -f $(pkg)/testdata/*.actual.golden;)
 	$(foreach pkg,$(SHORT_PKGS),rm -f $(pkg).test;)
 	rm -rf __[0-9]*.log
-	rm -rf ${TMPDIR-/tmp}/logd-testdata*
+	rm -rf $(TMPDIR)/logd-testdata*
+	rm -rf $(TMPDIR)/logd-artifacts.log*
 	rm -rf ./tmp
 
 .PHONY: clean.reports
