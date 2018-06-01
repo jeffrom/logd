@@ -11,6 +11,7 @@ import (
 
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/internal"
+	"github.com/jeffrom/logd/logger"
 	"github.com/jeffrom/logd/protocol"
 )
 
@@ -144,7 +145,14 @@ func (c *Conn) readFrom(r io.Reader) (int64, error) {
 	if err := c.setWaitForReadFromDeadline(); err != nil {
 		return 0, err
 	}
-	n, err := c.Conn.(*net.TCPConn).ReadFrom(r)
+	var n int64
+	var err error
+	if p, ok := r.(*logger.Partition); ok {
+		// sendfile optimization
+		n, err = c.Conn.(*net.TCPConn).ReadFrom(p.Reader())
+	} else {
+		n, err = io.Copy(c.Conn, r)
+	}
 	return n, handleConnErr(c.config, err, c)
 }
 

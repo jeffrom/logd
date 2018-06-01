@@ -47,6 +47,7 @@ var errInvalidProtocolLine = errors.New("invalid protocol line")
 var errInvalidBodyLength = errors.New("invalid body length")
 var errCrcChecksumMismatch = errors.New("crc checksum mismatch")
 var errRangeNotFound = errors.New("id range not found")
+var errTooLarge = errors.New("batch too large")
 
 var crcTable = crc32.MakeTable(crc32.Koopman)
 

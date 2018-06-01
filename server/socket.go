@@ -415,7 +415,7 @@ func (s *Socket) sendResponse(conn *Conn, resp *protocol.ResponseV2) (int, error
 	var readOne bool
 	for {
 		r, err = resp.ScanReader()
-		if err != nil {
+		if err != nil || r == nil {
 			break
 		}
 

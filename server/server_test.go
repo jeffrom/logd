@@ -39,8 +39,8 @@ func newTestClientLogger(conf *config.Config, srv *Socket) *client.Logger {
 	return l
 }
 
-func NewTestServer(config *config.Config) *Socket {
-	srv := NewSocket("127.0.0.1:0", config)
+func NewTestServer(conf *config.Config) *Socket {
+	srv := NewSocket("127.0.0.1:0", conf)
 	srv.GoServe()
 
 	return srv

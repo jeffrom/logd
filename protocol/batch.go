@@ -352,6 +352,9 @@ func (b *Batch) readEnvelope(r *bufio.Reader) (int64, error) {
 func (b *Batch) readData(r *bufio.Reader) (int64, error) {
 	var total int64
 
+	if b.Size > uint64(b.conf.MaxBatchSize) {
+		return total, errTooLarge
+	}
 	b.ensureBuf()
 	n, err := io.ReadFull(r, b.body[:b.Size])
 	total += int64(n)

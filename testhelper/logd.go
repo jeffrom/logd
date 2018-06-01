@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"io/ioutil"
 	"log"
+	"os"
+	"path/filepath"
 	"runtime/debug"
 	"time"
 )
@@ -50,6 +52,9 @@ func CheckGoldenFile(filename string, b []byte, golden bool) {
 
 func LoadFixture(name string) []byte {
 	filename := "testdata/fixture." + name
+	if _, err := os.Stat(filename); err != nil {
+		filename = filepath.Join("testdata", name+".golden")
+	}
 	b, err := ioutil.ReadFile(filename)
 	if err != nil {
 		panic(err)

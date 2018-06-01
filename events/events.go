@@ -322,6 +322,7 @@ Loop:
 			// if we've successfully read anything, we've read the last
 			// partition by now
 			if q.partArgBuf.nparts > 0 {
+				// fmt.Println("all done", q.partArgBuf.nparts)
 				return q.partArgBuf, nil
 			}
 			return nil, gerr
@@ -334,17 +335,22 @@ Loop:
 			n += b.Messages
 			if n >= messages {
 				q.partArgBuf.add(currstart, delta, scanner.Scanned())
+				// fmt.Println("scanned enough", currstart, q.partArgBuf.parts[:q.partArgBuf.nparts])
 				break Loop
 			}
 		}
+		// fmt.Println("finished part", currstart, q.partArgBuf.parts[:q.partArgBuf.nparts])
 
 		serr := scanner.Error()
 		// if we've read a partition and and we haven't read any messages, it's
 		// an error. probably an incorrect offset near the end of the partition
-		if serr == io.EOF && q.partArgBuf.nparts > 0 {
-			q.partArgBuf.add(currstart, delta, p.Size())
-			currstart = p.Offset() + uint64(p.Size()+1)
+		if serr == io.EOF && n > 0 {
+			q.partArgBuf.add(currstart, delta, p.Size()-delta)
+			currstart = p.Offset() + uint64(p.Size())
 			delta = 0
+			// fmt.Println("next part", currstart, q.partArgBuf.parts[:q.partArgBuf.nparts])
+		} else if serr == io.EOF {
+			return nil, io.ErrUnexpectedEOF
 		} else if serr != nil {
 			return nil, serr
 		}

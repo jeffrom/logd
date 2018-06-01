@@ -39,9 +39,7 @@ var (
 	// ErrNotFound is returned when the log id is above the logs head or has been
 	// deleted.
 	ErrNotFound = errors.New("offset not found")
-)
 
-var (
 	// ErrRespInvalid are the error response bytes sent for invalid requests
 	ErrRespInvalid = []byte("invalid request")
 
@@ -170,7 +168,7 @@ func (r *ResponseV2) Reset() {
 // AddReader adds a reader for the server to send back over the conn
 func (r *ResponseV2) AddReader(rdr io.ReadCloser) error {
 	if r.numReaders > r.conf.MaxPartitions+1 {
-		panic("too many readers")
+		panic("too many readers in response")
 	}
 	r.readers[r.numReaders] = rdr
 	r.numReaders++
