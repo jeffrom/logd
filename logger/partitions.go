@@ -258,8 +258,17 @@ func (p *Partitions) removeFile(off uint64) error {
 	// we just remove it. if it's not removed, it's not in the tempdir
 	ppath := partitionPath(p.conf, off)
 	fullpath := filepath.Join(p.tempDir, ppath)
-	err := os.Remove(fullpath)
-	return err
+
+	if _, err := os.Stat(fullpath); err != nil {
+		return err
+	}
+	go func() {
+		err := os.Remove(fullpath)
+		if err != nil {
+			log.Printf("error removing %s: %+v", fullpath, err)
+		}
+	}()
+	return nil
 }
 
 // Len implements sort.Interface
