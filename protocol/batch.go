@@ -90,6 +90,8 @@ func (b *Batch) FromRequest(req *Request) (*Batch, error) {
 }
 
 // Validate checks the batch's checksum
+// TODO should add config.MaxMessageSize and config.MaxMessagesPerBatch and
+// check them here, maybe?
 func (b *Batch) Validate() error {
 	// if size > MaxBatchSize || crc doesn't match
 	if b.Size > uint64(b.conf.MaxBatchSize) {

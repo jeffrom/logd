@@ -422,9 +422,10 @@ func (s *Socket) sendResponse(conn *Conn, resp *protocol.ResponseV2) (int, error
 		readOne = true
 
 		n, serr := conn.readFrom(r)
-		if cerr := r.Close(); cerr != nil {
-			log.Printf("error closing reader %+v: %+v", r, cerr)
-		}
+		r.Close()
+		// if cerr := r.Close(); cerr != nil {
+		// 	log.Printf("error closing reader %+v: %+v", r, cerr)
+		// }
 		total += int(n)
 		if serr != nil {
 			return total, serr
