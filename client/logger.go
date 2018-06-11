@@ -34,8 +34,8 @@ func DialLoggerConfig(addr string, conf *config.Config) (*Logger, error) {
 	l := &Logger{
 		Client: c,
 		cmd:    protocol.NewCommand(conf, protocol.CmdMessage),
-		batch:  make([][]byte, conf.ClientChunkSize),
-		timer:  time.NewTimer(time.Duration(conf.ClientChunkInterval)),
+		batch:  make([][]byte, conf.ClientBatchSize),
+		timer:  time.NewTimer(time.Duration(conf.ClientBatchInterval)),
 	}
 	return l, nil
 }
@@ -70,7 +70,7 @@ func (l *Logger) Flush() error {
 }
 
 func (l *Logger) shouldFlush() bool {
-	if l.batchsize >= l.config.ClientChunkSize {
+	if l.batchsize >= l.config.ClientBatchSize {
 		return true
 	}
 	select {
@@ -90,7 +90,7 @@ func (l *Logger) resetTimer() {
 	if !l.timer.Stop() {
 		<-l.timer.C
 	}
-	l.timer.Reset(time.Duration(l.config.ClientChunkInterval))
+	l.timer.Reset(time.Duration(l.config.ClientBatchInterval))
 }
 
 // messageBatch collects messages so they can be sent in a batch

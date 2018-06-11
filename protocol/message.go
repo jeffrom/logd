@@ -276,3 +276,13 @@ func (m *MessageV2) WriteTo(w io.Writer) (int64, error) {
 
 	return total, nil
 }
+
+func (m *MessageV2) calcSize() int {
+	l := len(m.Body)
+	l += asciiSize(l) + 2
+	l += len(bmsgStart) // `MSG `
+	l += termLen        // `\r\n`
+
+	// fmt.Printf("calcSize: %d %q\n", l, m.Body)
+	return l
+}

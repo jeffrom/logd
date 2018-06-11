@@ -71,7 +71,7 @@ func (s *Scanner) Scan() bool {
 		}
 
 		for {
-			pscanner, err := s.client.continueRead(start, s.config.ClientChunkSize)
+			pscanner, err := s.client.continueRead(start, s.config.ClientBatchSize)
 			s.err = err
 			if err != nil {
 				if err == errNotFound {

@@ -60,7 +60,6 @@ var breadStart = []byte("READ ")
 var bok = []byte("OK")
 var bokStart = []byte("OK ")
 var berr = []byte("ERR")
-var berrStart = []byte("ERR ")
 
 // ReadLine reads a line from a bufio.Reader
 // NOTE the line data will be overwritten the next time the bufio.Reader is
@@ -256,6 +255,23 @@ func uintToASCII(n uint64, b *[32]byte) int {
 	i--
 
 	return i + 1
+}
+
+func asciiSize(n int) int {
+	size := 1
+	if n < 0 {
+		size *= -1
+		size++
+	}
+
+	x := n
+	for x > 9 {
+		size++
+		x /= 10
+	}
+
+	// fmt.Println("size of", n, size)
+	return size
 }
 
 func readNewLine(r *bufio.Reader) (int, error) {

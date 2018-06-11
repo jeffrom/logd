@@ -132,8 +132,11 @@ func (c *Conn) Write(p []byte) (int, error) {
 
 // Flush sends all pending data over the connection
 func (c *Conn) Flush() error {
-	internal.Debugf(c.config, "%s: flush()", c.RemoteAddr())
-	return c.bw.Flush()
+	if c.bw.Buffered() > 0 {
+		internal.Debugf(c.config, "%s: flush() (%d bytes buffered)", c.RemoteAddr(), c.bw.Buffered())
+		return c.bw.Flush()
+	}
+	return nil
 }
 
 func (c *Conn) Read(p []byte) (int, error) {
@@ -153,6 +156,7 @@ func (c *Conn) readFrom(r io.Reader) (int64, error) {
 	} else {
 		n, err = io.Copy(c.Conn, r)
 	}
+	internal.Debugf(c.config, "%s: wrote %d bytes", c.RemoteAddr(), n)
 	return n, handleConnErr(c.config, err, c)
 }
 

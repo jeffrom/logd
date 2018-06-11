@@ -4,331 +4,327 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"io"
-	"log"
-	"net"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
-
-	"github.com/pkg/errors"
-	"gopkg.in/urfave/cli.v1"
-	"gopkg.in/urfave/cli.v1/altsrc"
 
 	"github.com/jeffrom/logd/client"
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/internal"
-	"github.com/jeffrom/logd/protocol"
+	cli "gopkg.in/urfave/cli.v2"
 )
 
-func toBytes(args []string) [][]byte {
-	var b [][]byte
-	for _, arg := range args {
-		b = append(b, []byte(arg))
-	}
+var tmpConfig = &client.Config{}
 
-	return b
+var helpFlag = &cli.BoolFlag{
+	Name:    "help",
+	Aliases: []string{},
+	Usage:   "show help",
 }
 
-func checkErrResp(resp *protocol.Response) error {
-	if resp.Status == protocol.RespErr {
-		return cli.NewExitError("Server error", 2)
-	}
-	if resp.Status == protocol.RespErrClient {
-		return cli.NewExitError("Client error", 3)
-	}
-	return nil
+var versionFlag = &cli.BoolFlag{
+	Name:    "version",
+	Aliases: []string{},
+	Usage:   "Print version",
 }
 
-func formatResp(resp *protocol.Response, args []string) string {
-	var out bytes.Buffer
-	respBytes, err := resp.SprintBytes()
-	internal.PanicOnError(err)
+var verboseFlag = &cli.BoolFlag{
+	Name:        "verbose",
+	Aliases:     []string{"v"},
+	Usage:       "Print debug information to the console",
+	Value:       client.DefaultConfig.Verbose,
+	EnvVars:     []string{"LOG_VERBOSE"},
+	Destination: &tmpConfig.Verbose,
+}
 
-	isOk := bytes.HasPrefix(respBytes, []byte("OK "))
-	respBytes = bytes.TrimLeft(respBytes, "OK ")
+var hostFlag = &cli.StringFlag{
+	Name:        "host",
+	Aliases:     []string{"h"},
+	Usage:       "A `HOST:PORT` combination to connect to a logd instance",
+	Value:       client.DefaultConfig.Hostport,
+	EnvVars:     []string{"LOG_HOST"},
+	Destination: &tmpConfig.Hostport,
+}
 
-	idx := bytes.Index(respBytes, []byte(" "))
-	if idx > 0 {
-		respBytes = respBytes[idx+1:]
-	} else if isOk && args != nil {
-		var lastID uint64
-		if _, err := fmt.Sscanf(string(respBytes), "%d", &lastID); err != nil {
-			panic(err)
+var timeoutFlag = &cli.DurationFlag{
+	Name:        "timeout",
+	Aliases:     []string{"t"},
+	Usage:       "`DURATION` to wait for reads and writes to complete",
+	Value:       client.DefaultConfig.Timeout,
+	EnvVars:     []string{"LOG_TIMEOUT"},
+	Destination: &tmpConfig.Timeout,
+}
+
+var writeTimeoutFlag = &cli.DurationFlag{
+	Name:        "write-timeout",
+	Usage:       "`DURATION` to wait for writes to complete",
+	Value:       client.DefaultConfig.WriteTimeout,
+	EnvVars:     []string{"LOG_WRITE_TIMEOUT"},
+	Destination: &tmpConfig.WriteTimeout,
+}
+
+var readTimeoutFlag = &cli.DurationFlag{
+	Name:        "read-timeout",
+	Usage:       "`DURATION` to wait for reads to complete",
+	Value:       client.DefaultConfig.ReadTimeout,
+	EnvVars:     []string{"LOG_READ_TIMEOUT"},
+	Destination: &tmpConfig.ReadTimeout,
+}
+
+var batchSizeFlag = &cli.IntFlag{
+	Name:        "batch-size",
+	Aliases:     []string{"b"},
+	Usage:       "max size of batch in `BYTES`",
+	Value:       client.DefaultConfig.BatchSize,
+	EnvVars:     []string{"LOG_BATCH_SIZE"},
+	Destination: &tmpConfig.BatchSize,
+}
+
+var limitFlag = &cli.IntFlag{
+	Name:        "limit",
+	Aliases:     []string{"l"},
+	Usage:       "limit number of messages per read to `MESSAGES`",
+	Value:       client.DefaultConfig.Limit,
+	EnvVars:     []string{"LOG_LIMIT"},
+	Destination: &tmpConfig.Limit,
+}
+
+var waitIntervalFlag = &cli.DurationFlag{
+	Name:        "wait-interval",
+	Usage:       "`DURATION` to wait after the last write to flush the current batch",
+	Value:       client.DefaultConfig.WaitInterval,
+	EnvVars:     []string{"LOG_WAIT_INTERVAL"},
+	Destination: &tmpConfig.WaitInterval,
+}
+
+var writeForeverFlag = &cli.BoolFlag{
+	Name:        "write-forever",
+	Aliases:     []string{"F"},
+	Usage:       "Keep reading input until the program is killed",
+	Value:       client.DefaultConfig.WriteForever,
+	EnvVars:     []string{"LOG_WRITE_FOREVER"},
+	Destination: &tmpConfig.WriteForever,
+}
+
+var inputPathFlag = &cli.PathFlag{
+	Name:        "input",
+	Usage:       "A file path to read messages into the log",
+	Value:       client.DefaultConfig.InputPath,
+	EnvVars:     []string{"LOG_INPUT"},
+	Destination: &tmpConfig.InputPath,
+}
+
+var outputPathFlag = &cli.PathFlag{
+	Name:        "output",
+	Usage:       "A file path to write offsets to",
+	Value:       client.DefaultConfig.OutputPath,
+	EnvVars:     []string{"LOG_OUTPUT"},
+	Destination: &tmpConfig.OutputPath,
+}
+
+var countFlag = &cli.BoolFlag{
+	Name:        "count",
+	Aliases:     []string{"c"},
+	Usage:       "Print counts before exiting",
+	Value:       client.DefaultConfig.Count,
+	EnvVars:     []string{"LOG_COUNT"},
+	Destination: &tmpConfig.Count,
+}
+
+var sharedFlags = []cli.Flag{
+	verboseFlag, hostFlag,
+	timeoutFlag, writeTimeoutFlag, readTimeoutFlag,
+	countFlag,
+}
+
+func withSharedFlags(flags []cli.Flag) []cli.Flag {
+	res := make([]cli.Flag, len(sharedFlags))
+	copy(res, sharedFlags)
+	return append(res, flags...)
+}
+
+func buildConfig(c *cli.Context) *client.Config {
+	conf := &client.Config{}
+	*conf = *tmpConfig
+	internal.Debugf(&config.Config{Verbose: conf.Verbose}, "%v", conf)
+	return conf
+}
+
+func getFile(s string, in bool) (*os.File, error) {
+	if s == "-" || s == "" {
+		f := os.Stdout
+		if in {
+			f = os.Stdin
 		}
-
-		for i := lastID - uint64(len(args)-1); i < lastID; i++ {
-			out.WriteString(fmt.Sprintf("%d\n", i))
-		}
-	}
-	out.Write(bytes.TrimRight(respBytes, "\r\n"))
-	return out.String()
-}
-
-func cmdAction(conf *config.Config, cmd protocol.CmdType) func(c *cli.Context) error {
-	return func(cliCtx *cli.Context) error {
-		c, err := client.DialConfig(conf.Hostport, conf)
+		stat, err := f.Stat()
 		if err != nil {
-			return cli.NewExitError(err, 1)
+			return nil, err
 		}
-		defer c.Close()
+		if in && (stat.Mode()&os.ModeCharDevice) != 0 {
+			return nil, nil
+		}
+		return f, nil
+	}
+	return os.Open(s)
+}
 
-		if len(cliCtx.Args()) > 0 {
-			resp, err := c.Do(protocol.NewCommand(conf, cmd, toBytes(cliCtx.Args())...))
-			if err != nil {
-				return cli.NewExitError(err, 1)
-			}
-			fmt.Println(formatResp(resp, cliCtx.Args()))
-			if err := checkErrResp(resp); err != nil {
-				return err
-			}
-		} else if cmd != protocol.CmdMessage {
-			resp, err := c.Do(protocol.NewCommand(conf, cmd))
-			if err != nil {
-				if err == io.EOF && cmd == protocol.CmdShutdown {
-					return nil
-				}
-				return cli.NewExitError(err, 1)
-			}
-			fmt.Println(formatResp(resp, cliCtx.Args()))
-			if err := checkErrResp(resp); err != nil {
-				return err
-			}
+func handleKills(c chan struct{}) {
+	stopC := make(chan os.Signal)
+	signal.Notify(stopC, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		for range stopC {
+			c <- struct{}{}
+		}
+	}()
+}
+
+// var counts = map[string]int{
+// 	"messages": 0,
+// 	"bytes in": 0,
+// }
+
+type debugCounts struct {
+	started time.Time
+	counts  map[string]int
+}
+
+func newDebugCounts(started time.Time) *debugCounts {
+	return &debugCounts{
+		started: started,
+		counts: map[string]int{
+			"messages": 0,
+			"bytes in": 0,
+		},
+	}
+}
+
+func (c *debugCounts) String() string {
+	// return fmt.Sprintf("")
+	b := bytes.Buffer{}
+	dur := time.Now().Sub(c.started)
+	b.WriteString(fmt.Sprintf("elapsed:\t%s\n", dur))
+	for k, v := range c.counts {
+		b.WriteString(fmt.Sprintf("%s:\t%d\t%.2f %s/s\n", k, v, float64(v)/float64(dur.Seconds()), k))
+	}
+	return b.String()
+}
+
+func doWrite(conf *client.Config, args cli.Args) error {
+	done := make(chan struct{})
+	handleKills(done)
+
+	started := time.Now()
+	counts := newDebugCounts(started)
+
+	in, err := getFile(conf.InputPath, true)
+	if err != nil {
+		return err
+	}
+	if in != nil {
+		defer in.Close()
+	}
+	out, err := getFile(conf.OutputPath, false)
+	if err != nil {
+		return err
+	}
+	if out != nil {
+		defer out.Close()
+	}
+
+	w, err := client.DialWriterConfig(conf.Hostport, conf)
+	if err != nil {
+		return err
+	}
+	var m client.StatePusher
+	if out == nil {
+		m = &client.NoopStatePusher{}
+	} else {
+		m = client.NewFileStatePusher(out)
+	}
+	w.SetStateHandler(m)
+
+	for _, arg := range args.Slice() {
+		select {
+		case <-done:
+			break
+		default:
 		}
 
-		// check if there's data in stdin
-		stat, _ := os.Stdin.Stat()
-		if (stat.Mode() & os.ModeCharDevice) != 0 {
-			return nil
+		if len(arg) == 0 {
+			continue
 		}
 
-		scanner := bufio.NewScanner(os.Stdin)
+		n, err := w.Write([]byte(arg))
+		counts.counts["bytes in"] += n
+		if err != nil {
+			return err
+		}
+		counts.counts["messages"]++
+	}
+
+	if in != nil {
+		scanner := bufio.NewScanner(in)
 		scanner.Split(bufio.ScanLines)
-		var lastResp *protocol.Response
 		for scanner.Scan() {
+			select {
+			case <-done:
+				break
+			default:
+			}
+
 			b := scanner.Bytes()
-			resp, err := c.Do(protocol.NewCommand(conf, cmd, b))
-			lastResp = resp
-			if err == io.EOF {
-				return nil
+			if len(b) == 0 {
+				continue
 			}
+
+			n, err := w.Write(b)
+			counts.counts["bytes in"] += n
 			if err != nil {
-				panic(err)
-			}
-			if cmd != protocol.CmdMessage {
-				fmt.Println(formatResp(resp, nil))
-			}
-			if err := checkErrResp(resp); err != nil {
 				return err
 			}
+			counts.counts["messages"]++
 		}
-
-		if cmd == protocol.CmdMessage {
-			fmt.Println(formatResp(lastResp, nil))
+		if err := scanner.Err(); err != nil {
+			return err
 		}
-		return nil
 	}
-}
 
-func doReadCmdAction(conf *config.Config) func(c *cli.Context) error {
-	return func(cliCtx *cli.Context) error {
-		start := conf.StartID
-		limit := int(conf.ReadLimit)
-
-		c, err := client.DialConfig(conf.Hostport, conf)
-		if err != nil {
-			log.Printf("%+v", err)
-			return cli.NewExitError(err, 1)
-		}
-		defer c.Close()
-
-		if start == 0 {
-			resp, headErr := c.Do(protocol.NewCommand(conf, protocol.CmdHead))
-			if err != nil {
-				log.Printf("%+v", err)
-				return cli.NewExitError(headErr, 2)
-			}
-
-			if resp.ID < uint64(limit) {
-				limit = int(resp.ID)
-				start = 1
-			} else {
-				start = resp.ID - uint64(limit) + 1
-			}
-		} else if start > 0 {
-			// limit--
-		}
-
-		if conf.ReadForever {
-			limit = conf.ClientChunkSize
-		}
-
-		// fmt.Printf("Reading %d messages from id %d\n", limit, start)
-
-		scanner, err := c.DoRead(start, limit)
-		if err != nil {
-			log.Printf("%+v", err)
-			return cli.NewExitError(err, 2)
-		}
-
-		timeout := time.Duration(conf.ClientTimeout) * time.Millisecond
-		if srerr := c.SetReadDeadline(time.Now().Add(timeout)); srerr != nil {
-			panic(srerr)
-		}
-		for scanner.Scan() {
-			msg := scanner.Message()
-			fmt.Printf("%d %s\n", msg.ID, msg.Body)
-		}
-
-		if err := scanner.Error(); err != io.EOF && err != nil {
-			if cerr, ok := errors.Cause(err).(net.Error); !ok || !cerr.Timeout() {
-				log.Printf("%v", err)
-				return cli.NewExitError(err, 3)
-			}
-		}
-
-		// if conf.ReadForever {
-		// 	for {
-		// 		// fmt.Printf("waiting for more log entries\n")
-
-		// 		select {
-		// 		case <-sigc:
-		// 			return nil
-		// 		case <-time.After(200 * time.Millisecond):
-		// 		}
-
-		// 		c.SetDeadline(time.Now().Add(200 * time.Millisecond))
-		// 		for scanner.Scan() {
-		// 			msg := scanner.Message()
-		// 			fmt.Printf("%d %s\n", msg.ID, msg.Body)
-		// 			c.SetDeadline(time.Now().Add(200 * time.Millisecond))
-		// 		}
-
-		// 		if err := scanner.Error(); err != nil && err != io.EOF {
-		// 			if cerr, ok := errors.Cause(err).(net.Error); !ok || !cerr.Timeout() {
-		// 				log.Printf("%+v", err)
-		// 				return cli.NewExitError(err, 3)
-		// 			}
-		// 		}
-
-		// 	}
-		// }
-
-		return nil
+	if conf.Count {
+		fmt.Println(counts)
 	}
+	return w.Flush()
 }
 
 func runApp(args []string) {
-	conf := &config.Config{}
-	*conf = *config.DefaultConfig
-
-	cli.VersionFlag = cli.BoolFlag{
-		Name:  "version",
-		Usage: "Print only the version",
-	}
-
-	app := cli.NewApp()
-	app.Name = "log-cli"
-	app.Usage = "networked logging client"
-	app.Version = "0.0.1"
-	app.EnableBashCompletion = true
-
-	flags := []cli.Flag{
-		cli.StringFlag{
-			Name:   "config, c",
-			Usage:  "Load configuration from `FILE`",
-			Value:  "logd.conf.yml",
-			EnvVar: "LOGD_CONFIG",
-		},
-		altsrc.NewBoolFlag(cli.BoolFlag{
-			Name:        "verbose, v",
-			Usage:       "print debug output",
-			EnvVar:      "LOGD_VERBOSE",
-			Destination: &conf.Verbose,
-		}),
-		altsrc.NewStringFlag(cli.StringFlag{
-			Name:        "host",
-			Usage:       "A `HOST:PORT` combination to connect to",
-			EnvVar:      "LOGD_HOST",
-			Value:       "127.0.0.1:1774",
-			Destination: &conf.Hostport,
-		}),
-		altsrc.NewUintFlag(cli.UintFlag{
-			Name:        "timeout",
-			Usage:       "`MILLISECONDS` to wait for a response",
-			EnvVar:      "LOGD_TIMEOUT",
-			Value:       500,
-			Destination: &conf.ClientTimeout,
-		}),
-	}
-
-	app.Flags = flags
-
-	app.Before = altsrc.InitInputSourceWithContext(app.Flags, altsrc.NewYamlSourceFromFlagFunc("config"))
-
-	app.Commands = []cli.Command{
-		{
-			Name:   "ping",
-			Usage:  "ping a host for availability",
-			Action: cmdAction(conf, protocol.CmdPing),
-		},
-		{
-			Name:   "sleep",
-			Usage:  "pause the current transaction",
-			Action: cmdAction(conf, protocol.CmdSleep),
-		},
-		{
-			Name:   "head",
-			Usage:  "get the log's current ID",
-			Action: cmdAction(conf, protocol.CmdHead),
-		},
-		{
-			Name:   "write",
-			Usage:  "write a message to the log",
-			Action: cmdAction(conf, protocol.CmdMessage),
-		},
-		{
-			Name:  "read",
-			Usage: "read from the log",
-			Flags: append([]cli.Flag{
-				cli.Uint64Flag{
-					Name:        "start, s",
-					Usage:       "Starting `ID`",
-					Value:       0,
-					Destination: &conf.StartID,
+	cli.HelpFlag = helpFlag
+	cli.VersionFlag = versionFlag
+	app := &cli.App{
+		Name:                  "log-cli",
+		Usage:                 "logd command-line client",
+		Version:               "0.0.1",
+		EnableShellCompletion: true,
+		Flags: withSharedFlags([]cli.Flag{}),
+		Commands: []*cli.Command{
+			{
+				Name:    "write",
+				Aliases: []string{"w"},
+				Usage:   "writes messages to the log",
+				Flags: withSharedFlags([]cli.Flag{
+					batchSizeFlag, limitFlag,
+					waitIntervalFlag,
+					writeForeverFlag,
+					inputPathFlag, outputPathFlag,
+				}),
+				Action: func(c *cli.Context) error {
+					return doWrite(buildConfig(c), c.Args())
 				},
-				cli.Uint64Flag{
-					Name:        "limit, n",
-					Usage:       "`NUMBER` of message to read",
-					Value:       15,
-					Destination: &conf.ReadLimit,
-				},
-				cli.BoolFlag{
-					Name:        "forever, f",
-					Usage:       "read forever",
-					Destination: &conf.ReadForever,
-				},
-				cli.BoolFlag{
-					Name:        "from-tail, t",
-					Usage:       "read from log tail if the queried id can't be found",
-					Destination: &conf.ReadFromTail,
-				},
-			}, flags...),
-			Action: doReadCmdAction(conf),
-		},
-		{
-			Name:   "stats",
-			Usage:  "get running server stats",
-			Action: cmdAction(conf, protocol.CmdStats),
-		},
-		{
-			Name:   "shutdown",
-			Usage:  "shutdown the server (debug only)",
-			Action: cmdAction(conf, protocol.CmdShutdown),
+			},
 		},
 	}
 
 	if err := app.Run(args); err != nil {
-		log.Printf("closed: %+v", err)
+		panic(err)
 	}
 }
 

@@ -8,8 +8,8 @@ func DefaultTestConfig(verbose bool) *config.Config {
 
 	return &config.Config{
 		Verbose:                 verbose,
-		ServerTimeout:           1000,
-		ClientTimeout:           1000,
+		ServerTimeout:           200,
+		ClientTimeout:           200,
 		GracefulShutdownTimeout: 1000,
 		LogFileMode:             0644,
 		LogFile:                 TmpLog(),

@@ -56,6 +56,15 @@ func Debugf(conf *config.Config, s string, args ...interface{}) {
 	stdlog(2, s, args...)
 }
 
+// DebugfDepth prints a debug log message to stdout
+func DebugfDepth(conf *config.Config, depth int, s string, args ...interface{}) {
+	if !conf.Verbose {
+		return
+	}
+
+	stdlog(2+depth, s, args...)
+}
+
 // Logf logs to stdout
 func Logf(s string, args ...interface{}) {
 	stdlog(2, s, args...)
@@ -111,4 +120,11 @@ func CloseAll(c []io.Closer) error {
 		}
 	}
 	return firstErr
+}
+
+// IgnoreError logs the error if one occurred
+func IgnoreError(err error) {
+	if err != nil {
+		stdlog(2, "error ignored: %+v", err)
+	}
 }

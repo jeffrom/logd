@@ -39,7 +39,7 @@ func NewBatch(conf *config.Config) *Batch {
 }
 
 func (b *Batch) String() string {
-	return fmt.Sprintf("Batch<Messages: %d>", b.Messages)
+	return fmt.Sprintf("Batch<%p Messages: %d, Size: %d>", b, b.Messages, b.Size)
 }
 
 // Reset puts a batch in an initial state so it can be reused
@@ -114,13 +114,20 @@ func (b *Batch) Bytes() []byte {
 
 // Append adds a new message's bytes to the batch
 func (b *Batch) Append(p []byte) error {
+	if b.Messages > len(b.msgs)-1 {
+		msgs := make([]*MessageV2, len(b.msgs)*2)
+		copy(msgs, b.msgs)
+		b.msgs = msgs
+	}
 	if b.msgs[b.Messages] == nil {
 		b.msgs[b.Messages] = NewMessageV2(b.conf)
 	}
 	msg := b.msgs[b.Messages]
 	msg.Body = p
 	msg.Size = len(p)
+
 	b.Messages++
+	b.Size += uint64(msg.calcSize())
 	return nil
 }
 
@@ -186,6 +193,7 @@ func (b *Batch) buildBodyBytes() error {
 	l := b.msgBuf.Len()
 	b.Size = uint64(l)
 	b.ensureBuf()
+	// fmt.Printf("buildBodyBytes: %q\n", b.msgBuf.Bytes())
 	copy(b.body[:b.Size], b.msgBuf.Bytes())
 
 	return nil

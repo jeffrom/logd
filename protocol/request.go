@@ -104,8 +104,8 @@ func (req *Request) readBody(r *bufio.Reader, pos int64) (int64, error) {
 
 	req.body = req.raw[pos : int(pos)+req.bodysize]
 
-	newLineRead, err := readNewLine(r)
-	read += newLineRead
+	// newLineRead, err := readNewLine(r)
+	// read += newLineRead
 	return int64(read), err
 }
 

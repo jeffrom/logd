@@ -59,7 +59,7 @@ func runApp(args []string) {
 			Name:        "timeout",
 			Usage:       "Time, in milliseconds, to wait for a response to be acknowledged",
 			EnvVar:      "LOGD_TIMEOUT",
-			Value:       500,
+			Value:       1000,
 			Destination: &conf.ServerTimeout,
 		}),
 		altsrc.NewStringFlag(cli.StringFlag{

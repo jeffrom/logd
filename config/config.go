@@ -26,8 +26,8 @@ type Config struct {
 	ReadLimit           uint64 `json:"limit"`
 	ReadForever         bool   `json:"forever"`
 	ReadFromTail        bool   `json:"from_tail"`
-	ClientChunkSize     int    `json:"client_chunk_size"`
-	ClientChunkInterval int    `json:"client_chunk_interval"`
+	ClientBatchSize     int    `json:"client_batch_size"`
+	ClientBatchInterval int    `json:"client_batch_interval"`
 	ClientWaitInterval  int    `json:"client_wait_interval"`
 }
 
@@ -49,8 +49,8 @@ var DefaultConfig *Config
 
 func init() {
 	DefaultConfig = NewConfig()
-	DefaultConfig.ServerTimeout = 500
-	DefaultConfig.GracefulShutdownTimeout = 500
+	DefaultConfig.ServerTimeout = 1000
+	DefaultConfig.GracefulShutdownTimeout = 1000
 	DefaultConfig.LogFile = "__"
 	DefaultConfig.LogFileMode = 0644
 	DefaultConfig.MaxBatchSize = 1024 * 20
@@ -61,12 +61,12 @@ func init() {
 	// DefaultConfig.IndexCursorSize = 1000
 	DefaultConfig.IndexCursorSize = 10
 
-	DefaultConfig.ClientTimeout = 500
+	DefaultConfig.ClientTimeout = 1000
 	DefaultConfig.ClientWaitInterval = 500
 	DefaultConfig.ReadLimit = 15
 	DefaultConfig.ReadFromTail = false
-	DefaultConfig.ClientChunkSize = 100
-	DefaultConfig.ClientChunkInterval = 1000
+	DefaultConfig.ClientBatchSize = 100
+	DefaultConfig.ClientBatchInterval = 500
 
 	// XXX just for dev
 	DefaultConfig.CanShutdown = true

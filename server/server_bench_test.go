@@ -40,7 +40,7 @@ func serverBenchConfigWithOpts(t testing.TB, discard bool) *config.Config {
 
 	conf.Verbose = testing.Verbose()
 
-	conf.ClientChunkSize = 10
+	conf.ClientBatchSize = 10
 	conf.ClientWaitInterval = 200
 
 	return conf
@@ -164,7 +164,7 @@ func BenchmarkServerTail(b *testing.B) {
 		log.Panicf("expected ok response but got %s", resp)
 	}
 
-	for n := 0; n < config.ClientChunkSize; n++ {
+	for n := 0; n < config.ClientBatchSize; n++ {
 		if resp, err := writerClient.Do(protocol.NewCommand(config, protocol.CmdMessage, someMessage)); err != nil {
 			panic(err)
 		} else if resp.Status != protocol.RespOK {
@@ -175,7 +175,7 @@ func BenchmarkServerTail(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		scanner, err := client.DoRead(1, config.ClientChunkSize)
+		scanner, err := client.DoRead(1, config.ClientBatchSize)
 		if err != nil {
 			panic(err)
 		}
@@ -213,7 +213,7 @@ func BenchmarkServerTailTen(b *testing.B) {
 
 	}
 
-	for n := 0; n < config.ClientChunkSize; n++ {
+	for n := 0; n < config.ClientBatchSize; n++ {
 		if resp, err := writerClient.Do(cmd); err != nil {
 			panic(err)
 		} else if resp.Status != protocol.RespOK {
@@ -224,7 +224,7 @@ func BenchmarkServerTailTen(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for _, client := range clients {
-			scanner, err := client.DoRead(1, config.ClientChunkSize)
+			scanner, err := client.DoRead(1, config.ClientBatchSize)
 			if err != nil {
 				panic(err)
 			}

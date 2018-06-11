@@ -325,30 +325,36 @@ func (s *Socket) handleConnection(conn *Conn) {
 		// wait for a new request. continue along if there isn't one. All
 		// requests will be handled in this block, and after all commands have
 		// been migrated, this will be the whole loop
+		internal.Debugf(s.config, "%s: waiting for request", conn.RemoteAddr())
 		if req, err := s.waitForRequest(conn); req != nil && err == nil {
+			internal.Debugf(s.config, "%s: waited for request", conn.RemoteAddr())
 			if _, rerr := req.ReadFrom(conn.br); rerr != nil {
 				// conn.Flush()
 				log.Printf("%s read error: %+v", conn.RemoteAddr(), rerr)
 				return
 			}
+			internal.Debugf(s.config, "%s: read request %v", conn.RemoteAddr(), req)
 			resp, rerr := s.q.PushRequest(ctx, req)
 			if rerr != nil {
-				conn.Flush()
+				internal.IgnoreError(conn.Flush())
 				log.Printf("%s error: %+v", conn.RemoteAddr(), rerr)
 				return
 			}
+			internal.Debugf(s.config, "%s: got response: %+v", conn.RemoteAddr(), resp)
 
-			if _, rerr := s.sendResponse(conn, resp); rerr != nil {
-				conn.Flush()
+			n, rerr := s.sendResponse(conn, resp)
+			if rerr != nil {
+				internal.IgnoreError(conn.Flush())
 				log.Printf("%s response error: %+v", conn.RemoteAddr(), rerr)
 				return
 			}
+			internal.Debugf(s.config, "%s: sent response (%d bytes)", conn.RemoteAddr(), n)
 
-			conn.Flush()
+			internal.IgnoreError(conn.Flush())
 			continue
 		} else if terr, ok := err.(net.Error); ok && terr.Timeout() {
 			log.Printf("%s timeout, so passing through to legacy command handler: %+v", conn.RemoteAddr(), terr)
-			// pass through to the old command
+			// NOTE comment out this continue to pass through to the old command flow
 		} else if err != nil {
 			log.Printf("%s wait error: %+v", conn.RemoteAddr(), err)
 			return

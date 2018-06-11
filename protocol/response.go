@@ -1,9 +1,7 @@
 package protocol
 
 import (
-	"bufio"
 	"bytes"
-	"fmt"
 	"io"
 
 	"github.com/jeffrom/logd/config"
@@ -36,9 +34,17 @@ const (
 )
 
 var (
-	// ErrNotFound is returned when the log id is above the logs head or has been
-	// deleted.
+	// ErrNotFound is returned when the log offset is above the logs head, has been
+	// deleted, or does not point to a message batch.
 	ErrNotFound = errors.New("offset not found")
+
+	// ErrInternal is a server side error. This is an "ERR" response from the
+	// server.
+	ErrInternal = errors.New("internal server error")
+
+	//
+	// protocol responses
+	//
 
 	// ErrRespInvalid are the error response bytes sent for invalid requests
 	ErrRespInvalid = []byte("invalid request")
@@ -190,164 +196,4 @@ func (r *ResponseV2) ScanReader() (io.ReadCloser, error) {
 // NumReaders returns the number of io.Readers available
 func (r *ResponseV2) NumReaders() int {
 	return r.numReaders
-}
-
-var respBytes = map[error][]byte{
-	ErrNotFound:            []byte("not found"),
-	errCrcChecksumMismatch: []byte("checksum mismatch"),
-	errInvalidProtocolLine: []byte("invalid protocol"),
-}
-
-// ClientResponse is the response clients receive after making a request.  V2.
-// Handles responses to all requests except READ, which responds with BATCH.
-// OK <offset>\r\n
-// MOK <size>\r\n<body>\r\n
-// ERR <reason>\r\n
-type ClientResponse struct {
-	conf     *config.Config
-	raw      []byte
-	offset   uint64
-	err      error
-	digitbuf [32]byte
-}
-
-// NewClientResponse creates a new instance of *ClientResponse
-func NewClientResponse(conf *config.Config) *ClientResponse {
-	return &ClientResponse{
-		conf: conf,
-	}
-}
-
-// NewClientBatchResponseV2 returns a successful batch *ClientResponse
-func NewClientBatchResponseV2(conf *config.Config, off uint64) *ClientResponse {
-	cr := NewClientResponse(conf)
-	cr.SetOffset(off)
-	return cr
-}
-
-// NewClientErrResponseV2 returns an error response
-func NewClientErrResponseV2(conf *config.Config, err error) *ClientResponse {
-	cr := NewClientResponse(conf)
-	cr.err = err
-	return cr
-}
-
-func (cr *ClientResponse) String() string {
-	return fmt.Sprintf("ClientResponse<offset: %d>", cr.offset)
-}
-
-// Reset sets ClientResponse to initial values
-func (cr *ClientResponse) Reset() {
-	cr.offset = 0
-}
-
-// SetOffset sets the offset number for a batch response
-func (cr *ClientResponse) SetOffset(off uint64) {
-	cr.offset = off
-}
-
-// Offset returns the response offset. It will panic if the response type isn't
-// for a batch.
-func (cr *ClientResponse) Offset() uint64 {
-	return cr.offset
-}
-
-// WriteTo implements io.WriterTo
-func (cr *ClientResponse) WriteTo(w io.Writer) (int64, error) {
-	if cr.err != nil {
-		return cr.writeErr(w)
-	}
-	return cr.writeOK(w)
-}
-
-func (cr *ClientResponse) writeErr(w io.Writer) (int64, error) {
-	var total int64
-	n, err := w.Write(berr)
-	total += int64(n)
-	if err != nil {
-		return total, err
-	}
-
-	if p, ok := respBytes[cr.err]; ok {
-		n, err = w.Write(bspace)
-		total += int64(n)
-		if err != nil {
-			return total, err
-		}
-
-		n, err = w.Write(p)
-		total += int64(n)
-		if err != nil {
-			return total, err
-		}
-	}
-
-	n, err = w.Write(bnewLine)
-	total += int64(n)
-	if err != nil {
-		return total, err
-	}
-	return total, nil
-}
-
-func (cr *ClientResponse) writeOK(w io.Writer) (int64, error) {
-	var total int64
-	n, err := w.Write(bok)
-	total += int64(n)
-	if err != nil {
-		return total, err
-	}
-
-	n, err = w.Write(bspace)
-	total += int64(n)
-	if err != nil {
-		return total, err
-	}
-
-	l := uintToASCII(uint64(cr.offset), &cr.digitbuf)
-	n, err = w.Write(cr.digitbuf[l:])
-	total += int64(n)
-	if err != nil {
-		return total, err
-	}
-
-	n, err = w.Write(bnewLine)
-	total += int64(n)
-	if err != nil {
-		return total, err
-	}
-
-	return total, nil
-}
-
-// ReadFrom implements io.ReaderFrom
-func (cr *ClientResponse) ReadFrom(r io.Reader) (int64, error) {
-	return cr.readFromBuf(r.(*bufio.Reader))
-}
-
-func (cr *ClientResponse) readFromBuf(r *bufio.Reader) (int64, error) {
-	var total int64
-
-	word, err := r.ReadSlice(' ')
-	total += int64(len(word))
-	if err != nil {
-		return total, err
-	}
-
-	if !bytes.HasPrefix(word, bokStart) {
-		return total, errInvalidProtocolLine
-	}
-
-	word, err = r.ReadSlice('\n')
-	total += int64(len(word))
-	if err != nil {
-		return total, err
-	}
-	n, err := asciiToUint(word[:len(word)-termLen])
-	if err != nil {
-		return total, err
-	}
-	cr.offset = n
-
-	return total, err
 }
