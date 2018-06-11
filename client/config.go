@@ -37,7 +37,7 @@ var DefaultConfig = &Config{
 
 	BatchSize:    1024 * 100,
 	Limit:        500,
-	WaitInterval: 1000 * time.Millisecond,
+	WaitInterval: 400 * time.Millisecond,
 	InputPath:    "-",
 	OutputPath:   "-",
 }
