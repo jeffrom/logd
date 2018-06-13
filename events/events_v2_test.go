@@ -16,6 +16,8 @@ import (
 
 func TestQFileLoggerV2(t *testing.T) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf.MaxBatchSize /= 10
+	conf.PartitionSize /= 10
 	q := NewEventQ(conf)
 	startQV2(t, q)
 	defer shutdownQV2(t, q)

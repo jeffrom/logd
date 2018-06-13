@@ -68,10 +68,11 @@ func (p *partitions) rotate() {
 	if len(parts) <= 1 {
 		return
 	}
-
+	// fmt.Println("before rotate", parts)
 	for i := 0; i < len(parts)-1; i++ {
 		parts[i], parts[i+1] = parts[i+1], parts[i]
 	}
+	// fmt.Println("after rotate", parts)
 }
 
 func (p *partitions) available() int {

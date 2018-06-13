@@ -279,7 +279,7 @@ func (q *EventQ) handleReadV2(req *protocol.Request) (*protocol.ResponseV2, erro
 
 	partArgs, err := q.gatherReadArgs(readreq.Offset, readreq.Messages)
 	if err != nil {
-		// fmt.Println(readreq.Offset, err)
+		// fmt.Println("gatherReadArgs error:", err)
 		return errResponse(q.conf, req, resp, err)
 	}
 
@@ -348,7 +348,7 @@ func (q *EventQ) handleTailV2(req *protocol.Request) (*protocol.ResponseV2, erro
 
 func (q *EventQ) gatherReadArgs(offset uint64, messages int) (*partitionArgList, error) {
 	soff, delta, err := q.parts.lookup(offset)
-	// fmt.Println("gatherReadArgs", offset, soff, delta, err)
+	// fmt.Printf("%v\ngatherReadArgs: offset: %d, partition: %d, delta: %d, err: %v\n", q.parts, offset, soff, delta, err)
 	if err != nil {
 		return nil, err
 	}

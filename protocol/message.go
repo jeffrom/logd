@@ -278,11 +278,15 @@ func (m *MessageV2) WriteTo(w io.Writer) (int64, error) {
 }
 
 func (m *MessageV2) calcSize() int {
-	l := len(m.Body)
-	l += asciiSize(l) + 2
-	l += len(bmsgStart) // `MSG `
-	l += termLen        // `\r\n`
+	return MessageSize(len(m.Body))
+}
 
-	// fmt.Printf("calcSize: %d %q\n", l, m.Body)
+// MessageSize returns the size of the message, including protocol
+func MessageSize(bodySize int) int {
+	l := bodySize
+	l += asciiSize(l)
+	l += len(bmsgStart) // `MSG `
+	l += termLen * 2    // `\r\n`, both of them
+
 	return l
 }
