@@ -35,7 +35,7 @@ var DefaultConfig = &Config{
 	ReadTimeout:  -1 * time.Millisecond,
 	Count:        false,
 
-	BatchSize:    1024 * 100,
+	BatchSize:    1024 * 20,
 	Limit:        500,
 	WaitInterval: 400 * time.Millisecond,
 	InputPath:    "-",

@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/jeffrom/logd/config"
+	"github.com/jeffrom/logd/internal"
 	"github.com/pkg/errors"
 )
 
@@ -97,15 +98,19 @@ func (req *Request) readBody(r *bufio.Reader, pos int64) (int64, error) {
 	}
 	req.bodysize = int(n)
 
+	internal.Debugf(req.conf, "body size: %d bytes (total %d)", req.bodysize, int64(req.bodysize)+pos)
+	if int64(req.bodysize)+pos > int64(req.conf.MaxBatchSize) {
+		return 0, errTooLarge
+	}
+
+	// fmt.Println(pos, req.bodysize, pos+int64(req.bodysize))
+	// fmt.Printf("%q\n", req.raw)
 	read, err := io.ReadFull(r, req.raw[pos:pos+int64(req.bodysize)])
 	if err != nil {
 		return int64(read), err
 	}
 
 	req.body = req.raw[pos : int(pos)+req.bodysize]
-
-	// newLineRead, err := readNewLine(r)
-	// read += newLineRead
 	return int64(read), err
 }
 
@@ -157,6 +162,7 @@ func (req *Request) readFromBuf(r *bufio.Reader) (int64, error) {
 		}
 	}
 
+	internal.Debugf(req.conf, "read envelope: %d bytes", total)
 	if req.hasBody() {
 		n, berr := req.readBody(r, total)
 		total += n

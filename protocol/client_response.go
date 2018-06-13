@@ -11,6 +11,7 @@ import (
 
 var respBytes = map[error][]byte{
 	ErrNotFound:            []byte("not found"),
+	errTooLarge:            []byte(errTooLarge.Error()),
 	errInvalidProtocolLine: []byte("invalid protocol"),
 	errCrcChecksumMismatch: []byte("checksum mismatch"),
 }
@@ -98,12 +99,12 @@ func (cr *ClientResponse) Error() error {
 // WriteTo implements io.WriterTo
 func (cr *ClientResponse) WriteTo(w io.Writer) (int64, error) {
 	if cr.err != nil {
-		return cr.writeErr(w)
+		return cr.writeERR(w)
 	}
 	return cr.writeOK(w)
 }
 
-func (cr *ClientResponse) writeErr(w io.Writer) (int64, error) {
+func (cr *ClientResponse) writeERR(w io.Writer) (int64, error) {
 	var total int64
 	n, err := w.Write(berr)
 	total += int64(n)

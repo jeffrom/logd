@@ -174,6 +174,22 @@ func (b *Batch) SetChecksum() {
 	b.Checksum = b.calculateChecksum()
 }
 
+// CalcSize calculates the full byte size of the batch. this is intended to be
+// called to make sure the batch isn't larger than config.MaxBatchSize, so
+// we're assuming the crc is the longest possible uint32 for now to save
+// calculating the crc for every message
+func (b *Batch) CalcSize() int {
+	l := len(bbatchStart)       // `BATCH `
+	l += asciiSize(int(b.Size)) // <size>
+	l += len(bspace)            // ` `
+	l += maxCRCSize             // <crc>
+	l += len(bspace)            // ` `
+	l += asciiSize(b.Messages)  // <messages>
+	l += termLen                // `\r\n`
+	l += int(b.Size)            // <data>
+	return l
+}
+
 func (b *Batch) calculateChecksum() uint32 {
 	return crc32.Checksum(b.Bytes(), crcTable)
 }
@@ -362,6 +378,7 @@ func (b *Batch) readEnvelope(r *bufio.Reader) (int64, error) {
 func (b *Batch) readData(r *bufio.Reader) (int64, error) {
 	var total int64
 
+	// TODO this check is redundant, should check the total batch size above this
 	if b.Size > uint64(b.conf.MaxBatchSize) {
 		return total, errTooLarge
 	}

@@ -42,6 +42,10 @@ var (
 	// server.
 	ErrInternal = errors.New("internal server error")
 
+	// errTooLarge is returned when the batch size is larger than the
+	// configured max batch size.
+	errTooLarge = errors.New("too large")
+
 	//
 	// protocol responses
 	//
@@ -60,6 +64,9 @@ var (
 
 	// ErrRespServer indicates an internal server error
 	ErrRespServer = []byte("internal error")
+
+	// ErrRespTooLarge indicates a protocol error
+	ErrRespTooLarge = []byte("too large")
 )
 
 func (resp RespType) String() string {

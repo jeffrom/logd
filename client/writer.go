@@ -194,6 +194,6 @@ func (w *Writer) flushPending(sync bool) error {
 
 func (w *Writer) shouldFlush(size int) bool {
 	// fmt.Printf("shouldFlush: %d + %d (%d) >= %d\n", w.batch.Size, size, w.batch.Size+uint64(size), w.conf.BatchSize)
-	should := (w.batch.Size+uint64(protocol.MessageSize(size)) >= uint64(w.conf.BatchSize))
+	should := (w.batch.CalcSize()+protocol.MessageSize(size) >= w.conf.BatchSize)
 	return should
 }
