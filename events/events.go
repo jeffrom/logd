@@ -119,7 +119,7 @@ func (q *EventQ) setupPartitions() error {
 	return nil
 }
 
-func (q *EventQ) loop() {
+func (q *EventQ) loop() { // nolint: gocyclo
 	for {
 		internal.Debugf(q.conf, "waiting for event")
 
@@ -135,6 +135,8 @@ func (q *EventQ) loop() {
 				resp, err = q.handleBatch(req)
 			case protocol.CmdReadV2:
 				resp, err = q.handleReadV2(req)
+			case protocol.CmdTailV2:
+				resp, err = q.handleTailV2(req)
 			default:
 				log.Printf("unhandled request type passed: %v", req.Name)
 				continue
@@ -239,10 +241,6 @@ func (q *EventQ) handleBatch(req *protocol.Request) (*protocol.ResponseV2, error
 		return errResponse(q.conf, req, resp, err)
 	}
 
-	if verr := batch.Validate(); verr != nil {
-		return errResponse(q.conf, req, resp, verr)
-	}
-
 	// set next write partition if needed
 	if q.parts.shouldRotate(req.FullSize()) {
 		nextStartOffset := q.parts.nextOffset()
@@ -263,8 +261,8 @@ func (q *EventQ) handleBatch(req *protocol.Request) (*protocol.ResponseV2, error
 	}
 
 	// respond
-	clientResp := protocol.NewClientBatchResponseV2(q.conf, respOffset)
-	_, err = req.WriteResponse(resp, clientResp)
+	cr := protocol.NewClientBatchResponseV2(q.conf, respOffset)
+	_, err = req.WriteResponse(resp, cr)
 	if err != nil {
 		return errResponse(q.conf, req, resp, err)
 	}
@@ -279,16 +277,20 @@ func (q *EventQ) handleReadV2(req *protocol.Request) (*protocol.ResponseV2, erro
 		return errResponse(q.conf, req, resp, err)
 	}
 
-	if verr := readreq.Validate(); verr != nil {
-		return resp, verr
-	}
-
 	partArgs, err := q.gatherReadArgs(readreq.Offset, readreq.Messages)
 	if err != nil {
 		// fmt.Println(readreq.Offset, err)
 		return errResponse(q.conf, req, resp, err)
 	}
 
+	// respond OK <offset>\r\n
+	cr := protocol.NewClientBatchResponseV2(q.conf, readreq.Offset)
+	_, err = req.WriteResponse(resp, cr)
+	if err != nil {
+		return errResponse(q.conf, req, resp, err)
+	}
+
+	// respond with the batch(es)
 	for i := 0; i < partArgs.nparts; i++ {
 		args := partArgs.parts[i]
 		p, gerr := q.parts.logp.Get(args.offset, args.delta, args.limit)
@@ -301,6 +303,46 @@ func (q *EventQ) handleReadV2(req *protocol.Request) (*protocol.ResponseV2, erro
 		}
 	}
 
+	return resp, nil
+}
+
+func (q *EventQ) handleTailV2(req *protocol.Request) (*protocol.ResponseV2, error) {
+	resp := protocol.NewResponseV2(q.conf)
+	tailreq, err := protocol.NewTail(q.conf).FromRequest(req)
+	if err != nil {
+		return errResponse(q.conf, req, resp, err)
+	}
+
+	firstPart := q.parts.parts[0]
+	if firstPart.size <= 0 {
+		return errResponse(q.conf, req, resp, protocol.ErrNotFound)
+	}
+	off := firstPart.startOffset
+
+	partArgs, err := q.gatherReadArgs(off, tailreq.Messages)
+	if err != nil {
+		return errResponse(q.conf, req, resp, err)
+	}
+
+	// respond OK <offset>\r\n
+	cr := protocol.NewClientBatchResponseV2(q.conf, off)
+	_, err = req.WriteResponse(resp, cr)
+	if err != nil {
+		return errResponse(q.conf, req, resp, err)
+	}
+
+	// respond with the batch(es)
+	for i := 0; i < partArgs.nparts; i++ {
+		args := partArgs.parts[i]
+		p, gerr := q.parts.logp.Get(args.offset, args.delta, args.limit)
+		if gerr != nil {
+			return errResponse(q.conf, req, resp, gerr)
+		}
+
+		if aerr := resp.AddReader(p); aerr != nil {
+			return errResponse(q.conf, req, resp, aerr)
+		}
+	}
 	return resp, nil
 }
 

@@ -36,6 +36,10 @@ const (
 	// from the beginning of the log.
 	CmdTail
 
+	// CmdTailV2 is similar to READV2, except it always starts from the
+	// beginning of the log.
+	CmdTailV2
+
 	// CmdHead is a head command type.
 	CmdHead
 
@@ -67,6 +71,8 @@ func (cmd *CmdType) String() string {
 		return "READV2"
 	case CmdTail:
 		return "TAIL"
+	case CmdTailV2:
+		return "TAILV2"
 	case CmdHead:
 		return "HEAD"
 	case CmdStats:
@@ -96,6 +102,8 @@ func (cmd *CmdType) Bytes() []byte {
 		return []byte("READV2")
 	case CmdTail:
 		return []byte("TAIL")
+	case CmdTailV2:
+		return []byte("TAILV2")
 	case CmdHead:
 		return []byte("HEAD")
 	case CmdStats:
@@ -128,6 +136,9 @@ func cmdNamefromBytes(b []byte) CmdType {
 	if bytes.Equal(b, []byte("TAIL")) {
 		return CmdTail
 	}
+	if bytes.Equal(b, []byte("TAILV2")) {
+		return CmdTailV2
+	}
 	if bytes.Equal(b, []byte("HEAD")) {
 		return CmdHead
 	}
@@ -155,6 +166,7 @@ var argLens = map[CmdType]int{
 	CmdRead:     2,
 	CmdReadV2:   2,
 	CmdTail:     2,
+	CmdTailV2:   1,
 	CmdHead:     0,
 	CmdStats:    0,
 	CmdPing:     0,

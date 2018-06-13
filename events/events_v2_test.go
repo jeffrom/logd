@@ -24,6 +24,7 @@ func TestQFileLoggerV2(t *testing.T) {
 	writesPerPartition := conf.PartitionSize / len(fixture)
 	n, interval := partitionIterations(conf, len(fixture))
 	var offs []uint64
+
 	for i := 0; i < n; i += interval {
 		// trim offsets from rotated partitions
 		if i > 0 && i%writesPerPartition == 0 {
@@ -47,9 +48,13 @@ func TestQFileLoggerV2(t *testing.T) {
 	}
 }
 
+func addReadRespEnvelope(off uint64, b []byte) []byte {
+	return append([]byte(fmt.Sprintf("OK %d\r\n", off)), b...)
+}
+
 func checkBatch(t *testing.T, q *EventQ, fixture []byte, off uint64) {
 	respb := pushRead(t, q, off, 3)
-	if !bytes.Equal(respb, fixture) {
+	if !bytes.Equal(respb, addReadRespEnvelope(off, fixture)) {
 		t.Fatalf("expected (%d):\n\t%q\nbut got\n\t%q", off, fixture, respb)
 	}
 }
@@ -64,7 +69,8 @@ func checkReadMultipleBatches(t *testing.T, q *EventQ, fixture []byte, offs []ui
 			break
 		}
 		respb := pushRead(t, q, off, (left * 3))
-		if len(respb) != len(fixture)*left {
+		envelope := []byte(fmt.Sprintf("OK %d\r\n", off))
+		if len(respb)-len(envelope) != len(fixture)*left {
 			t.Logf("failed attempt at READV2(%d, %d), expected %d remaining batches. Log location: %s", off, (left * 3), left, q.conf.LogFile)
 			log.Panicf("expected (%d):\n\t(%dx)%q\nbut got\n\t%q", off, left, fixture, respb)
 		}

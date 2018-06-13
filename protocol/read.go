@@ -26,11 +26,12 @@ func NewRead(conf *config.Config) *Read {
 
 // Reset puts READ in an initial state so it can be reused
 func (r *Read) Reset() {
-
+	r.Offset = 0
+	r.Messages = 0
 }
 
-// FromRequest parses a request, populating the batch. If validation fails, an
-// error is returned
+// FromRequest parses a request, populating the Read struct. If validation
+// fails, an error is returned
 func (r *Read) FromRequest(req *Request) (*Read, error) {
 	if req.nargs != argLens[CmdReadV2] {
 		return r, errInvalidNumArgs
@@ -48,7 +49,7 @@ func (r *Read) FromRequest(req *Request) (*Read, error) {
 	}
 	r.Messages = int(n)
 
-	return r, nil
+	return r, r.Validate()
 }
 
 // Validate checks the READ arguments are valid
@@ -59,7 +60,7 @@ func (r *Read) Validate() error {
 // WriteTo implements io.WriterTo
 func (r *Read) WriteTo(w io.Writer) (int64, error) {
 	var total int64
-	n, err := w.Write(breadStart)
+	n, err := w.Write(breadv2Start)
 	total += int64(n)
 	if err != nil {
 		return total, err

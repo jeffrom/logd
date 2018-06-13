@@ -86,7 +86,7 @@ func (b *Batch) FromRequest(req *Request) (*Batch, error) {
 	b.body = req.body[:req.bodysize]
 
 	b.firstOff = uint64(len(req.envelope) + termLen)
-	return b, nil
+	return b, b.Validate()
 }
 
 // Validate checks the batch's checksum

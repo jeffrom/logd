@@ -240,7 +240,7 @@ func doWrite(conf *client.Config, args cli.Args) error {
 	if out == nil {
 		m = &client.NoopStatePusher{}
 	} else {
-		m = client.NewFileStatePusher(out)
+		m = client.NewStateOutputter(out)
 	}
 	w.SetStateHandler(m)
 

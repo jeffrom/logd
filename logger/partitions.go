@@ -14,6 +14,7 @@ import (
 	"sync"
 
 	"github.com/jeffrom/logd/config"
+	"github.com/jeffrom/logd/internal"
 )
 
 // ErrNotFound is returned when a partition could not be found
@@ -107,6 +108,7 @@ func (p *Partitions) Remove(off uint64) error {
 	}
 
 	fname := partitionPath(p.conf, off)
+	internal.Debugf(p.conf, "uncirculating %s", fname)
 	if err := os.Rename(partitionFullPath(p.conf, off), filepath.Join(p.tempDir, fname)); err != nil {
 		return err
 	}
@@ -263,6 +265,7 @@ func (p *Partitions) removeFile(off uint64) error {
 		return err
 	}
 	go func() {
+		internal.Debugf(p.conf, "removing %s", fullpath)
 		err := os.Remove(fullpath)
 		if err != nil {
 			log.Printf("error removing %s: %+v", fullpath, err)

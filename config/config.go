@@ -55,7 +55,7 @@ func init() {
 	DefaultConfig.LogFileMode = 0644
 	DefaultConfig.MaxBatchSize = 1024 * 20
 	// DefaultConfig.MaxBatchSize = 1024 * 1024 * 2
-	DefaultConfig.PartitionSize = 1024 * 50
+	DefaultConfig.PartitionSize = 1024 * 1024
 	// DefaultConfig.PartitionSize = 1024 * 1024 * 2000
 	DefaultConfig.MaxPartitions = 5
 	// DefaultConfig.IndexCursorSize = 1000
