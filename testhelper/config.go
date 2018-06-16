@@ -13,12 +13,10 @@ func DefaultTestConfig(verbose bool) *config.Config {
 		GracefulShutdownTimeout: 1000,
 		LogFileMode:             0644,
 		LogFile:                 TmpLog(),
-		// MaxBatchSize:            1024 * 1024 * 2,
-		// PartitionSize:           1024 * 1024 * 2,
-		MaxBatchSize:    1024 * 2,
-		PartitionSize:   1024 * 5,
-		IndexCursorSize: 100,
-		MaxPartitions:   5,
+		MaxBatchSize:            1024 * 2,
+		PartitionSize:           1024 * 5,
+		IndexCursorSize:         100,
+		MaxPartitions:           5,
 	}
 }
 

@@ -16,8 +16,19 @@ import (
 
 func TestQFileLoggerV2(t *testing.T) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
-	conf.MaxBatchSize /= 10
-	conf.PartitionSize /= 10
+	conf.MaxBatchSize /= 20
+	conf.PartitionSize /= 20
+
+	// goal is to test every rotation case
+	runs := conf.MaxBatchSize
+	for i := 0; i < runs; i++ {
+		conf.PartitionSize--
+		testQFileLoggerV2(t, conf)
+	}
+}
+
+func testQFileLoggerV2(t *testing.T, conf *config.Config) {
+	t.Logf("testing with config: %s", conf)
 	q := NewEventQ(conf)
 	startQV2(t, q)
 	defer shutdownQV2(t, q)
@@ -70,11 +81,15 @@ func checkReadMultipleBatches(t *testing.T, q *EventQ, fixture []byte, offs []ui
 		if left <= 1 {
 			break
 		}
-		respb := pushRead(t, q, off, (left * 3))
-		envelope := []byte(fmt.Sprintf("OK %d\r\n", off))
-		if len(respb)-len(envelope) != len(fixture)*left {
-			t.Logf("failed attempt at READV2(%d, %d), expected %d remaining batches. Log location: %s", off, (left * 3), left, q.conf.LogFile)
-			log.Panicf("expected (%d):\n\t(%dx)%q\nbut got\n\t%q", off, left, fixture, respb)
+
+		remainingMessages := (left * 3)
+		for j := 0; j < 3; j++ {
+			respb := pushRead(t, q, off, remainingMessages-j)
+			envelope := []byte(fmt.Sprintf("OK %d\r\n", off))
+			if len(respb)-len(envelope) != len(fixture)*left {
+				t.Logf("failed attempt at READV2(%d, %d), expected %d remaining batches. Log location: %s", off, remainingMessages, left, q.conf.LogFile)
+				log.Panicf("expected (%d):\n\t(%dx)%q\nbut got\n\t%q", off, left, fixture, respb)
+			}
 		}
 	}
 }
