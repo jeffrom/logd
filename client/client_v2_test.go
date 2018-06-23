@@ -41,14 +41,6 @@ func TestBatchV2(t *testing.T) {
 	}
 	check()
 
-	// go expectResp(t, gconf, server, fixture,
-	// 	protocol.NewClientErrResponseV2(gconf, protocol.ErrNotFound))
-
-	// _, err = c.Batch(batch)
-	// if err != protocol.ErrNotFound {
-	// 	t.Fatalf("expected %v but got %+v", protocol.ErrNotFound, err)
-	// }
-
 	check = goExpectResps(t, conf, server, []expectedRequest{
 		{fixture, protocol.NewClientErrResponseV2(gconf, errors.New("this should be an internal server error"))},
 	}...)
@@ -58,6 +50,18 @@ func TestBatchV2(t *testing.T) {
 		t.Fatalf("expected %v but got %+v", protocol.ErrInternal, err)
 	}
 	check()
+}
+
+func TestReadV2(t *testing.T) {
+
+	// go expectResp(t, gconf, server, fixture,
+	// 	protocol.NewClientErrResponseV2(gconf, protocol.ErrNotFound))
+
+	// _, err = c.Read(x, y)
+	// if err != protocol.ErrNotFound {
+	// 	t.Fatalf("expected %v but got %+v", protocol.ErrNotFound, err)
+	// }
+
 }
 
 func DefaultTestConfig(verbose bool) *Config {

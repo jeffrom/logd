@@ -20,9 +20,11 @@ type ClientV2 struct { // nolint: golint
 	readTimeout  time.Duration
 	writeTimeout time.Duration
 
-	bw *bufio.Writer
-	br *bufio.Reader
-	cr *protocol.ClientResponse
+	bw      *bufio.Writer
+	br      *bufio.Reader
+	cr      *protocol.ClientResponse
+	readreq *protocol.Read
+	bs      *protocol.BatchScanner
 }
 
 // NewClientV2 returns a new instance of ClientV2 without a net.Conn
@@ -33,6 +35,8 @@ func NewClientV2(conf *Config) *ClientV2 {
 		conf:         conf,
 		gconf:        gconf,
 		cr:           protocol.NewClientResponse(gconf),
+		bs:           protocol.NewBatchScanner(gconf, nil),
+		readreq:      protocol.NewRead(gconf),
 		readTimeout:  conf.getReadTimeout(),
 		writeTimeout: conf.getWriteTimeout(),
 	}
@@ -102,8 +106,42 @@ func (c *ClientV2) Batch(batch *protocol.Batch) (uint64, error) {
 	return c.readBatchResponse()
 }
 
-// Flush flushes all pending data to the server
-func (c *ClientV2) Flush() error {
+// Read sends a READ request, returning a scanner that can be used to iterate
+// over the messages in the response.
+func (c *ClientV2) Read(offset uint64, limit int) (*protocol.BatchScanner, error) {
+	internal.Debugf(c.gconf, "READ %d %d -> %s", offset, limit, c.Conn.RemoteAddr())
+	req := c.readreq
+	req.Reset()
+	req.Offset = offset
+	req.Messages = limit
+
+	if _, err := c.send(req); err != nil {
+		return nil, err
+	}
+
+	c.bs.Reset(c.Conn)
+	return c.bs, nil
+}
+
+func (c *ClientV2) send(wt io.WriterTo) (int64, error) {
+	internal.IgnoreError(c.SetWriteDeadline(time.Now().Add(c.writeTimeout)))
+	n, err := wt.WriteTo(c.bw)
+	if c.handleErr(err) != nil {
+		return 0, err
+	}
+	internal.Debugf(c.gconf, "wrote %d bytes to %s", n, c.Conn.RemoteAddr())
+
+	err = c.flush()
+	if c.handleErr(err) != nil {
+		return n, err
+	}
+
+	internal.IgnoreError(c.SetWriteDeadline(time.Time{}))
+	return n, err
+}
+
+// flush flushes all pending data to the server
+func (c *ClientV2) flush() error {
 	if c.bw.Buffered() > 0 {
 		internal.Debugf(c.gconf, "client.Flush() (%d bytes)", c.bw.Buffered())
 		internal.IgnoreError(c.SetWriteDeadline(time.Now().Add(c.writeTimeout)))
@@ -113,24 +151,6 @@ func (c *ClientV2) Flush() error {
 		return err
 	}
 	return nil
-}
-
-func (c *ClientV2) send(wt io.WriterTo) (int64, error) {
-	// c.br.Reset(c.Conn)
-	internal.IgnoreError(c.SetWriteDeadline(time.Now().Add(c.writeTimeout)))
-	n, err := wt.WriteTo(c.bw)
-	if c.handleErr(err) != nil {
-		return 0, err
-	}
-	internal.Debugf(c.gconf, "wrote %d bytes to %s", n, c.Conn.RemoteAddr())
-
-	err = c.Flush()
-	if c.handleErr(err) != nil {
-		return n, err
-	}
-
-	internal.IgnoreError(c.SetWriteDeadline(time.Time{}))
-	return n, err
 }
 
 func (c *ClientV2) readBatchResponse() (uint64, error) {

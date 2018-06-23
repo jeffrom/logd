@@ -35,7 +35,7 @@ func BenchmarkMessageReadV2(b *testing.B) {
 			b.Fatal(err)
 		}
 
-		msg.reset()
+		msg.Reset()
 		buf.Reset()
 		buf.Write(fixture)
 		br.Reset(buf)

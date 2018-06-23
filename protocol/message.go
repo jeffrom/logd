@@ -133,7 +133,8 @@ func NewMessageV2(conf *config.Config) *MessageV2 {
 	}
 }
 
-func (m *MessageV2) reset() {
+// Reset sets the message to its initial value so i can be reused
+func (m *MessageV2) Reset() {
 	m.Offset = 0
 	m.partition = 0
 	m.Size = 0

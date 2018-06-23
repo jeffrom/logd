@@ -113,6 +113,53 @@ func TestReadBatchTooLarge(t *testing.T) {
 	}
 }
 
+func TestScanBatches(t *testing.T) {
+	conf := testhelper.TestConfig(testing.Verbose())
+	data := testhelper.LoadFixture("batch.small")
+	fixture := []byte{}
+
+	nbatches := 3
+	for i := 0; i < nbatches; i++ {
+		fixture = append(fixture, data...)
+	}
+
+	b := &bytes.Buffer{}
+	b.Write(data)
+	expectedBatch := NewBatch(conf)
+	if _, err := expectedBatch.ReadFrom(bufio.NewReader(b)); err != nil {
+		t.Fatal("unexpected error reading batch")
+	}
+
+	b.Reset()
+	b.Write(fixture)
+	scanner := NewBatchScanner(conf, b)
+
+	for i := 0; i < nbatches; i++ {
+		if !scanner.Scan() {
+			t.Fatalf("expected to read another batch (read %d)", i+1)
+		}
+
+		batch := scanner.Batch()
+		if batch.Size != expectedBatch.Size {
+			t.Fatalf("expected batch size to be %d but was %d", expectedBatch.Size, batch.Size)
+		}
+		if batch.Checksum != expectedBatch.Checksum {
+			t.Fatalf("expected batch checksum to be %d but was %d", expectedBatch.Checksum, batch.Checksum)
+		}
+		if batch.Messages != expectedBatch.Messages {
+			t.Fatalf("expected batch message count to be %d but was %d", expectedBatch.Messages, batch.Messages)
+		}
+
+		if !bytes.Equal(batch.Bytes(), expectedBatch.Bytes()) {
+			t.Fatalf("expected:\n\t%q\nbut got:\n\t%q", expectedBatch.Bytes(), batch.Bytes())
+		}
+	}
+
+	if scanner.Scan() {
+		t.Fatalf("didn't expect another batch")
+	}
+}
+
 func testReadBatch(t *testing.T, conf *config.Config, fixtureName string) {
 	fixture := testhelper.LoadFixture(fixtureName)
 	batch := NewBatch(conf)

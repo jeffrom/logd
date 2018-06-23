@@ -21,7 +21,7 @@ func NewScannerV2(conf *Config) *ScannerV2 {
 
 // Reset sets the scanner to it's initial values so it can be reused.
 func (s *ScannerV2) Reset() {
-
+	s.msg.Reset()
 }
 
 // Scan reads the next message. If it encounters an error, it returns false.
@@ -31,7 +31,7 @@ func (s *ScannerV2) Scan() bool {
 
 // Message returns the current message
 func (s *ScannerV2) Message() *protocol.MessageV2 {
-	return nil
+	return s.msg
 }
 
 func (s *ScannerV2) Error() error {
