@@ -1,6 +1,8 @@
 package client
 
 import (
+	"bytes"
+	"io"
 	"net"
 	"testing"
 
@@ -12,36 +14,46 @@ func TestWriterV2(t *testing.T) {
 	conf := DefaultTestConfig(testing.Verbose())
 	gconf := conf.toGeneralConfig()
 	fixture := testhelper.LoadFixture("batch.small")
-	server, w, shutdown := newTestWriterConn(conf)
-	defer shutdown()
+	server, client := testhelper.Pipe()
+	defer server.Close()
+	c := NewClientV2(conf).SetConn(client)
+	w := WriterForClientV2(c)
 
-	check := goExpectResps(t, conf, server, []expectedRequest{
-		{fixture, protocol.NewClientBatchResponseV2(gconf, 10)},
-	}...)
-	defer check()
+	server.Expect(func(p []byte) io.WriterTo {
+		if !bytes.Equal(fixture, p) {
+			t.Fatalf("expected:\n\n\t%q\n\nbut got:\n\n\t%q\n", fixture, p)
+		}
+		return protocol.NewClientBatchResponseV2(gconf, 10)
+	})
 
 	writeBatch(t, w, "hi", "hallo", "sup")
 	flushBatch(t, w)
 }
 
-// func TestWriterFillBatchV2(t *testing.T) {
-// 	conf := DefaultTestConfig(testing.Verbose())
-// 	// gconf := conf.toGeneralConfig()
-// 	server, w, shutdown := newTestWriterConn(conf)
-// 	defer shutdown()
-// 	stop := goRespond(t, conf, server)
-// 	defer stop()
+func TestWriterFillBatchV2(t *testing.T) {
+	conf := DefaultTestConfig(testing.Verbose())
+	gconf := conf.toGeneralConfig()
+	server, client := testhelper.Pipe()
+	defer server.Close()
+	c := NewClientV2(conf).SetConn(client)
+	w := WriterForClientV2(c)
+	msg := []byte("pretty cool message!")
 
-// 	n := 0
-// 	msg := []byte("pretty cool message!")
-// 	for n < conf.BatchSize-len(msg) {
-// 		x, err := w.Write(msg)
-// 		n += x
-// 		if err != nil {
-// 			panic(err)
-// 		}
-// 	}
-// }
+	var read uint64
+	server.Respond(func(p []byte) io.WriterTo {
+		read += uint64(len(p))
+		return protocol.NewClientBatchResponseV2(gconf, read-uint64(len(p)))
+	})
+
+	n := 0
+	for n < conf.BatchSize-len(msg) {
+		x, err := w.Write(msg)
+		n += x
+		if err != nil {
+			t.Fatalf("%+v", err)
+		}
+	}
+}
 
 func writeBatch(t *testing.T, w *Writer, msgs ...string) {
 	for _, msg := range msgs {
@@ -70,7 +82,7 @@ func confForTimerTest(conf *Config) *Config {
 func newTestWriterConn(conf *Config) (net.Conn, *Writer, func()) {
 	server, client := net.Pipe()
 	c := NewClientV2(conf).SetConn(client)
-	w := ForClientV2(c)
+	w := WriterForClientV2(c)
 
 	return server, w, func() {
 		w.Close()

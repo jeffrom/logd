@@ -84,10 +84,19 @@ var batchSizeFlag = &cli.IntFlag{
 var limitFlag = &cli.IntFlag{
 	Name:        "limit",
 	Aliases:     []string{"l"},
-	Usage:       "limit number of messages per read to `MESSAGES`",
+	Usage:       "limit minimum number of messages per read to `MESSAGES`",
 	Value:       client.DefaultConfig.Limit,
 	EnvVars:     []string{"LOG_LIMIT"},
 	Destination: &tmpConfig.Limit,
+}
+
+var offsetFlag = &cli.Uint64Flag{
+	Name:        "offset",
+	Aliases:     []string{"s"},
+	Usage:       "start reading messages from `OFFSET`",
+	Value:       client.DefaultConfig.Offset,
+	EnvVars:     []string{"LOG_OFFSET"},
+	Destination: &tmpConfig.Offset,
 }
 
 var waitIntervalFlag = &cli.DurationFlag{
@@ -135,6 +144,7 @@ var countFlag = &cli.BoolFlag{
 var sharedFlags = []cli.Flag{
 	verboseFlag, hostFlag,
 	timeoutFlag, writeTimeoutFlag, readTimeoutFlag,
+	waitIntervalFlag, outputPathFlag,
 	countFlag,
 }
 
@@ -236,6 +246,8 @@ func doWrite(conf *client.Config, args cli.Args) error {
 	if err != nil {
 		return err
 	}
+	defer w.Close()
+
 	var m client.StatePusher
 	if out == nil {
 		m = &client.NoopStatePusher{}
@@ -263,6 +275,7 @@ func doWrite(conf *client.Config, args cli.Args) error {
 		counts.counts["messages"]++
 	}
 
+	// writer reads lines from stdin or the specified file
 	if in != nil {
 		scanner := bufio.NewScanner(in)
 		scanner.Split(bufio.ScanLines)
@@ -296,6 +309,23 @@ func doWrite(conf *client.Config, args cli.Args) error {
 	return w.Flush()
 }
 
+func doRead(conf *client.Config) error {
+	done := make(chan struct{})
+	handleKills(done)
+
+	scanner, err := client.DialScannerConfigV2(conf.Hostport, conf)
+	if err != nil {
+		return err
+	}
+	defer scanner.Close()
+
+	for scanner.Scan() {
+		fmt.Printf("%q\n", scanner.Message().BodyBytes())
+	}
+
+	return nil
+}
+
 func runApp(args []string) {
 	cli.HelpFlag = helpFlag
 	cli.VersionFlag = versionFlag
@@ -311,13 +341,24 @@ func runApp(args []string) {
 				Aliases: []string{"w"},
 				Usage:   "writes messages to the log",
 				Flags: withSharedFlags([]cli.Flag{
-					batchSizeFlag, limitFlag,
-					waitIntervalFlag,
+					batchSizeFlag,
 					writeForeverFlag,
-					inputPathFlag, outputPathFlag,
+					inputPathFlag,
 				}),
 				Action: func(c *cli.Context) error {
 					return doWrite(buildConfig(c), c.Args())
+				},
+			},
+			{
+				Name:    "read",
+				Aliases: []string{"r"},
+				Usage:   "reads messages from the log",
+				Flags: withSharedFlags([]cli.Flag{
+					batchSizeFlag,
+					limitFlag, offsetFlag,
+				}),
+				Action: func(c *cli.Context) error {
+					return doRead(buildConfig(c))
 				},
 			},
 		},

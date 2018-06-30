@@ -67,7 +67,7 @@ func DebugfDepth(conf *config.Config, depth int, s string, args ...interface{}) 
 
 // Logf logs to stdout
 func Logf(s string, args ...interface{}) {
-	stdlog(2, s, args...)
+	stdlog(3, s, args...)
 }
 
 func doTrace() func() {

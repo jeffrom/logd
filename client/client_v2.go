@@ -3,6 +3,7 @@ package client
 import (
 	"bufio"
 	"io"
+	"log"
 	"net"
 	"time"
 
@@ -64,21 +65,16 @@ func DialConfigV2(addr string, conf *Config) (*ClientV2, error) {
 		return nil, err
 	}
 
-	gconf := conf.toGeneralConfig()
-	return &ClientV2{
-		conf:         conf,
-		gconf:        gconf,
-		Conn:         conn,
-		readTimeout:  conf.getReadTimeout(),
-		writeTimeout: conf.getWriteTimeout(),
-		br:           bufio.NewReader(conn),
-		bw:           bufio.NewWriter(conn),
-		cr:           protocol.NewClientResponse(gconf),
-	}, nil
+	c := NewClientV2(conf)
+	c.Conn = conn
+	c.bw = bufio.NewWriter(conn)
+	c.br = bufio.NewReader(conn)
+	return c, nil
 }
 
 func (c *ClientV2) reset() {
 	c.cr.Reset()
+	c.readreq.Reset()
 }
 
 // SetConn sets net.Conn for a client.
@@ -106,9 +102,9 @@ func (c *ClientV2) Batch(batch *protocol.Batch) (uint64, error) {
 	return c.readBatchResponse()
 }
 
-// Read sends a READ request, returning a scanner that can be used to iterate
-// over the messages in the response.
-func (c *ClientV2) Read(offset uint64, limit int) (*protocol.BatchScanner, error) {
+// ReadOffset sends a READ request, returning a scanner that can be used to
+// iterate over the messages in the response.
+func (c *ClientV2) ReadOffset(offset uint64, limit int) (*protocol.BatchScanner, error) {
 	internal.Debugf(c.gconf, "READ %d %d -> %s", offset, limit, c.Conn.RemoteAddr())
 	req := c.readreq
 	req.Reset()
@@ -119,7 +115,17 @@ func (c *ClientV2) Read(offset uint64, limit int) (*protocol.BatchScanner, error
 		return nil, err
 	}
 
-	c.bs.Reset(c.Conn)
+	respID, err := c.readBatchResponse()
+	if err != nil {
+		return nil, err
+	}
+	if respID != offset {
+		log.Printf("response offset (%d) did not match request (%d)", respID, offset)
+		return nil, protocol.ErrInternal
+	}
+
+	c.bs.Reset(c.br)
+	internal.IgnoreError(c.SetReadDeadline(time.Now().Add(c.readTimeout)))
 	return c.bs, nil
 }
 
@@ -158,7 +164,7 @@ func (c *ClientV2) readBatchResponse() (uint64, error) {
 	internal.IgnoreError(c.SetReadDeadline(time.Now().Add(c.readTimeout)))
 	n, err := c.cr.ReadFrom(c.br)
 	internal.IgnoreError(c.SetReadDeadline(time.Time{}))
-	internal.Debugf(c.gconf, "read %d bytes from %s", n, c.Conn.RemoteAddr())
+	internal.Debugf(c.gconf, "read %d bytes from %s: %+v", n, c.Conn.RemoteAddr(), c.cr)
 	c.handleErr(err)
 	if err != nil {
 		return 0, err

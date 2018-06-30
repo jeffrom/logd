@@ -16,14 +16,18 @@ type Config struct {
 	WriteTimeout time.Duration `json:"write-timeout"`
 	ReadTimeout  time.Duration `json:"read-timeout"`
 	Count        bool          `json:"count"`
+	OutputPath   string        `json:"output"`
+	WaitInterval time.Duration `json:"wait-interval"`
 
 	// write options
-	BatchSize    int           `json:"batch-size"`
-	Limit        int           `json:"limit"`
-	WaitInterval time.Duration `json:"wait-interval"`
-	WriteForever bool          `json:"write-forever"`
-	InputPath    string        `json:"input"`
-	OutputPath   string        `json:"output"`
+	BatchSize    int    `json:"batch-size"`
+	WriteForever bool   `json:"write-forever"`
+	InputPath    string `json:"input"`
+
+	// read options
+	Limit       int    `json:"limit"`
+	Offset      uint64 `json:"offset"`
+	ReadForever bool   `json:"read-forever"`
 }
 
 // DefaultConfig is the default client configuration
@@ -34,12 +38,13 @@ var DefaultConfig = &Config{
 	WriteTimeout: -1 * time.Millisecond,
 	ReadTimeout:  -1 * time.Millisecond,
 	Count:        false,
-
-	BatchSize:    1024 * 20,
-	Limit:        500,
-	WaitInterval: 400 * time.Millisecond,
-	InputPath:    "-",
 	OutputPath:   "-",
+	WaitInterval: 400 * time.Millisecond,
+
+	BatchSize: 1024 * 20,
+	InputPath: "-",
+
+	Limit: 15,
 }
 
 func (c *Config) String() string {

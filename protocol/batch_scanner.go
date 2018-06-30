@@ -30,7 +30,10 @@ func NewBatchScanner(conf *config.Config, r io.Reader) *BatchScanner {
 // Reset sets *BatchScanner to its initial state
 func (s *BatchScanner) Reset(r io.Reader) {
 	s.r = r
-	s.br.Reset(r)
+	// NOTE Reset actually always allocates, newreader will reuse a
+	// bufio.Reader if it's larger.
+	// s.br.Reset(r)
+	s.br = bufio.NewReader(r)
 	s.err = nil
 	s.scanned = 0
 }

@@ -195,7 +195,11 @@ func (cr *ClientResponse) readFromBuf(r *bufio.Reader) (int64, error) {
 	}
 
 	if isErr {
-		cr.err = parseError(line)
+		errBytes := line
+		if len(line) > 2 && line[len(line)-1] == '\n' && line[len(line)-2] == '\r' {
+			errBytes = line[:len(line)-termLen]
+		}
+		cr.err = parseError(errBytes)
 	} else {
 		_, word, err = parseWord(line)
 		if err != nil {

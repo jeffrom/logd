@@ -3,7 +3,6 @@ package protocol
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"io"
 
 	"github.com/jeffrom/logd/config"
@@ -143,8 +142,13 @@ func (m *MessageV2) Reset() {
 	m.completedRead = false
 }
 
-func (m *MessageV2) String() string {
-	return fmt.Sprintf("%+v", *m)
+// func (m *MessageV2) String() string {
+// 	return fmt.Sprintf("%+v", *m)
+// }
+
+// BodyBytes returns the bytes of the message body
+func (m *MessageV2) BodyBytes() []byte {
+	return m.Body[:m.Size]
 }
 
 // SetBody sets the body of a message

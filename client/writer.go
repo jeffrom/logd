@@ -38,8 +38,8 @@ func NewWriter(conf *Config) *Writer {
 	return w
 }
 
-// ForClientV2 returns a new writer from a *ClientV2
-func ForClientV2(c *ClientV2) *Writer {
+// WriterForClientV2 returns a new writer from a *ClientV2
+func WriterForClientV2(c *ClientV2) *Writer {
 	w := NewWriter(c.conf)
 	w.ClientV2 = c
 	return w
@@ -55,7 +55,7 @@ func DialWriterConfig(addr string, conf *Config) (*Writer, error) {
 		return nil, err
 	}
 
-	return ForClientV2(c), nil
+	return WriterForClientV2(c), nil
 }
 
 // DialWriter returns a new writer with a default configuration

@@ -64,7 +64,7 @@ func LoadFixture(name string) []byte {
 
 func CheckError(err error) {
 	if err != nil {
-		log.Printf("%s", debug.Stack())
+		log.Printf("%+v\n\nstacktrace:\n\n%s", err, debug.Stack())
 		log.Fatalf("Unexpected error: %+v", err)
 	}
 }

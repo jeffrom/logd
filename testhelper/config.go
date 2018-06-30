@@ -1,10 +1,16 @@
 package testhelper
 
 import (
+	"log"
+	"os"
+
 	"github.com/jeffrom/logd/config"
 )
 
 func DefaultTestConfig(verbose bool) *config.Config {
+	if verbose {
+		log.SetOutput(os.Stdout)
+	}
 
 	return &config.Config{
 		Verbose:                 verbose,
