@@ -146,16 +146,14 @@ func (s *Socket) GoServe() {
 // Shutdown implements internal.LifecycleManager, shutting down the server
 func (s *Socket) Shutdown() error {
 	defer func() {
-		select {
-		case s.shutdownC <- struct{}{}:
-		}
+		s.shutdownC <- struct{}{}
+		log.Print("shutdown complete")
 	}()
 
 	s.mu.Lock()
 	s.shuttingDown = true
 	s.mu.Unlock()
 
-	// err := s.q.Stop()
 	var err error
 
 	wg := sync.WaitGroup{}
@@ -214,12 +212,11 @@ func (s *Socket) logConns() {
 
 // Stop can be called to shut down the server
 func (s *Socket) Stop() error {
-	select {
-	case s.stopC <- struct{}{}:
-	}
+	s.stopC <- struct{}{}
 
 	select {
 	case <-s.shutdownC:
+	case <-time.After(time.Duration(s.conf.GracefulShutdownTimeout) * time.Millisecond):
 	}
 
 	return nil

@@ -29,7 +29,8 @@ import (
 type EventQ struct {
 	conf         *config.Config
 	in           chan *protocol.Request
-	stop         chan error
+	stopC        chan error
+	shutdownC    chan error
 	parts        *partitions
 	partArgBuf   *partitionArgList
 	logw         logger.LogWriter
@@ -47,7 +48,8 @@ func NewEventQ(conf *config.Config) *EventQ {
 		conf:         conf,
 		Stats:        internal.NewStats(),
 		in:           make(chan *protocol.Request, 1000),
-		stop:         make(chan error),
+		stopC:        make(chan error),
+		shutdownC:    make(chan error),
 		parts:        newPartitions(conf, logp), // partition state manager
 		partArgBuf:   newPartitionArgList(conf), // partition arguments buffer
 		logw:         logger.NewWriter(conf),
@@ -97,7 +99,7 @@ func (q *EventQ) Start() error {
 	}
 
 	select {
-	case err := <-q.stop:
+	case err := <-q.shutdownC:
 		if err != nil {
 			return err
 		}
@@ -134,6 +136,10 @@ func (q *EventQ) setupPartitions() error {
 }
 
 func (q *EventQ) loop() { // nolint: gocyclo
+	defer func() {
+		q.shutdownC <- nil
+	}()
+
 	for {
 		internal.Debugf(q.conf, "waiting for event")
 
@@ -163,7 +169,7 @@ func (q *EventQ) loop() { // nolint: gocyclo
 			}
 			req.Respond(resp)
 
-		case <-q.stop:
+		case <-q.stopC:
 			return
 		}
 	}
@@ -182,11 +188,20 @@ func (q *EventQ) Stop() error {
 	}
 
 	select {
-	case q.stop <- err:
+	case q.stopC <- err:
 	case <-time.After(500 * time.Millisecond):
 		log.Printf("event queue failed to stop properly")
 	}
+
 	return nil
+
+	// select {
+	// case err := <-q.shutdownC:
+	// 	return err
+	// case <-time.After(time.Duration(q.conf.GracefulShutdownTimeout) * time.Millisecond):
+	// 	log.Printf("event queue failed to shutdown properly")
+	// 	return errors.New("failed to shut down")
+	// }
 }
 
 func (q *EventQ) handleBatch(req *protocol.Request) (*protocol.Response, error) {
