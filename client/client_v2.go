@@ -67,8 +67,8 @@ func DialConfigV2(addr string, conf *Config) (*ClientV2, error) {
 
 	c := NewClientV2(conf)
 	c.Conn = conn
-	c.bw = bufio.NewWriter(conn)
-	c.br = bufio.NewReader(conn)
+	c.bw = bufio.NewWriterSize(conn, conf.BatchSize)
+	c.br = bufio.NewReaderSize(conn, conf.BatchSize)
 	return c, nil
 }
 
@@ -81,12 +81,12 @@ func (c *ClientV2) reset() {
 func (c *ClientV2) SetConn(conn net.Conn) *ClientV2 {
 	c.Conn = conn
 	if c.bw == nil {
-		c.bw = bufio.NewWriter(conn)
+		c.bw = bufio.NewWriterSize(conn, c.conf.BatchSize)
 	} else {
 		c.bw.Reset(conn)
 	}
 	if c.br == nil {
-		c.br = bufio.NewReader(conn)
+		c.br = bufio.NewReaderSize(conn, c.conf.BatchSize)
 	} else {
 		c.br.Reset(conn)
 	}

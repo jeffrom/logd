@@ -291,7 +291,7 @@ func doWrite(conf *client.Config, args cli.Args) error {
 				continue
 			}
 
-			n, err := w.Write(b)
+			n, err := w.Write(internal.CopyBytes(b))
 			counts.counts["bytes in"] += n
 			if err != nil {
 				return err

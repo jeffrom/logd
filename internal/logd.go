@@ -128,3 +128,10 @@ func IgnoreError(err error) {
 		stdlog(2, "error ignored: %+v", err)
 	}
 }
+
+// CopyBytes returns a copy of p
+func CopyBytes(p []byte) []byte {
+	b := make([]byte, len(p))
+	copy(b, p)
+	return b
+}

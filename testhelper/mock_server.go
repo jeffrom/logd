@@ -5,6 +5,8 @@ import (
 	"log"
 	"net"
 	"time"
+
+	"github.com/jeffrom/logd/internal"
 )
 
 type logger interface {
@@ -13,7 +15,7 @@ type logger interface {
 
 // MockServer sets expected requests and responds
 type MockServer struct {
-	c         *bufferedConn
+	c         net.Conn
 	b         []byte
 	responder func([]byte) io.WriterTo
 	respondC  chan func([]byte) io.WriterTo
@@ -22,7 +24,7 @@ type MockServer struct {
 }
 
 // NewMockServer returns a new instance of a MockServer
-func NewMockServer(c *bufferedConn) *MockServer {
+func NewMockServer(c net.Conn) *MockServer {
 	s := &MockServer{
 		c:        c,
 		b:        make([]byte, 1024*64),
@@ -59,7 +61,7 @@ func (s *MockServer) handleRespond(cb func([]byte) io.WriterTo) {
 	}()
 
 	read := 0
-	s.c.SetReadDeadline(time.Now().Add(50 * time.Millisecond))
+	internal.IgnoreError(s.c.SetReadDeadline(time.Now().Add(50 * time.Millisecond)))
 	n, err := s.c.Read(s.b[read:])
 	if err == io.ErrClosedPipe {
 		return
@@ -69,7 +71,7 @@ func (s *MockServer) handleRespond(cb func([]byte) io.WriterTo) {
 	}
 
 	for err == nil {
-		s.c.SetReadDeadline(time.Now().Add(10 * time.Millisecond))
+		internal.IgnoreError(s.c.SetReadDeadline(time.Now().Add(20 * time.Millisecond)))
 		n, err = s.c.Read(s.b[read:])
 		read += n
 		if err == io.ErrClosedPipe {
@@ -91,19 +93,20 @@ func (s *MockServer) handleRespond(cb func([]byte) io.WriterTo) {
 		panic(err)
 	}
 	log.Printf("%s: wrote %d bytes (err: %+v)", s.c.RemoteAddr(), wrote, err)
-	err = s.c.Flush()
-	if err != nil {
-		panic(err)
-	}
+	// err = s.c.Flush()
+	// if err != nil {
+	// 	panic(err)
+	// }
 }
 
 // Respond will respond using cb until the server is stopped
 func (s *MockServer) Respond(cb func([]byte) io.WriterTo) {
 	s.respondC <- cb
+	panic("MockServer.Respond doesn't work")
 }
 
 func (s *MockServer) handleExpectation(cb func([]byte) io.WriterTo) {
-	s.c.SetReadDeadline(time.Now().Add(50 * time.Millisecond))
+	internal.IgnoreError(s.c.SetReadDeadline(time.Now().Add(50 * time.Millisecond)))
 	n, err := s.c.Read(s.b)
 	log.Printf("%s: read %d bytes: %q (err: %+v)", s.c.RemoteAddr(), n, s.b[:n], err)
 	if err != nil {
@@ -117,10 +120,10 @@ func (s *MockServer) handleExpectation(cb func([]byte) io.WriterTo) {
 		panic(err)
 	}
 
-	err = s.c.Flush()
-	if err != nil {
-		panic(err)
-	}
+	// err = s.c.Flush()
+	// if err != nil {
+	// 	panic(err)
+	// }
 }
 
 // Expect sets an expectation for a read, and sends a response

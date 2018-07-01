@@ -49,6 +49,7 @@ func (b *Batch) Reset() {
 	b.Messages = 0
 	b.firstOff = 0
 	b.wasRead = false
+	b.msgBuf.Reset()
 }
 
 func (b *Batch) ensureBuf() {
@@ -123,6 +124,7 @@ func (b *Batch) Append(p []byte) error {
 		b.msgs[b.Messages] = NewMessageV2(b.conf)
 	}
 	msg := b.msgs[b.Messages]
+	msg.Reset()
 	msg.Body = p
 	msg.Size = len(p)
 

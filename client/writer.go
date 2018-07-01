@@ -77,6 +77,7 @@ func (w *Writer) Reset() {
 	w.start()
 }
 
+// TODO have a zero copy version, WriteSlice, but Write should copy, probably
 func (w *Writer) Write(p []byte) (int, error) {
 	w.mu.Lock()
 	shouldFlush := w.shouldFlush(len(p))
@@ -121,8 +122,6 @@ func (w *Writer) Flush() error {
 
 // Close implements the LogWriterV2 interface
 func (w *Writer) Close() error {
-	// w.mu.Lock()
-	// defer w.mu.Unlock()
 	internal.IgnoreError(w.ClientV2.Close())
 	return nil
 }

@@ -135,9 +135,11 @@ func NewMessageV2(conf *config.Config) *MessageV2 {
 // Reset sets the message to its initial value so i can be reused
 func (m *MessageV2) Reset() {
 	m.Offset = 0
-	m.partition = 0
 	m.Size = 0
 	m.fullSize = 0
+	m.firstOffset = 0
+	m.offsetDelta = 0
+	m.partition = 0
 	m.read = 0
 	m.completedRead = false
 }
@@ -267,7 +269,7 @@ func (m *MessageV2) WriteTo(w io.Writer) (int64, error) {
 		return total, err
 	}
 
-	n, err = w.Write(m.Body[:m.Size])
+	n, err = w.Write(m.BodyBytes())
 	total += int64(n)
 	if err != nil {
 		return total, err

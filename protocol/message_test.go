@@ -17,9 +17,16 @@ func newTestMessage(conf *config.Config, body string) *MessageV2 {
 
 func TestWriteMessage(t *testing.T) {
 	conf := testhelper.TestConfig(testing.Verbose())
-	msg := newTestMessage(conf, "cool message")
+	s := "cool message"
+	msg := newTestMessage(conf, s)
 
 	b := &bytes.Buffer{}
+	msg.WriteTo(b)
+	testhelper.CheckGoldenFile("msg.small", b.Bytes(), testhelper.Golden)
+
+	b.Reset()
+	msg.Reset()
+	msg.SetBody([]byte(s))
 	msg.WriteTo(b)
 	testhelper.CheckGoldenFile("msg.small", b.Bytes(), testhelper.Golden)
 }
@@ -30,8 +37,30 @@ func TestReadMessage(t *testing.T) {
 	fixture := testhelper.LoadFixture("msg.small")
 	buf := bytes.NewBuffer(fixture)
 	br := bufio.NewReaderSize(buf, buf.Len())
+	s := "cool message"
 
 	if _, err := msg.ReadFrom(br); err != nil {
 		t.Fatalf("(ReadFrom) unexpected error: %+v", err)
+	}
+	if !bytes.Equal(msg.BodyBytes(), []byte(s)) {
+		t.Fatalf("expected:\n\n\t%q\n\nbut got:\n\n\t%q\n", s, msg.BodyBytes())
+	}
+	if msg.Size != 12 {
+		t.Fatalf("expected size to be 12 but was %d", msg.Size)
+	}
+
+	buf.Reset()
+	buf.Write(fixture)
+	br.Reset(buf)
+	msg.Reset()
+
+	if _, err := msg.ReadFrom(br); err != nil {
+		t.Fatalf("(ReadFrom) unexpected error: %+v", err)
+	}
+	if !bytes.Equal(msg.BodyBytes(), []byte(s)) {
+		t.Fatalf("expected:\n\n\t%q\n\nbut got:\n\n\t%q\n", s, msg.BodyBytes())
+	}
+	if msg.Size != 12 {
+		t.Fatalf("expected size to be 12 but was %d", msg.Size)
 	}
 }

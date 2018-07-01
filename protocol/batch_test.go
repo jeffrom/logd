@@ -79,24 +79,27 @@ func testWriteBatch(t *testing.T, conf *config.Config, goldenFileName string, ar
 
 func TestReadBatch(t *testing.T) {
 	conf := testhelper.TestConfig(testing.Verbose())
-	testReadBatch(t, conf, "batch.small")
+	batch := NewBatch(conf)
+	testReadBatch(t, conf, "batch.small", batch)
+	batch.Reset()
+	testReadBatch(t, conf, "batch.small", batch)
 }
 
 func TestReadBatchSmallest(t *testing.T) {
 	conf := testhelper.TestConfig(testing.Verbose())
-	testReadBatch(t, conf, "batch.smallest")
+	testRead(t, conf, "batch.smallest")
 }
 
 func TestReadBatchMedium(t *testing.T) {
 	conf := testhelper.TestConfig(testing.Verbose())
-	testReadBatch(t, conf, "batch.medium")
+	testRead(t, conf, "batch.medium")
 }
 
 func TestReadBatchLarge(t *testing.T) {
 	conf := testhelper.TestConfig(testing.Verbose())
 	conf.MaxBatchSize = 1024 * 1024
 	conf.PartitionSize = 1024 * 1024 * 10
-	testReadBatch(t, conf, "batch.large")
+	testRead(t, conf, "batch.large")
 }
 
 func TestReadBatchTooLarge(t *testing.T) {
@@ -160,9 +163,12 @@ func TestScanBatches(t *testing.T) {
 	}
 }
 
-func testReadBatch(t *testing.T, conf *config.Config, fixtureName string) {
+func testRead(t *testing.T, conf *config.Config, fixtureName string) {
+	testReadBatch(t, conf, fixtureName, NewBatch(conf))
+}
+
+func testReadBatch(t *testing.T, conf *config.Config, fixtureName string, batch *Batch) {
 	fixture := testhelper.LoadFixture(fixtureName)
-	batch := NewBatch(conf)
 	b := &bytes.Buffer{}
 	b.Write(fixture)
 	br := bufio.NewReader(b)
@@ -178,4 +184,5 @@ func testReadBatch(t *testing.T, conf *config.Config, fixtureName string) {
 
 	actual := b.Bytes()
 	testhelper.CheckGoldenFile(fixtureName, actual, testhelper.Golden)
+
 }
