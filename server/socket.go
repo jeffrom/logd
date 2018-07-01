@@ -11,14 +11,14 @@ import (
 	"time"
 
 	"github.com/jeffrom/logd/config"
-	"github.com/jeffrom/logd/events"
 	"github.com/jeffrom/logd/internal"
 	"github.com/jeffrom/logd/protocol"
+	"github.com/jeffrom/logd/transport"
 )
 
 // Socket handles socket connections
 type Socket struct {
-	config *config.Config
+	conf *config.Config
 
 	addr string
 	ln   net.Listener
@@ -35,26 +35,19 @@ type Socket struct {
 	shutdownC    chan struct{}
 	shuttingDown bool
 
-	q *events.EventQ
+	q transport.QPusher
 }
 
 // NewSocket will return a new instance of a log server
-func NewSocket(addr string, config *config.Config) *Socket {
-	log.Printf("starting options: %s", config)
-	q := events.NewEventQ(config)
-	if err := q.Start(); err != nil {
-		panic(err)
-	}
-
+func NewSocket(addr string, conf *config.Config) *Socket {
 	return &Socket{
-		config:    config,
+		conf:      conf,
 		addr:      addr,
 		readyC:    make(chan struct{}),
 		conns:     make(map[*Conn]bool),
 		connIn:    make(chan *Conn, 1000),
 		stopC:     make(chan struct{}),
 		shutdownC: make(chan struct{}),
-		q:         q,
 	}
 }
 
@@ -63,9 +56,14 @@ func (s *Socket) ListenAndServe() error {
 	return s.listenAndServe(false)
 }
 
-// ListenAddress returns the listen address of the server.
-func (s *Socket) ListenAddress() net.Addr {
+// ListenAddr returns the listen address of the server.
+func (s *Socket) ListenAddr() net.Addr {
 	return s.ln.Addr()
+}
+
+// SetQPusher implements transport.Server
+func (s *Socket) SetQPusher(q transport.QPusher) {
+	s.q = q
 }
 
 func (s *Socket) listenAndServe(wait bool) error {
@@ -80,9 +78,7 @@ func (s *Socket) listenAndServe(wait bool) error {
 
 	log.Printf("Serving at %s", s.ln.Addr())
 	if wait {
-		select {
-		case s.readyC <- struct{}{}:
-		}
+		s.readyC <- struct{}{}
 	}
 
 	go s.accept()
@@ -98,16 +94,6 @@ func (s *Socket) listenAndServe(wait bool) error {
 		}
 	}
 }
-
-// Respond satisfies Server interface
-// func (s *SocketServer) Respond(cmd *Command, resp *Response) error {
-// 	return nil
-// }
-
-// Send satisfies Server interface
-// func (s *SocketServer) Send(sub *Subscription, msg *Message) error {
-// 	return nil
-// }
 
 // ready signals that the application is ready to serve on this host:port
 func (s *Socket) ready() {
@@ -137,10 +123,10 @@ func (s *Socket) accept() {
 			break
 		}
 
-		s.q.Stats.Incr("total_connections")
-		internal.Debugf(s.config, "accept: %s", rawConn.RemoteAddr())
+		// s.q.Stats.Incr("total_connections")
+		internal.Debugf(s.conf, "accept: %s", rawConn.RemoteAddr())
 
-		conn := newServerConn(rawConn, s.config)
+		conn := newServerConn(rawConn, s.conf)
 		s.addConn(conn)
 
 		s.connIn <- conn
@@ -169,7 +155,8 @@ func (s *Socket) Shutdown() error {
 	s.shuttingDown = true
 	s.mu.Unlock()
 
-	err := s.q.Stop()
+	// err := s.q.Stop()
+	var err error
 
 	wg := sync.WaitGroup{}
 	s.connMu.Lock()
@@ -181,12 +168,12 @@ func (s *Socket) Shutdown() error {
 			if c.isActive() {
 				select {
 				case <-c.done:
-					internal.Debugf(s.config, "%s(ACTIVE) closed gracefully", c.RemoteAddr())
-				case <-time.After(time.Duration(s.config.GracefulShutdownTimeout) * time.Millisecond):
+					internal.Debugf(s.conf, "%s(ACTIVE) closed gracefully", c.RemoteAddr())
+				case <-time.After(time.Duration(s.conf.GracefulShutdownTimeout) * time.Millisecond):
 					log.Printf("%s timed out", c.RemoteAddr())
 				}
 			} else {
-				internal.Debugf(s.config, "%s(%s): closed gracefully", c.RemoteAddr(), c.getState())
+				internal.Debugf(s.conf, "%s(%s): closed gracefully", c.RemoteAddr(), c.getState())
 			}
 
 			s.removeConn(c)
@@ -247,7 +234,7 @@ func (s *Socket) addConn(conn *Conn) {
 
 func (s *Socket) removeConn(conn *Conn) {
 	if err := conn.Close(); err != nil {
-		internal.Debugf(s.config, "error removing connection: %+v", err)
+		internal.Debugf(s.conf, "error removing connection: %+v", err)
 	}
 
 	s.connMu.Lock()
@@ -260,7 +247,7 @@ func (s *Socket) setDisallowedCommands(cmds map[protocol.CmdType]bool) {
 }
 
 func (s *Socket) handleConnection(conn *Conn) {
-	s.q.Stats.Incr("connections")
+	// s.q.Stats.Incr("connections")
 
 	var (
 		ctx    context.Context
@@ -271,17 +258,17 @@ func (s *Socket) handleConnection(conn *Conn) {
 
 	defer func() {
 		cancel()
-		s.q.Stats.Decr("connections")
+		// s.q.Stats.Decr("connections")
 
 		if err := conn.close(); err != nil {
-			internal.Debugf(s.config, "error closing connection: %+v", err)
+			internal.Debugf(s.conf, "error closing connection: %+v", err)
 		}
 		s.removeConn(conn)
 	}()
 
 	for {
 		if s.isShuttingDown() {
-			internal.Debugf(s.config, "closing connection to %s due to shutdown", conn.RemoteAddr())
+			internal.Debugf(s.conf, "closing connection to %s due to shutdown", conn.RemoteAddr())
 			break
 		}
 
@@ -292,22 +279,22 @@ func (s *Socket) handleConnection(conn *Conn) {
 		// wait for a new request. continue along if there isn't one. All
 		// requests will be handled in this block, and after all commands have
 		// been migrated, this will be the whole loop
-		internal.Debugf(s.config, "%s: waiting for request", conn.RemoteAddr())
+		internal.Debugf(s.conf, "%s: waiting for request", conn.RemoteAddr())
 		if req, err := s.waitForRequest(conn); req != nil && err == nil {
-			internal.Debugf(s.config, "%s: waited for request", conn.RemoteAddr())
+			internal.Debugf(s.conf, "%s: waited for request", conn.RemoteAddr())
 			if _, rerr := req.ReadFrom(conn.br); rerr != nil {
 				// conn.Flush()
 				log.Printf("%s read error: %+v", conn.RemoteAddr(), rerr)
 				return
 			}
-			internal.Debugf(s.config, "%s: read request %v", conn.RemoteAddr(), req)
+			internal.Debugf(s.conf, "%s: read request %v", conn.RemoteAddr(), req)
 			resp, rerr := s.q.PushRequest(ctx, req)
 			if rerr != nil {
 				internal.IgnoreError(conn.Flush())
 				log.Printf("%s error: %+v", conn.RemoteAddr(), rerr)
 				return
 			}
-			internal.Debugf(s.config, "%s: got response: %+v", conn.RemoteAddr(), resp)
+			internal.Debugf(s.conf, "%s: got response: %+v", conn.RemoteAddr(), resp)
 
 			n, rerr := s.sendResponse(conn, resp)
 			if rerr != nil {
@@ -315,7 +302,7 @@ func (s *Socket) handleConnection(conn *Conn) {
 				log.Printf("%s response error: %+v", conn.RemoteAddr(), rerr)
 				return
 			}
-			internal.Debugf(s.config, "%s: sent response (%d bytes)", conn.RemoteAddr(), n)
+			internal.Debugf(s.conf, "%s: sent response (%d bytes)", conn.RemoteAddr(), n)
 
 			internal.IgnoreError(conn.Flush())
 			continue
@@ -335,7 +322,7 @@ func (s *Socket) waitForRequest(conn *Conn) (*protocol.Request, error) {
 	if err != nil {
 		return nil, err
 	}
-	return protocol.NewRequest(s.config), nil
+	return protocol.NewRequest(s.conf), nil
 }
 
 func (s *Socket) sendResponse(conn *Conn, resp *protocol.Response) (int, error) {

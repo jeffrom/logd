@@ -28,7 +28,7 @@ func benchmarkBatch(b *testing.B, conf *config.Config, logw logger.LogWriter) {
 	if logw != nil {
 		q.logw = logw
 	}
-	if err := q.Start(); err != nil {
+	if err := q.GoStart(); err != nil {
 		b.Fatalf("unexpected startup error: %+v", err)
 	}
 

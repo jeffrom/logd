@@ -44,7 +44,8 @@ func stdlog(distance int, s string, args ...interface{}) {
 	s = "%s %s " + s + "\n"
 	linearg := fmt.Sprintf("%s:%d:", file, line)
 	args = append([]interface{}{time.Now().Format("2006/01/02 15:04:05.000"), linearg}, args...)
-	fmt.Fprintf(os.Stdout, s, args...)
+	_, err := fmt.Fprintf(os.Stdout, s, args...)
+	IgnoreError(err)
 }
 
 // Debugf prints a debug log message to stdout
@@ -73,7 +74,7 @@ func Logf(s string, args ...interface{}) {
 func doTrace() func() {
 	f, err := os.Create("trace.out")
 	PanicOnError(err)
-	trace.Start(f)
+	IgnoreError(trace.Start(f))
 	return trace.Stop
 }
 

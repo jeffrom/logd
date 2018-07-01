@@ -14,7 +14,8 @@ import (
 	"gopkg.in/urfave/cli.v1/altsrc"
 
 	"github.com/jeffrom/logd/config"
-	"github.com/jeffrom/logd/server"
+	"github.com/jeffrom/logd/events"
+	"github.com/jeffrom/logd/internal"
 )
 
 func runApp(args []string) {
@@ -120,14 +121,14 @@ func runApp(args []string) {
 			panic("not implemented")
 		}
 
-		srv := server.NewSocket(conf.Hostport, conf)
+		q := events.NewEventQ(conf)
 
 		stopC := make(chan os.Signal, 1)
 		signal.Notify(stopC, os.Interrupt, syscall.SIGTERM)
 		go func() {
 			for range stopC {
 				log.Print("Caught signal. Exiting...")
-				srv.Stop()
+				internal.IgnoreError(q.Stop())
 			}
 		}()
 
@@ -136,7 +137,7 @@ func runApp(args []string) {
 			log.Println(http.ListenAndServe("localhost:6060", nil))
 		}()
 
-		return srv.ListenAndServe()
+		return q.Start()
 	}
 
 	sort.Sort(cli.FlagsByName(app.Flags))

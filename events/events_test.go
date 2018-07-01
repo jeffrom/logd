@@ -26,7 +26,7 @@ func init() {
 func startQConfig(t testing.TB, conf *config.Config) *EventQ {
 	q := NewEventQ(conf)
 	t.Logf("starting event queue with config: %+v", conf)
-	if err := q.Start(); err != nil {
+	if err := q.GoStart(); err != nil {
 		t.Logf("%s", debug.Stack())
 		t.Fatalf("error starting queue: %+v", err)
 	}
@@ -85,7 +85,7 @@ func testQFileLogger(t *testing.T, conf *config.Config) {
 		checkReadMultipleBatches(t, q, fixture, offs)
 
 		testhelper.CheckError(q.Stop())
-		testhelper.CheckError(q.Start())
+		testhelper.CheckError(q.GoStart())
 
 		cr = pushBatch(t, q, fixture)
 
@@ -246,7 +246,7 @@ func checkReadResp(t testing.TB, conf *config.Config, resp *protocol.Response) [
 func doStartQ(b testing.TB, q *EventQ) {
 	dir, _ := filepath.Split(q.conf.LogFile)
 	log.Printf("starting log dir: %s", dir)
-	if err := q.Start(); err != nil {
+	if err := q.GoStart(); err != nil {
 		b.Fatalf("unexpected error starting event queue: %+v", err)
 	}
 }

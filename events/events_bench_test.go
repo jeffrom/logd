@@ -37,7 +37,7 @@ func startQForBench(b *testing.B) (*EventQ, func()) {
 	config.LogFile = testhelper.TmpLog()
 
 	q := NewEventQ(config)
-	if err := q.Start(); err != nil {
+	if err := q.GoStart(); err != nil {
 		b.Logf("%s", debug.Stack())
 		b.Fatalf("error starting queue: %v", err)
 	}
@@ -51,7 +51,7 @@ func BenchmarkEventQLifecycle(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		q := NewEventQ(config)
-		q.Start()
+		q.GoStart()
 		q.handleShutdown()
 		q.Stop()
 	}

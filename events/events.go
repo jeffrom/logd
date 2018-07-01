@@ -12,6 +12,8 @@ import (
 	"github.com/jeffrom/logd/internal"
 	"github.com/jeffrom/logd/logger"
 	"github.com/jeffrom/logd/protocol"
+	"github.com/jeffrom/logd/server"
+	"github.com/jeffrom/logd/transport"
 )
 
 // this file contains the core logic of the program. Commands come from the
@@ -26,34 +28,42 @@ import (
 // EventQ manages the receiving, processing, and responding to events.
 type EventQ struct {
 	conf         *config.Config
-	requestIn    chan *protocol.Request
-	close        chan struct{}
+	in           chan *protocol.Request
+	stop         chan error
 	parts        *partitions
 	partArgBuf   *partitionArgList
 	logw         logger.LogWriter
 	batchScanner *protocol.BatchScanner
+	servers      []transport.Server
 	Stats        *internal.Stats
 }
 
 // NewEventQ creates a new instance of an EventQ
 func NewEventQ(conf *config.Config) *EventQ {
+	log.Printf("starting options: %s", conf)
+
 	logp := logger.NewPartitions(conf)
 	q := &EventQ{
 		conf:         conf,
 		Stats:        internal.NewStats(),
-		requestIn:    make(chan *protocol.Request, 1000),
-		close:        make(chan struct{}),
+		in:           make(chan *protocol.Request, 1000),
+		stop:         make(chan error),
 		parts:        newPartitions(conf, logp), // partition state manager
 		partArgBuf:   newPartitionArgList(conf), // partition arguments buffer
-		logw:         logger.NewWriter(conf),    // new logger.Writer
+		logw:         logger.NewWriter(conf),
 		batchScanner: protocol.NewBatchScanner(conf, nil),
+		servers:      []transport.Server{},
+	}
+
+	if conf.Hostport != "" {
+		q.servers = append(q.servers, server.NewSocket(conf.Hostport, conf))
 	}
 
 	return q
 }
 
-// Start begins handling messages
-func (q *EventQ) Start() error {
+// GoStart begins handling messages
+func (q *EventQ) GoStart() error {
 	// TODO refactor socket to register LifecycleManagers with events so events
 	// can control shutdown order of loggers AND servers
 	if lc, ok := q.parts.logp.(internal.LifecycleManager); ok {
@@ -72,6 +82,26 @@ func (q *EventQ) Start() error {
 	}
 
 	go q.loop()
+
+	for _, server := range q.servers {
+		server.SetQPusher(q)
+		server.GoServe()
+	}
+	return nil
+}
+
+// Start begins handling messages, blocking until the application is closed
+func (q *EventQ) Start() error {
+	if err := q.GoStart(); err != nil {
+		return err
+	}
+
+	select {
+	case err := <-q.stop:
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -109,7 +139,7 @@ func (q *EventQ) loop() { // nolint: gocyclo
 
 		select {
 		// new flow for handling requests passed in from servers
-		case req := <-q.requestIn:
+		case req := <-q.in:
 			var resp *protocol.Response
 			var err error
 			internal.Debugf(q.conf, "request: %s", &req.Name)
@@ -133,7 +163,7 @@ func (q *EventQ) loop() { // nolint: gocyclo
 			}
 			req.Respond(resp)
 
-		case <-q.close:
+		case <-q.stop:
 			return
 		}
 	}
@@ -141,8 +171,18 @@ func (q *EventQ) loop() { // nolint: gocyclo
 
 // Stop halts the event queue
 func (q *EventQ) Stop() error {
+	var err error
+	for _, server := range q.servers {
+		if serr := server.Stop(); serr != nil {
+			if err == nil {
+				err = serr
+			}
+			log.Printf("shutdown error: %+v", serr)
+		}
+	}
+
 	select {
-	case q.close <- struct{}{}:
+	case q.stop <- err:
 	case <-time.After(500 * time.Millisecond):
 		log.Printf("event queue failed to stop properly")
 	}
@@ -367,7 +407,7 @@ func (q *EventQ) handleShutdown() error {
 // Called by server conn goroutines.
 func (q *EventQ) PushRequest(ctx context.Context, req *protocol.Request) (*protocol.Response, error) {
 	select {
-	case q.requestIn <- req:
+	case q.in <- req:
 	case <-ctx.Done():
 		internal.Debugf(q.conf, "request %s cancelled", req)
 		return nil, errors.New("request cancelled")
