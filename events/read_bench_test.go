@@ -12,29 +12,29 @@ import (
 	"github.com/jeffrom/logd/testhelper"
 )
 
-func BenchmarkReadHeadV2(b *testing.B) {
+func BenchmarkReadHead(b *testing.B) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
 	q := NewEventQ(conf)
-	startQV2(b, q)
-	defer shutdownQV2(b, q)
+	doStartQ(b, q)
+	defer doShutdownQ(b, q)
 	offs := writeBatches(b, conf, q)
 	benchmarkRead(b, conf, q, offs[len(offs)-1:])
 }
 
-func BenchmarkReadTailV2(b *testing.B) {
+func BenchmarkReadTail(b *testing.B) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
 	q := NewEventQ(conf)
-	startQV2(b, q)
-	defer shutdownQV2(b, q)
+	doStartQ(b, q)
+	defer doShutdownQ(b, q)
 	offs := writeBatches(b, conf, q)
 	benchmarkRead(b, conf, q, offs[:1])
 }
 
-func BenchmarkReadAllV2(b *testing.B) {
+func BenchmarkReadAll(b *testing.B) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
 	q := NewEventQ(conf)
-	startQV2(b, q)
-	defer shutdownQV2(b, q)
+	doStartQ(b, q)
+	defer doShutdownQ(b, q)
 	offs := writeBatches(b, conf, q)
 	benchmarkRead(b, conf, q, offs)
 }
@@ -42,7 +42,7 @@ func BenchmarkReadAllV2(b *testing.B) {
 func benchmarkRead(b *testing.B, conf *config.Config, q *EventQ, offs []uint64) {
 	var bufs [][]byte
 	for _, off := range offs {
-		buf := []byte(fmt.Sprintf("READV2 %d %d\r\n", off, 3))
+		buf := []byte(fmt.Sprintf("READ %d %d\r\n", off, 3))
 		bufs = append(bufs, buf)
 	}
 	// b.Logf("%d read commands prepared", len(bufs))

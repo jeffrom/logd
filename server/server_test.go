@@ -4,7 +4,6 @@ import (
 	"flag"
 	"testing"
 
-	"github.com/jeffrom/logd/client"
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/testhelper"
 )
@@ -14,29 +13,6 @@ func init() {
 	// testhelper module.
 	flag.BoolVar(&testhelper.Golden, "golden", false, "write the golden file for this module")
 	flag.Parse()
-}
-
-func newTestClient(config *config.Config, srv *Socket) *client.Client {
-	if config == nil {
-		config = testhelper.DefaultTestConfig(testing.Verbose())
-	}
-
-	conn, err := client.DialConfig(srv.ln.Addr().String(), config)
-	if err != nil {
-		panic(err)
-	}
-	return conn
-}
-
-func newTestClientLogger(conf *config.Config, srv *Socket) *client.Logger {
-	if conf == nil {
-		conf = testhelper.DefaultTestConfig(testing.Verbose())
-	}
-	l, err := client.DialLoggerConfig(srv.ln.Addr().String(), conf)
-	if err != nil {
-		panic(err)
-	}
-	return l
 }
 
 func NewTestServer(conf *config.Config) *Socket {
@@ -57,3 +33,9 @@ func CloseTestServer(t testing.TB, srv *Socket) {
 		t.Fatalf("Leftover connections after server shutdown complete")
 	}
 }
+
+// func TestBatch(t *testing.T) {
+// 	conf := testhelper.DefaultTestConfig(testing.Verbose())
+// 	srv := NewTestServer(conf)
+// 	defer CloseTestServer(t, srv)
+// }

@@ -1,0 +1,35 @@
+# These are the old benchmarks, from before the old core code was removed.
+
+pkg: github.com/jeffrom/logd/client
+BenchmarkBatchV2-4        100000             32759 ns/op             312 B/op          9 allocs/op
+pkg: github.com/jeffrom/logd/events
+BenchmarkBatchDiscardV2-4                 100000             29002 ns/op            9721 B/op         19 allocs/op
+BenchmarkBatchFileV2-4                    200000             17416 ns/op            8607 B/op          5 allocs/op
+BenchmarkEventQLifecycle-4                 10000            284753 ns/op           76217 B/op        167 allocs/op
+BenchmarkEventQPing-4                    1000000              3073 ns/op             688 B/op          7 allocs/op
+BenchmarkEventQLogOne-4                   200000             17893 ns/op            1253 B/op         22 allocs/op
+BenchmarkEventQLogFive-4                  100000             45682 ns/op            3569 B/op         76 allocs/op
+BenchmarkReadHeadV2-4                     100000             35450 ns/op            5830 B/op         31 allocs/op
+BenchmarkReadTailV2-4                     100000             35334 ns/op            5718 B/op         29 allocs/op
+BenchmarkReadAllV2-4                      100000             37371 ns/op            5696 B/op         29 allocs/op
+pkg: github.com/jeffrom/logd/logger
+BenchmarkFileLoggerLifecycle-4             50000             62344 ns/op           11431 B/op         69 allocs/op
+BenchmarkFileLoggerWrite-4                500000              5704 ns/op             720 B/op          7 allocs/op
+BenchmarkFileLoggerWriteWithFlush-4       500000              5744 ns/op             720 B/op          7 allocs/op
+pkg: github.com/jeffrom/logd/protocol
+BenchmarkBatchWriteV2-4                 50000000                62.6 ns/op             0 B/op          0 allocs/op
+BenchmarkBatchWriteNewV2-4                200000             11545 ns/op               0 B/op          0 allocs/op
+BenchmarkBatchReadV2-4                   5000000               761 ns/op               0 B/op          0 allocs/op
+BenchmarkMessageWriteV2-4               100000000               28.7 ns/op             0 B/op          0 allocs/op
+BenchmarkMessageReadV2-4                20000000               115 ns/op               0 B/op          0 allocs/op
+BenchmarkRequestReadV2-4                 3000000               897 ns/op               0 B/op          0 allocs/op
+BenchmarkBatchResponseWriteV2-4         100000000               29.2 ns/op             0 B/op          0 allocs/op
+BenchmarkScannerReadMessages-4             20000            162055 ns/op           13040 B/op         61 allocs/op
+pkg: github.com/jeffrom/logd/server
+BenchmarkServerConnect-4           10000            246807 ns/op           33355 B/op         86 allocs/op
+BenchmarkServerPing-4              50000             68255 ns/op            2120 B/op         31 allocs/op
+BenchmarkServerMsg-4               30000             83950 ns/op            4872 B/op         58 allocs/op
+BenchmarkServerMsgBatched-4        30000             90354 ns/op            4566 B/op         71 allocs/op
+BenchmarkServerRead-4              10000            237934 ns/op           28427 B/op        101 allocs/op
+BenchmarkServerTail-4              10000            289531 ns/op           33620 B/op        119 allocs/op
+BenchmarkServerTailTen-4            1000           2629955 ns/op          336242 B/op       1195 allocs/op

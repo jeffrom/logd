@@ -9,107 +9,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Message is a log message type.
+// Message is a new message type
 type Message struct {
-	ID        uint64
-	Body      []byte
-	partition uint64
-	offset    uint64
-	checksum  uint32
-	size      int
-	allread   bool
-}
-
-// NewMessage returns a new instance of a Message.
-func NewMessage(id uint64, body []byte) *Message {
-	// fmt.Printf("NewMessage: %d -> %q\n", id, body)
-	return &Message{
-		ID:   id,
-		Body: body,
-	}
-}
-
-// Reset resets the message data
-func (m *Message) Reset() {
-	m.ID = 0
-	m.Body = nil
-	m.partition = 0
-	m.offset = 0
-	m.checksum = 0
-	m.size = 0
-	m.allread = false
-}
-
-func (m *Message) logBytes() []byte {
-	b := NewWriter().Message(m)
-	return []byte(b)
-}
-
-func (m *Message) String() string {
-	return string(m.logBytes())
-}
-
-// MsgFromBytes loads the message from b
-func MsgFromBytes(b []byte) (*Message, error) {
-	ps := NewScanner(config.DefaultConfig, bytes.NewReader(b))
-	_, msg, err := ps.ReadMessage()
-	return msg, err
-}
-
-// MsgFromReader loads the message from r
-func MsgFromReader(r io.Reader) (*Message, error) {
-	ps := NewScanner(config.DefaultConfig, r)
-	_, msg, err := ps.ReadMessage()
-	return msg, err
-}
-
-func msgFromLogReader(r *bufio.Reader) (int, *Message, error) {
-	var err error
-	var n int
-	var read int
-
-	idBytes, err := r.ReadBytes(' ')
-	read += len(idBytes)
-	if err == io.EOF {
-		return 0, nil, err
-	}
-	if err != nil {
-		return 0, nil, errors.Wrap(err, "failed reading id bytes")
-	}
-	// fmt.Printf("id: %q\n", idBytes)
-
-	var id uint64
-	id, err = asciiToUint(idBytes)
-	if err != nil {
-		return read, nil, errors.Wrap(err, "invalid id bytes")
-	}
-
-	lenBytes, err := r.ReadBytes(' ')
-	// fmt.Printf("length: %q\n", lenBytes)
-	read += len(lenBytes)
-	if err != nil {
-		return read, nil, errors.Wrap(err, "failed reading length bytes")
-	}
-
-	var length uint64
-	length, err = asciiToUint(lenBytes)
-	if err != nil {
-		return read, nil, errors.Wrap(err, "invalid length bytes")
-	}
-
-	buf := make([]byte, length+2)
-	n, err = r.Read(buf)
-	// fmt.Printf("msg: (%d) %q\n", length, buf)
-	read += n
-	if err != nil {
-		return read, nil, errors.Wrap(err, "failed reading body")
-	}
-
-	return read, NewMessage(id, trimNewline(buf)), nil
-}
-
-// MessageV2 is a new message type
-type MessageV2 struct {
 	conf          *config.Config
 	Offset        uint64 // firstOffset + offsetDelta
 	Body          []byte
@@ -123,17 +24,17 @@ type MessageV2 struct {
 	digitbuf      [32]byte
 }
 
-// NewMessageV2 returns a MessageV2
+// NewMessage returns a Message
 // MSG <size>\r\n<body>\r\n
-func NewMessageV2(conf *config.Config) *MessageV2 {
-	return &MessageV2{
+func NewMessage(conf *config.Config) *Message {
+	return &Message{
 		conf: conf,
 		Body: make([]byte, conf.MaxBatchSize), // TODO MaxMessageSize
 	}
 }
 
 // Reset sets the message to its initial value so i can be reused
-func (m *MessageV2) Reset() {
+func (m *Message) Reset() {
 	m.Offset = 0
 	m.Size = 0
 	m.fullSize = 0
@@ -144,23 +45,23 @@ func (m *MessageV2) Reset() {
 	m.completedRead = false
 }
 
-// func (m *MessageV2) String() string {
+// func (m *Message) String() string {
 // 	return fmt.Sprintf("%+v", *m)
 // }
 
 // BodyBytes returns the bytes of the message body
-func (m *MessageV2) BodyBytes() []byte {
+func (m *Message) BodyBytes() []byte {
 	return m.Body[:m.Size]
 }
 
 // SetBody sets the body of a message
-func (m *MessageV2) SetBody(b []byte) {
+func (m *Message) SetBody(b []byte) {
 	n := copy(m.Body, b)
 	m.Size = n
 }
 
 // ReadFrom implements io.ReaderFrom
-func (m *MessageV2) ReadFrom(r io.Reader) (int64, error) {
+func (m *Message) ReadFrom(r io.Reader) (int64, error) {
 	if br, ok := r.(*bufio.Reader); ok {
 		n, err := m.readFromBuf(br)
 		m.read = n
@@ -169,7 +70,7 @@ func (m *MessageV2) ReadFrom(r io.Reader) (int64, error) {
 	return 0, errors.Errorf("message.ReadFrom not implemented for %T", r)
 }
 
-func (m *MessageV2) readFromBuf(r *bufio.Reader) (int64, error) {
+func (m *Message) readFromBuf(r *bufio.Reader) (int64, error) {
 	var total int64
 	var n uint64
 
@@ -210,9 +111,9 @@ func (m *MessageV2) readFromBuf(r *bufio.Reader) (int64, error) {
 	return total, nil
 }
 
-// FromBytes populates a MessageV2 from a byte slice, returning bytes read and
+// FromBytes populates a Message from a byte slice, returning bytes read and
 // an error, if any
-func (m *MessageV2) FromBytes(b []byte) (int, error) {
+func (m *Message) FromBytes(b []byte) (int, error) {
 	var total int
 	// fmt.Printf("FromBytes(%q)\n", b)
 
@@ -247,7 +148,7 @@ func (m *MessageV2) FromBytes(b []byte) (int, error) {
 }
 
 // WriteTo implements io.WriterTo
-func (m *MessageV2) WriteTo(w io.Writer) (int64, error) {
+func (m *Message) WriteTo(w io.Writer) (int64, error) {
 	var total int64
 
 	n, err := w.Write(bmsgStart)
@@ -284,7 +185,7 @@ func (m *MessageV2) WriteTo(w io.Writer) (int64, error) {
 	return total, nil
 }
 
-func (m *MessageV2) calcSize() int {
+func (m *Message) calcSize() int {
 	return MessageSize(len(m.Body))
 }
 

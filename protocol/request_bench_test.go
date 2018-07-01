@@ -8,7 +8,7 @@ import (
 	"github.com/jeffrom/logd/testhelper"
 )
 
-func BenchmarkRequestReadV2(b *testing.B) {
+func BenchmarkRequestRead(b *testing.B) {
 	conf := protocolBenchConfig()
 	req := NewRequest(conf)
 	fixture := testhelper.LoadFixture("batch.medium")

@@ -5,14 +5,15 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
+	"log"
 	"net"
+	"runtime/debug"
 	"sync"
 	"time"
 
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/internal"
 	"github.com/jeffrom/logd/logger"
-	"github.com/jeffrom/logd/protocol"
 )
 
 type connState uint8
@@ -60,7 +61,6 @@ type Conn struct {
 
 	id string
 
-	pr           *protocol.Reader
 	readTimeout  time.Duration
 	writeTimeout time.Duration
 	br           *bufio.Reader
@@ -80,7 +80,6 @@ func newServerConn(c net.Conn, conf *config.Config) *Conn {
 		config:       conf,
 		id:           newUUID(),
 		Conn:         c,
-		pr:           protocol.NewReader(conf),
 		readTimeout:  timeout,
 		br:           bufio.NewReader(c),
 		bw:           bufio.NewWriter(c),
@@ -203,7 +202,7 @@ func (c *Conn) setWaitForCmdDeadline() error {
 	defer c.mu.Unlock()
 
 	if c.state == connStateReading {
-		c.SetDeadline(time.Time{})
+		internal.IgnoreError(c.SetDeadline(time.Time{}))
 	} else {
 		timeout := time.Duration(c.config.ServerTimeout) * time.Millisecond
 		err := c.SetReadDeadline(time.Now().Add(timeout))
@@ -225,4 +224,20 @@ var defaultErrResp = []byte("ERR\r\n")
 
 func (c *Conn) sendDefaultError() (int, error) {
 	return c.Write(defaultErrResp)
+}
+
+func handleConnErr(config *config.Config, err error, conn *Conn) error {
+	if err == nil {
+		return nil
+	}
+	if err == io.EOF {
+		internal.Debugf(config, "%s closed the connection", conn.RemoteAddr())
+	} else if err, ok := err.(net.Error); ok && err.Timeout() {
+		internal.Logf("%s timed out: %s", conn.RemoteAddr(), debug.Stack())
+	} else if err != nil {
+		conn.setState(connStateFailed)
+
+		log.Printf("error handling connection: %+v", err)
+	}
+	return err
 }

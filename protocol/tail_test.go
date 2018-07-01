@@ -7,7 +7,7 @@ import (
 	"github.com/jeffrom/logd/testhelper"
 )
 
-func TestWriteTailV2(t *testing.T) {
+func TestWriteTail(t *testing.T) {
 	conf := testhelper.TestConfig(testing.Verbose())
 	tail := NewTail(conf)
 	tail.Messages = 100

@@ -14,7 +14,6 @@ import (
 	"gopkg.in/urfave/cli.v1/altsrc"
 
 	"github.com/jeffrom/logd/config"
-	"github.com/jeffrom/logd/logger"
 	"github.com/jeffrom/logd/server"
 )
 
@@ -118,10 +117,7 @@ func runApp(args []string) {
 
 	app.Action = func(c *cli.Context) error {
 		if check {
-			if err := logger.CheckIndex(conf); err != nil {
-				panic(err)
-			}
-			return nil
+			panic("not implemented")
 		}
 
 		srv := server.NewSocket(conf.Hostport, conf)

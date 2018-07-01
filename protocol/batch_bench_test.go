@@ -9,7 +9,7 @@ import (
 	"github.com/jeffrom/logd/testhelper"
 )
 
-func BenchmarkBatchWriteV2(b *testing.B) {
+func BenchmarkBatchWrite(b *testing.B) {
 	conf := protocolBenchConfig()
 
 	fixture := testhelper.LoadFixture("batch.small")
@@ -28,7 +28,7 @@ func BenchmarkBatchWriteV2(b *testing.B) {
 	}
 }
 
-func BenchmarkBatchWriteNewV2(b *testing.B) {
+func BenchmarkBatchWriteNew(b *testing.B) {
 	conf := protocolBenchConfig()
 
 	batch := NewBatch(conf)
@@ -46,7 +46,7 @@ func BenchmarkBatchWriteNewV2(b *testing.B) {
 	}
 }
 
-func BenchmarkBatchReadV2(b *testing.B) {
+func BenchmarkBatchRead(b *testing.B) {
 	conf := protocolBenchConfig()
 	batch := NewBatch(conf)
 	fixture := testhelper.LoadFixture("batch.medium")

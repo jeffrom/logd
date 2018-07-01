@@ -15,34 +15,34 @@ import (
 	"github.com/jeffrom/logd/testhelper"
 )
 
-func TestWriterV2(t *testing.T) {
+func TestWriter(t *testing.T) {
 	conf := DefaultTestConfig(testing.Verbose())
 	gconf := conf.toGeneralConfig()
 	fixture := testhelper.LoadFixture("batch.small")
 	server, client := testhelper.Pipe()
 	defer server.Close()
-	c := NewClientV2(conf).SetConn(client)
-	w := WriterForClientV2(c)
+	c := New(conf).SetConn(client)
+	w := WriterForClient(c)
 	defer w.Close()
 
 	server.Expect(func(p []byte) io.WriterTo {
 		if !bytes.Equal(fixture, p) {
 			t.Fatalf("expected:\n\n\t%q\n\nbut got:\n\n\t%q\n", fixture, p)
 		}
-		return protocol.NewClientBatchResponseV2(gconf, 10)
+		return protocol.NewClientBatchResponse(gconf, 10)
 	})
 
 	writeBatch(t, w, "hi", "hallo", "sup")
 	flushBatch(t, w)
 }
 
-func TestWriterFillBatchV2(t *testing.T) {
+func TestWriterFillBatch(t *testing.T) {
 	conf := DefaultTestConfig(testing.Verbose())
 	gconf := conf.toGeneralConfig()
 	server, client := testhelper.Pipe()
 	defer server.Close()
-	c := NewClientV2(conf).SetConn(client)
-	w := WriterForClientV2(c)
+	c := New(conf).SetConn(client)
+	w := WriterForClient(c)
 	defer w.Close()
 	msg := []byte("pretty cool message!")
 	buf := newLockedBuffer()
@@ -50,7 +50,7 @@ func TestWriterFillBatchV2(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		server.Expect(func(p []byte) io.WriterTo {
 			buf.Write(p)
-			return protocol.NewClientBatchResponseV2(gconf, 10)
+			return protocol.NewClientBatchResponse(gconf, 10)
 		})
 	}
 
@@ -69,13 +69,13 @@ func TestWriterFillBatchV2(t *testing.T) {
 	testhelper.CheckGoldenFile("writer.fillbatch", buf.Bytes(), testhelper.Golden)
 }
 
-func TestWriterTwoBatchesV2(t *testing.T) {
+func TestWriterTwoBatches(t *testing.T) {
 	conf := DefaultTestConfig(testing.Verbose())
 	gconf := conf.toGeneralConfig()
 	server, client := testhelper.Pipe()
 	defer server.Close()
-	c := NewClientV2(conf).SetConn(client)
-	w := WriterForClientV2(c)
+	c := New(conf).SetConn(client)
+	w := WriterForClient(c)
 	defer w.Close()
 	buf := newLockedBuffer()
 
@@ -89,7 +89,7 @@ func TestWriterTwoBatchesV2(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		server.Expect(func(p []byte) io.WriterTo {
 			buf.Write(p)
-			cr := protocol.NewClientBatchResponseV2(gconf, uint64(n))
+			cr := protocol.NewClientBatchResponse(gconf, uint64(n))
 			n += len(p)
 			return cr
 		})
@@ -140,8 +140,8 @@ func confForTimerTest(conf *Config) *Config {
 
 func newTestWriterConn(conf *Config) (net.Conn, *Writer, func()) {
 	server, client := net.Pipe()
-	c := NewClientV2(conf).SetConn(client)
-	w := WriterForClientV2(c)
+	c := New(conf).SetConn(client)
+	w := WriterForClient(c)
 
 	return server, w, func() {
 		w.Close()

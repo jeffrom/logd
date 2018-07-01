@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/jeffrom/logd/config"
+	"github.com/jeffrom/logd/internal"
 	"github.com/pkg/errors"
 )
 
@@ -13,7 +14,7 @@ import (
 type Request struct {
 	conf      *config.Config
 	Name      CmdType
-	responseC chan *ResponseV2
+	responseC chan *Response
 
 	respBuf *closingBuffer
 
@@ -31,7 +32,7 @@ func NewRequest(conf *config.Config) *Request {
 	return &Request{
 		conf:      conf,
 		raw:       make([]byte, conf.MaxBatchSize),
-		responseC: make(chan *ResponseV2),
+		responseC: make(chan *Response),
 		args:      make([][]byte, maxArgs),
 		respBuf:   newClosingBuffer(),
 	}
@@ -81,8 +82,6 @@ func (req *Request) parseArg(line []byte) ([]byte, error) {
 
 func (req *Request) hasBody() bool {
 	switch req.Name {
-	case CmdMessage:
-		fallthrough
 	case CmdBatch:
 		return true
 	}
@@ -120,14 +119,14 @@ func (req *Request) ReadFrom(r io.Reader) (int64, error) {
 	return n, err
 }
 
-// Respond sends a ResponseV2 over the channel back to the conn goroutine
-func (req *Request) Respond(resp *ResponseV2) {
+// Respond sends a Response over the channel back to the conn goroutine
+func (req *Request) Respond(resp *Response) {
 	req.responseC <- resp
 }
 
 // Responded returns a channel that a response will be passed to. the event
 // handler uses this to pass messages to the conn goroutines.
-func (req *Request) Responded() chan *ResponseV2 {
+func (req *Request) Responded() chan *Response {
 	return req.responseC
 }
 
@@ -176,9 +175,9 @@ func (req *Request) readFromBuf(r *bufio.Reader) (int64, error) {
 // WriteResponse is used by the event loop to write a single response. Should
 // be used for all commands except READ. It can be used for the READ response
 // envelope.
-func (req *Request) WriteResponse(resp *ResponseV2, cr *ClientResponse) (int64, error) {
+func (req *Request) WriteResponse(resp *Response, cr *ClientResponse) (int64, error) {
 	n, err := cr.WriteTo(req.respBuf)
-	resp.AddReader(req.respBuf)
+	internal.IgnoreError(resp.AddReader(req.respBuf))
 	return n, err
 }
 

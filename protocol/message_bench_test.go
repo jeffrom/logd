@@ -9,7 +9,7 @@ import (
 	"github.com/jeffrom/logd/testhelper"
 )
 
-func BenchmarkMessageWriteV2(b *testing.B) {
+func BenchmarkMessageWrite(b *testing.B) {
 	conf := protocolBenchConfig()
 	msg := newTestMessage(conf, string(testhelper.SomeLines[0]))
 	w := ioutil.Discard
@@ -22,9 +22,9 @@ func BenchmarkMessageWriteV2(b *testing.B) {
 	}
 }
 
-func BenchmarkMessageReadV2(b *testing.B) {
+func BenchmarkMessageRead(b *testing.B) {
 	conf := protocolBenchConfig()
-	msg := NewMessageV2(conf)
+	msg := NewMessage(conf)
 	fixture := testhelper.LoadFixture("msg.small")
 	buf := bytes.NewBuffer(fixture)
 	br := bufio.NewReaderSize(buf, buf.Len())

@@ -313,7 +313,7 @@ func doRead(conf *client.Config) error {
 	done := make(chan struct{})
 	handleKills(done)
 
-	scanner, err := client.DialScannerConfigV2(conf.Hostport, conf)
+	scanner, err := client.DialScannerConfig(conf.Hostport, conf)
 	if err != nil {
 		return err
 	}

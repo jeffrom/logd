@@ -9,8 +9,8 @@ import (
 	"github.com/jeffrom/logd/testhelper"
 )
 
-func newTestMessage(conf *config.Config, body string) *MessageV2 {
-	msg := NewMessageV2(conf)
+func newTestMessage(conf *config.Config, body string) *Message {
+	msg := NewMessage(conf)
 	msg.SetBody([]byte(body))
 	return msg
 }
@@ -33,7 +33,7 @@ func TestWriteMessage(t *testing.T) {
 
 func TestReadMessage(t *testing.T) {
 	conf := testhelper.TestConfig(testing.Verbose())
-	msg := NewMessageV2(conf)
+	msg := NewMessage(conf)
 	fixture := testhelper.LoadFixture("msg.small")
 	buf := bytes.NewBuffer(fixture)
 	br := bufio.NewReaderSize(buf, buf.Len())

@@ -8,8 +8,8 @@ import (
 	"github.com/jeffrom/logd/config"
 )
 
-// LogWriterV2 is the new log writer interface
-type LogWriterV2 interface {
+// LogWriter is the new log writer interface
+type LogWriter interface {
 	io.WriteCloser
 	Flush() error
 	SetPartition(off uint64) error
@@ -32,12 +32,12 @@ func (w *Writer) Write(p []byte) (int, error) {
 	return w.f.Write(p)
 }
 
-// Flush implements LogWriterV2 interface
+// Flush implements LogWriter interface
 func (w *Writer) Flush() error {
 	return w.f.Sync()
 }
 
-// SetPartition implements LogWriterV2 interface
+// SetPartition implements LogWriter interface
 func (w *Writer) SetPartition(off uint64) error {
 	if err := w.Close(); err != nil {
 		return err
@@ -49,7 +49,7 @@ func (w *Writer) SetPartition(off uint64) error {
 	return err
 }
 
-// Close implements LogWriterV2 interface
+// Close implements LogWriter interface
 func (w *Writer) Close() error {
 	if w.f != nil {
 		return w.f.Close()

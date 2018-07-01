@@ -10,7 +10,7 @@ import (
 	"github.com/jeffrom/logd/testhelper"
 )
 
-func TestScannerV2(t *testing.T) {
+func TestScanner(t *testing.T) {
 	conf := DefaultTestConfig(testing.Verbose())
 	conf.Offset = 0
 	conf.Limit = 3
@@ -18,10 +18,10 @@ func TestScannerV2(t *testing.T) {
 	fixture := testhelper.LoadFixture("batch.small")
 	server, clientConn := testhelper.Pipe()
 	defer server.Close()
-	c := NewClientV2(conf).SetConn(clientConn)
-	s := ScannerForClientV2(c)
+	c := New(conf).SetConn(clientConn)
+	s := ScannerForClient(c)
 
-	expected := []byte(fmt.Sprintf("READV2 0 %d\r\n", conf.Limit))
+	expected := []byte(fmt.Sprintf("READ 0 %d\r\n", conf.Limit))
 	server.Expect(func(p []byte) io.WriterTo {
 		if !bytes.Equal(p, expected) {
 			log.Panicf("expected:\n\n\t%q\n\n but got:\n\n\t%q", expected, p)

@@ -20,13 +20,13 @@ func init() {
 	flag.Parse()
 }
 
-func TestBatchWriteV2(t *testing.T) {
+func TestBatchWrite(t *testing.T) {
 	conf := DefaultTestConfig(testing.Verbose())
 	gconf := conf.toGeneralConfig()
 	fixture := testhelper.LoadFixture("batch.small")
 	server, clientConn := testhelper.Pipe()
 	defer server.Close()
-	c := NewClientV2(conf).SetConn(clientConn)
+	c := New(conf).SetConn(clientConn)
 
 	var expectedID uint64 = 10
 
@@ -39,7 +39,7 @@ func TestBatchWriteV2(t *testing.T) {
 		if !bytes.Equal(fixture, p) {
 			t.Fatalf("expected:\n\n\t%q\n\nbut got:\n\n\t%q\n", fixture, p)
 		}
-		return protocol.NewClientBatchResponseV2(gconf, expectedID)
+		return protocol.NewClientBatchResponse(gconf, expectedID)
 	})
 
 	off, err := c.Batch(batch)
@@ -54,7 +54,7 @@ func TestBatchWriteV2(t *testing.T) {
 		if !bytes.Equal(fixture, p) {
 			t.Fatalf("expected:\n\n\t%q\n\nbut got:\n\n\t%q\n", fixture, p)
 		}
-		return protocol.NewClientErrResponseV2(gconf, errors.New("this should be an internal server error"))
+		return protocol.NewClientErrResponse(gconf, errors.New("this should be an internal server error"))
 	})
 
 	_, err = c.Batch(batch)
@@ -63,15 +63,15 @@ func TestBatchWriteV2(t *testing.T) {
 	}
 }
 
-func TestReadV2(t *testing.T) {
+func TestRead(t *testing.T) {
 	conf := DefaultTestConfig(testing.Verbose())
 	gconf := conf.toGeneralConfig()
 	fixture := testhelper.LoadFixture("batch.small")
 	server, clientConn := testhelper.Pipe()
 	defer server.Close()
-	c := NewClientV2(conf).SetConn(clientConn)
+	c := New(conf).SetConn(clientConn)
 
-	expected := []byte("READV2 10 3\r\n")
+	expected := []byte("READ 10 3\r\n")
 	server.Expect(func(p []byte) io.WriterTo {
 		if !bytes.Equal(p, expected) {
 			log.Panicf("expected:\n\n\t%q\n\n but got:\n\n\t%q", expected, p)
@@ -97,7 +97,7 @@ func TestReadV2(t *testing.T) {
 	}
 
 	server.Expect(func(p []byte) io.WriterTo {
-		return protocol.NewClientErrResponseV2(gconf, protocol.ErrNotFound)
+		return protocol.NewClientErrResponse(gconf, protocol.ErrNotFound)
 	})
 
 	scanner, err = c.ReadOffset(10, 3)
@@ -131,7 +131,7 @@ func (wt *multiWriterTo) WriteTo(w io.Writer) (int64, error) {
 }
 
 func readOKResponse(gconf *config.Config, off uint64, batches ...[]byte) io.WriterTo {
-	wt := []io.WriterTo{protocol.NewClientBatchResponseV2(gconf, off)}
+	wt := []io.WriterTo{protocol.NewClientBatchResponse(gconf, off)}
 	for _, b := range batches {
 		wt = append(wt, bytes.NewBuffer(b))
 	}

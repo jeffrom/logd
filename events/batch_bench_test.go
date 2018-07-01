@@ -12,18 +12,18 @@ import (
 	"github.com/jeffrom/logd/testhelper"
 )
 
-func BenchmarkBatchDiscardV2(b *testing.B) {
+func BenchmarkBatchDiscard(b *testing.B) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
 	mw := logger.NewDiscardWriter(conf)
 	benchmarkBatch(b, conf, mw)
 }
 
-func BenchmarkBatchFileV2(b *testing.B) {
+func BenchmarkBatchFile(b *testing.B) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
 	benchmarkBatch(b, conf, nil)
 }
 
-func benchmarkBatch(b *testing.B, conf *config.Config, logw logger.LogWriterV2) {
+func benchmarkBatch(b *testing.B, conf *config.Config, logw logger.LogWriter) {
 	q := NewEventQ(conf)
 	if logw != nil {
 		q.logw = logw

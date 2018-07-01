@@ -11,7 +11,7 @@ import (
 
 // Writer is used for sending messages to the log over a tcp socket
 type Writer struct {
-	*ClientV2
+	*Client
 	conf  *Config
 	gconf *config.Config
 	state StatePusher
@@ -38,10 +38,10 @@ func NewWriter(conf *Config) *Writer {
 	return w
 }
 
-// WriterForClientV2 returns a new writer from a *ClientV2
-func WriterForClientV2(c *ClientV2) *Writer {
+// WriterForClient returns a new writer from a *Client
+func WriterForClient(c *Client) *Writer {
 	w := NewWriter(c.conf)
-	w.ClientV2 = c
+	w.Client = c
 	return w
 }
 
@@ -50,12 +50,12 @@ func DialWriterConfig(addr string, conf *Config) (*Writer, error) {
 	if addr == "" {
 		addr = conf.Hostport
 	}
-	c, err := DialConfigV2(addr, conf)
+	c, err := DialConfig(addr, conf)
 	if err != nil {
 		return nil, err
 	}
 
-	return WriterForClientV2(c), nil
+	return WriterForClient(c), nil
 }
 
 // DialWriter returns a new writer with a default configuration
@@ -115,14 +115,14 @@ func (w *Writer) signalFlushSync() error {
 	}
 }
 
-// Flush implements the LogWriterV2 interface
+// Flush implements the LogWriter interface
 func (w *Writer) Flush() error {
 	return w.signalFlushSync()
 }
 
-// Close implements the LogWriterV2 interface
+// Close implements the LogWriter interface
 func (w *Writer) Close() error {
-	internal.IgnoreError(w.ClientV2.Close())
+	internal.IgnoreError(w.Client.Close())
 	return nil
 }
 

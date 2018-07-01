@@ -52,7 +52,7 @@ func (w *MockWriter) Write(p []byte) (int, error) {
 	return w.w.Write(p)
 }
 
-// Flush implements LogWriterV2
+// Flush implements LogWriter
 func (w *MockWriter) Flush() error {
 	if fl, ok := w.w.(flusher); ok {
 		return fl.Flush()
@@ -60,7 +60,7 @@ func (w *MockWriter) Flush() error {
 	return nil
 }
 
-// SetPartition implements LogWriterV2
+// SetPartition implements LogWriter
 func (w *MockWriter) SetPartition(off uint64) error {
 	if w.nparts == w.conf.MaxPartitions-1 {
 		w.rotate()
@@ -79,7 +79,7 @@ func (w *MockWriter) SetPartition(off uint64) error {
 	return nil
 }
 
-// Close implements LogWriterV2
+// Close implements LogWriter
 func (w *MockWriter) Close() error {
 	return nil
 }

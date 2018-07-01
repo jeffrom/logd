@@ -10,7 +10,7 @@ import (
 	"github.com/jeffrom/logd/testhelper"
 )
 
-func BenchmarkBatchV2(b *testing.B) {
+func BenchmarkBatch(b *testing.B) {
 	conf := DefaultTestConfig(testing.Verbose())
 	gconf := conf.toGeneralConfig()
 	fixture := testhelper.LoadFixture("batch.small")
@@ -18,7 +18,7 @@ func BenchmarkBatchV2(b *testing.B) {
 	if _, err := batch.ReadFrom(bufio.NewReader(bytes.NewBuffer(fixture))); err != nil {
 		panic(err)
 	}
-	cr := protocol.NewClientBatchResponseV2(gconf, 10)
+	cr := protocol.NewClientBatchResponse(gconf, 10)
 	c, _ := newBenchmarkConns(conf, fixture, cr)
 
 	b.ResetTimer()
@@ -29,10 +29,10 @@ func BenchmarkBatchV2(b *testing.B) {
 	}
 }
 
-func newBenchmarkConns(conf *Config, fixture []byte, cr *protocol.ClientResponse) (*ClientV2, func()) {
+func newBenchmarkConns(conf *Config, fixture []byte, cr *protocol.ClientResponse) (*Client, func()) {
 	l := len(fixture)
 	server, client := net.Pipe()
-	c := NewClientV2(conf).SetConn(client)
+	c := New(conf).SetConn(client)
 	b := make([]byte, conf.BatchSize)
 	stopC := make(chan struct{})
 

@@ -3,7 +3,7 @@ package protocol
 import "github.com/jeffrom/logd/config"
 
 // ReadRequest is an incoming READ/2 command
-// READV2 <offset> <limit>\r\n
+// READ <offset> <limit>\r\n
 type ReadRequest struct {
 	conf   *config.Config
 	offset uint64
@@ -25,7 +25,7 @@ func (r *ReadRequest) reset() {
 // FromRequest parses a request, populating the ReadRequest. If validation
 // fails, an error is returned
 func (r *ReadRequest) FromRequest(req *Request) (*ReadRequest, error) {
-	if req.nargs != argLens[CmdReadV2] {
+	if req.nargs != argLens[CmdRead] {
 		return r, errInvalidNumArgs
 	}
 

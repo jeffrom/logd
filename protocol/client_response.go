@@ -32,7 +32,7 @@ func parseError(p []byte) error {
 	return ErrInternal
 }
 
-// ClientResponse is the response clients receive after making a request.  V2.
+// ClientResponse is the response clients receive after making a request.
 // There are a few possible responses:
 // OK <offset>\r\n
 // BATCH <size> <checksum> <messages>\r\n<data>...
@@ -54,22 +54,22 @@ func NewClientResponse(conf *config.Config) *ClientResponse {
 	}
 }
 
-// NewClientBatchResponseV2 returns a successful batch *ClientResponse
-func NewClientBatchResponseV2(conf *config.Config, off uint64) *ClientResponse {
+// NewClientBatchResponse returns a successful batch *ClientResponse
+func NewClientBatchResponse(conf *config.Config, off uint64) *ClientResponse {
 	cr := NewClientResponse(conf)
 	cr.SetOffset(off)
 	return cr
 }
 
-// NewClientMultiResponseV2 returns a successful MOK response
-func NewClientMultiResponseV2(conf *config.Config, p []byte) *ClientResponse {
+// NewClientMultiResponse returns a successful MOK response
+func NewClientMultiResponse(conf *config.Config, p []byte) *ClientResponse {
 	cr := NewClientResponse(conf)
 	cr.SetMultiResp(p)
 	return cr
 }
 
-// NewClientErrResponseV2 returns an error response
-func NewClientErrResponseV2(conf *config.Config, err error) *ClientResponse {
+// NewClientErrResponse returns an error response
+func NewClientErrResponse(conf *config.Config, err error) *ClientResponse {
 	cr := NewClientResponse(conf)
 	cr.SetError(err)
 	return cr

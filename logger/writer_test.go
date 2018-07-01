@@ -6,7 +6,7 @@ import (
 	"github.com/jeffrom/logd/testhelper"
 )
 
-func TestWriteV2(t *testing.T) {
+func TestWrite(t *testing.T) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
 	logw := NewWriter(conf)
 	fixture := testhelper.LoadFixture("batch.small")

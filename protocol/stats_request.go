@@ -3,7 +3,7 @@ package protocol
 import "github.com/jeffrom/logd/config"
 
 // StatsRequest is an incoming STATS command
-// STATSV2\r\n
+// STATS\r\n
 type StatsRequest struct {
 	conf *config.Config
 }

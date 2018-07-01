@@ -1,104 +1,139 @@
 package client
 
 import (
-	"fmt"
+	"bufio"
+	"bytes"
 	"io"
-	"time"
 
-	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/internal"
 	"github.com/jeffrom/logd/protocol"
 )
 
-// Scanner is similar to protocol.Scanner, but when reading forever, it issues
-// additional READ commands when all previous messages have been read
+// Scanner is used to read batches from the log, scanning message by message
 type Scanner struct {
-	*protocol.Scanner
-	config *config.Config
-	client *Client
-
-	err error
+	*Client
+	conf         *Config
+	state        StatePuller
+	s            *protocol.BatchScanner
+	batch        *protocol.Batch
+	msg          *protocol.Message
+	batchBuf     *bytes.Buffer
+	batchBufBr   *bufio.Reader
+	batchRead    int
+	messagesRead int
+	curr         uint64
+	err          error
 }
 
-// newScanner returns a new client scanner
-func newScanner(conf *config.Config, client *Client) *Scanner {
-	return &Scanner{config: conf, client: client}
+// NewScanner returns a new instance of *Scanner
+func NewScanner(conf *Config) *Scanner {
+	return &Scanner{
+		conf:     conf,
+		batchBuf: &bytes.Buffer{},
+		msg:      protocol.NewMessage(conf.toGeneralConfig()),
+	}
 }
 
-func (s *Scanner) fromScanResponse() (*Scanner, error) {
-	c := s.client
-
-	deadline := time.Now().Add(c.readTimeout)
-	if err := c.Conn.SetReadDeadline(deadline); err != nil {
-		return nil, err
-	}
-
-	resp, err := c.pr.ResponseFrom(c.Conn)
-	if c.handleErr(err) != nil {
-		return nil, err
-	}
-
-	if resp.Failed() {
-		return nil, fmt.Errorf("%s %s", resp.Status, resp.Body)
-	}
-
-	internal.Debugf(s.config, "initial scan response: %s", resp.Status)
-
-	if err := c.Conn.SetReadDeadline(time.Now().Add(c.readTimeout)); err != nil {
-		return nil, err
-	}
-	s.Scanner = protocol.NewScanner(s.config, c.pr.Br)
-	return s, nil
+// ScannerForClient returns a new scanner from a Client
+func ScannerForClient(c *Client) *Scanner {
+	s := NewScanner(c.conf)
+	s.Client = c
+	return s
 }
 
-// Scan reads messages. when the server's response has finished, it will issue
-// another READ command.
+// DialScannerConfig returns a new writer with a connection to addr
+func DialScannerConfig(addr string, conf *Config) (*Scanner, error) {
+	if addr == "" {
+		addr = conf.Hostport
+	}
+	c, err := DialConfig(addr, conf)
+	if err != nil {
+		return nil, err
+	}
+	return ScannerForClient(c), nil
+}
+
+// DialScanner returns a new scanner with a default configuration
+func DialScanner(addr string) (*Scanner, error) {
+	return DialScannerConfig(addr, DefaultConfig)
+}
+
+// Reset sets the scanner to it's initial values so it can be reused.
+func (s *Scanner) Reset() {
+	s.msg.Reset()
+	s.curr = s.conf.Offset
+	s.messagesRead = 0
+	s.batchBuf.Reset()
+	s.batchBufBr = bufio.NewReader(s.batchBuf)
+	s.batchRead = 0
+}
+
+// Scan reads the next message. If it encounters an error, it returns false.
 func (s *Scanner) Scan() bool {
-	c := s.client
-	prev := s.Scanner.Message()
-
-	if err := c.Conn.SetReadDeadline(time.Now().Add(c.readTimeout)); err != nil {
-		s.err = err
-		return false
+	if s.s == nil { // initial state
+		bs, err := s.Client.ReadOffset(s.curr, s.conf.Limit)
+		if err != nil {
+			return s.scanErr(err)
+		}
+		s.s = bs
+		s.s.Batch().MessageBytes()
 	}
-	res := s.Scanner.Scan()
-	if err := s.Scanner.Error(); res == false && s.config.ReadForever &&
-		err == io.EOF {
 
-		start := s.config.StartID
-		if prev != nil {
-			start = prev.ID + 1
+	// if we've finished reading a batch, maybe scan another batch or make
+	// another request for more batches
+	if s.batchRead >= len(s.s.Batch().MessageBytes()) {
+		s.curr += uint64(s.batchRead)
+		if !s.conf.ReadForever && s.messagesRead >= s.conf.Limit {
+			return s.scanErr(nil)
 		}
 
-		for {
-			pscanner, err := s.client.continueRead(start, s.config.ClientBatchSize)
-			s.err = err
-			if err != nil {
-				if err == errNotFound {
-					time.Sleep(time.Duration(s.config.ClientWaitInterval) * time.Millisecond)
-					continue
-				} else {
-					return false
-				}
+		ok := s.bs.Scan()
+		if !ok {
+			err := s.bs.Error()
+			if err != nil && err != io.EOF {
+				return s.scanErr(err)
 			}
 
-			s.Scanner = pscanner
-			break
+			bs, err := s.Client.ReadOffset(s.curr, s.conf.Limit)
+			if err != nil {
+				return s.scanErr(err)
+			}
+			s.s = bs
 		}
 
-		return s.Scanner.Scan()
+		s.batch = s.bs.Batch()
+		s.batchRead = 0
+		s.batchBuf.Reset()
+		s.batchBufBr = bufio.NewReader(s.batchBuf)
+		if _, err := s.batchBuf.Write(s.batch.MessageBytes()); err != nil {
+			return s.scanErr(err)
+		}
 	}
 
-	return res
+	// read the next message in the batch
+	s.msg.Reset()
+	n, err := s.msg.ReadFrom(s.batchBufBr)
+	s.batchRead += int(n)
+	if err != nil {
+		return s.scanErr(err)
+	}
+	s.messagesRead++
+	return true
+}
+
+func (s *Scanner) scanErr(err error) bool {
+	if err != nil {
+		internal.Logf("scan: %+v", err)
+	}
+	s.err = err
+	return false
+}
+
+// Message returns the current message
+func (s *Scanner) Message() *protocol.Message {
+	return s.msg
 }
 
 func (s *Scanner) Error() error {
-	if s.err != nil && s.err != io.EOF {
-		return s.err
-	}
-	err := s.Scanner.Error()
-	if err != nil && err != io.EOF {
-		return err
-	}
-	return nil
+	return s.err
 }

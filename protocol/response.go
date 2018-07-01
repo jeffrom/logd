@@ -1,11 +1,9 @@
 package protocol
 
 import (
-	"bytes"
 	"io"
 
 	"github.com/jeffrom/logd/config"
-	"github.com/jeffrom/logd/internal"
 	"github.com/pkg/errors"
 )
 
@@ -85,92 +83,25 @@ func (resp RespType) String() string {
 	return "<unknown_resp_type>"
 }
 
-// Response is returned to the caller
-type Response struct {
-	config  *config.Config
-	Status  RespType
-	ID      uint64
-	Body    []byte
-	ReaderC chan ReadPart
-	pw      *Writer
-	eofbuf  *bytes.Reader
-}
-
-// NewResponse returns a new instance of a Response
-func NewResponse(conf *config.Config, status RespType) *Response {
-	r := &Response{
-		config: conf,
-		Status: status,
-		pw:     NewWriter(),
-		eofbuf: bytes.NewReader(nil),
-	}
-	return r
-}
-
-// NewErrResponse returns a new server error response
-func NewErrResponse(conf *config.Config, body []byte) *Response {
-	return &Response{config: conf, Status: RespErr, Body: body}
-}
-
-// NewClientErrResponse returns a new validation error response
-func NewClientErrResponse(conf *config.Config, body []byte) *Response {
-	return &Response{config: conf, Status: RespErrClient, Body: body}
-}
-
-// SprintBytes returns a byte representation of the response
-func (r *Response) SprintBytes() ([]byte, error) {
-	w := NewWriter()
-	_, b := w.Response(r)
-	return b, nil
-}
-
-func (r *Response) String() string {
-	b, _ := r.SprintBytes()
-	return string(b)
-}
-
-// Failed indicates whether the command should continue execution.
-func (r *Response) Failed() bool {
-	return r.Status != RespOK && r.Status != RespEOF
-}
-
-// SendBytes sends a PartReader back to the connection
-func (r *Response) SendBytes(b []byte) {
-	internal.Debugf(r.config, "<-ReaderC %q", b)
-	reader := bytes.NewReader(b)
-	r.ReaderC <- NewPartReader(reader)
-}
-
-// SendEOF sends an EOF to a connection, then finishes the response.
-func (r *Response) SendEOF() {
-	_, b := r.pw.EOF()
-	internal.Debugf(r.config, "<-ReaderC %q (with flush)", b)
-	r.eofbuf.Reset(b)
-	r.ReaderC <- NewPartReader(r.eofbuf)
-	r.ReaderC <- &PartDone{}
-}
-
-// response v2
-
-// ResponseV2 is a response the conn can use to send bytes back to the client.
+// Response is a response the conn can use to send bytes back to the client.
 // can returns bytes as well as *os.File-s
-type ResponseV2 struct {
+type Response struct {
 	conf       *config.Config
 	readers    []io.ReadCloser
 	numReaders int
 	numScanned int
 }
 
-// NewResponseV2 returns a new response
-func NewResponseV2(conf *config.Config) *ResponseV2 {
-	return &ResponseV2{
+// NewResponse returns a new response
+func NewResponse(conf *config.Config) *Response {
+	return &Response{
 		conf:    conf,
 		readers: make([]io.ReadCloser, conf.MaxPartitions+1),
 	}
 }
 
 // Reset sets the response to its initial values
-func (r *ResponseV2) Reset() {
+func (r *Response) Reset() {
 	for i := 0; i < r.numReaders; i++ {
 		r.readers[i] = nil
 	}
@@ -179,7 +110,7 @@ func (r *ResponseV2) Reset() {
 }
 
 // AddReader adds a reader for the server to send back over the conn
-func (r *ResponseV2) AddReader(rdr io.ReadCloser) error {
+func (r *Response) AddReader(rdr io.ReadCloser) error {
 	if r.numReaders > r.conf.MaxPartitions+1 {
 		panic("too many readers in response")
 	}
@@ -189,7 +120,7 @@ func (r *ResponseV2) AddReader(rdr io.ReadCloser) error {
 }
 
 // ScanReader returns the next reader, or io.EOF if they've all been scanned
-func (r *ResponseV2) ScanReader() (io.ReadCloser, error) {
+func (r *Response) ScanReader() (io.ReadCloser, error) {
 	if r.numScanned > r.numReaders {
 		return nil, io.EOF
 	}
@@ -200,6 +131,6 @@ func (r *ResponseV2) ScanReader() (io.ReadCloser, error) {
 }
 
 // NumReaders returns the number of io.Readers available
-func (r *ResponseV2) NumReaders() int {
+func (r *Response) NumReaders() int {
 	return r.numReaders
 }

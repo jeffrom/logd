@@ -19,7 +19,7 @@ type Batch struct {
 	Size     uint64
 	Checksum uint32
 	Messages int
-	msgs     []*MessageV2
+	msgs     []*Message
 	body     []byte
 	digitbuf [32]byte
 	msgBuf   *bytes.Buffer
@@ -32,7 +32,7 @@ func NewBatch(conf *config.Config) *Batch {
 	b := &Batch{
 		conf:   conf,
 		msgBuf: &bytes.Buffer{},
-		msgs:   make([]*MessageV2, 1000),
+		msgs:   make([]*Message, 1000),
 	}
 
 	return b
@@ -116,12 +116,12 @@ func (b *Batch) Bytes() []byte {
 // Append adds a new message's bytes to the batch
 func (b *Batch) Append(p []byte) error {
 	if b.Messages > len(b.msgs)-1 {
-		msgs := make([]*MessageV2, len(b.msgs)*2)
+		msgs := make([]*Message, len(b.msgs)*2)
 		copy(msgs, b.msgs)
 		b.msgs = msgs
 	}
 	if b.msgs[b.Messages] == nil {
-		b.msgs[b.Messages] = NewMessageV2(b.conf)
+		b.msgs[b.Messages] = NewMessage(b.conf)
 	}
 	msg := b.msgs[b.Messages]
 	msg.Reset()
@@ -134,14 +134,14 @@ func (b *Batch) Append(p []byte) error {
 }
 
 // AppendMessage adds a new message to the batch
-func (b *Batch) AppendMessage(m *MessageV2) error {
+func (b *Batch) AppendMessage(m *Message) error {
 	b.msgs[b.Messages] = m
 	b.Messages++
 	return nil
 }
 
 // SetMessages sets all messages in a batch
-func (b *Batch) SetMessages(msgs []*MessageV2) {
+func (b *Batch) SetMessages(msgs []*Message) {
 	b.msgs = msgs
 	b.Messages = len(msgs)
 }
@@ -217,7 +217,7 @@ func (b *Batch) buildBodyBytes() error {
 	return nil
 }
 
-func (b *Batch) messageFullSize(m *MessageV2) (int, error) {
+func (b *Batch) messageFullSize(m *Message) (int, error) {
 	if m.fullSize > 0 {
 		return m.fullSize, nil
 	}
@@ -394,7 +394,7 @@ func (b *Batch) readData(r *bufio.Reader) (int64, error) {
 func (b *Batch) makeMessages() error {
 	msgBytesRead := 0
 	for i := 0; i < b.Messages; i++ {
-		m := NewMessageV2(b.conf)
+		m := NewMessage(b.conf)
 
 		x, berr := m.FromBytes(b.body[msgBytesRead:b.Size])
 		if berr != nil {

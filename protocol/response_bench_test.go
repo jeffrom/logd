@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func BenchmarkBatchResponseWriteV2(b *testing.B) {
+func BenchmarkBatchResponseWrite(b *testing.B) {
 	conf := protocolBenchConfig()
 	cr := NewClientResponse(conf)
 	cr.SetOffset(1000)
