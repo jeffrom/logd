@@ -46,6 +46,9 @@ const (
 	// CmdStats returns some internal stats.
 	CmdStats
 
+	// CmdStatsV2 returns some internal stats.
+	CmdStatsV2
+
 	// CmdPing is a ping command type.
 	CmdPing
 
@@ -77,6 +80,8 @@ func (cmd *CmdType) String() string {
 		return "HEAD"
 	case CmdStats:
 		return "STATS"
+	case CmdStatsV2:
+		return "STATSV2"
 	case CmdPing:
 		return "PING"
 	case CmdClose:
@@ -108,6 +113,8 @@ func (cmd *CmdType) Bytes() []byte {
 		return []byte("HEAD")
 	case CmdStats:
 		return []byte("STATS")
+	case CmdStatsV2:
+		return []byte("STATSV2")
 	case CmdPing:
 		return []byte("PING")
 	case CmdClose:
@@ -145,6 +152,9 @@ func cmdNamefromBytes(b []byte) CmdType {
 	if bytes.Equal(b, []byte("STATS")) {
 		return CmdStats
 	}
+	if bytes.Equal(b, []byte("STATSV2")) {
+		return CmdStatsV2
+	}
 	if bytes.Equal(b, []byte("PING")) {
 		return CmdPing
 	}
@@ -169,6 +179,7 @@ var argLens = map[CmdType]int{
 	CmdTailV2:   1,
 	CmdHead:     0,
 	CmdStats:    0,
+	CmdStatsV2:  0,
 	CmdPing:     0,
 	CmdClose:    0,
 	CmdSleep:    1,

@@ -33,15 +33,17 @@ func parseError(p []byte) error {
 }
 
 // ClientResponse is the response clients receive after making a request.  V2.
-// Handles responses to all requests except READ, which responds with BATCH.
+// There are a few possible responses:
 // OK <offset>\r\n
 // BATCH <size> <checksum> <messages>\r\n<data>...
-// MOK <size> <args>\r\n<body>\r\n
+// MOK <size>\r\n<body>\r\n
 // ERR <reason>\r\n
+// ERR\r\n
 type ClientResponse struct {
 	conf     *config.Config
 	offset   uint64
 	err      error
+	mokBuf   []byte
 	digitbuf [32]byte
 }
 
@@ -59,10 +61,17 @@ func NewClientBatchResponseV2(conf *config.Config, off uint64) *ClientResponse {
 	return cr
 }
 
+// NewClientMultiResponseV2 returns a successful MOK response
+func NewClientMultiResponseV2(conf *config.Config, p []byte) *ClientResponse {
+	cr := NewClientResponse(conf)
+	cr.SetMultiResp(p)
+	return cr
+}
+
 // NewClientErrResponseV2 returns an error response
 func NewClientErrResponseV2(conf *config.Config, err error) *ClientResponse {
 	cr := NewClientResponse(conf)
-	cr.err = err
+	cr.SetError(err)
 	return cr
 }
 
@@ -74,6 +83,7 @@ func (cr *ClientResponse) String() string {
 func (cr *ClientResponse) Reset() {
 	cr.offset = 0
 	cr.err = nil
+	cr.mokBuf = nil
 }
 
 // SetOffset sets the offset number for a batch response
@@ -88,12 +98,22 @@ func (cr *ClientResponse) Offset() uint64 {
 }
 
 // SetError sets the error on the response
-// func (cr *ClientResponse) SetError(err error) {
-// 	cr.err = err
-// }
+func (cr *ClientResponse) SetError(err error) {
+	cr.err = err
+}
 
 func (cr *ClientResponse) Error() error {
 	return cr.err
+}
+
+// SetMultiResp sets the MOK response body
+func (cr *ClientResponse) SetMultiResp(p []byte) {
+	cr.mokBuf = p
+}
+
+// MultiResp returns the responses MOK response body
+func (cr *ClientResponse) MultiResp() []byte {
+	return cr.mokBuf
 }
 
 // WriteTo implements io.WriterTo
@@ -101,7 +121,45 @@ func (cr *ClientResponse) WriteTo(w io.Writer) (int64, error) {
 	if cr.err != nil {
 		return cr.writeERR(w)
 	}
+	if cr.mokBuf != nil {
+		return cr.writeMOK(w)
+	}
 	return cr.writeOK(w)
+}
+
+func (cr *ClientResponse) writeMOK(w io.Writer) (int64, error) {
+	var total int64
+	n, err := w.Write(bmokStart)
+	total += int64(n)
+	if err != nil {
+		return total, err
+	}
+
+	l := uintToASCII(uint64(len(cr.mokBuf)), &cr.digitbuf)
+	n, err = w.Write(cr.digitbuf[l:])
+	total += int64(n)
+	if err != nil {
+		return total, err
+	}
+
+	n, err = w.Write(bnewLine)
+	total += int64(n)
+	if err != nil {
+		return total, err
+	}
+
+	n, err = w.Write(cr.mokBuf)
+	total += int64(n)
+	if err != nil {
+		return total, err
+	}
+
+	n, err = w.Write(bnewLine)
+	total += int64(n)
+	if err != nil {
+		return total, err
+	}
+	return total, nil
 }
 
 func (cr *ClientResponse) writeERR(w io.Writer) (int64, error) {
@@ -188,8 +246,11 @@ func (cr *ClientResponse) readFromBuf(r *bufio.Reader) (int64, error) {
 	}
 
 	var isErr bool
+	var isMok bool
 	if bytes.HasPrefix(word, berr) {
 		isErr = true
+	} else if bytes.HasPrefix(word, bmok) {
+		isMok = true
 	} else if !bytes.HasPrefix(word, bok) {
 		return total, errInvalidProtocolLine
 	}
@@ -200,6 +261,8 @@ func (cr *ClientResponse) readFromBuf(r *bufio.Reader) (int64, error) {
 			errBytes = line[:len(line)-termLen]
 		}
 		cr.err = parseError(errBytes)
+	} else if isMok {
+		panic("MOK read not implemented")
 	} else {
 		_, word, err = parseWord(line)
 		if err != nil {

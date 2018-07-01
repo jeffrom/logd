@@ -61,6 +61,8 @@ var btailv2Start = []byte("TAILV2 ")
 var bok = []byte("OK")
 var bokStart = []byte("OK ")
 var berr = []byte("ERR")
+var bmok = []byte("MOK")
+var bmokStart = []byte("MOK ")
 
 // ReadLine reads a line from a bufio.Reader
 // NOTE the line data will be overwritten the next time the bufio.Reader is

@@ -18,10 +18,12 @@ import (
 	"github.com/jeffrom/logd/protocol"
 )
 
+// The first 6 bytes of each V2 request
 var v2Requests = [][]byte{
 	[]byte("BATCH "),
 	[]byte("READV2"),
 	[]byte("TAILV2"),
+	[]byte("STATSV"),
 }
 
 // TODO remove this when all commands have been migrated to requests
@@ -355,7 +357,6 @@ func (s *Socket) handleConnection(conn *Conn) {
 			continue
 		} else if terr, ok := err.(net.Error); ok && terr.Timeout() {
 			log.Printf("%s timeout, so passing through to legacy command handler: %+v", conn.RemoteAddr(), terr)
-			// NOTE comment out this continue to pass through to the old command flow
 		} else if err != nil {
 			log.Printf("%s wait error: %+v", conn.RemoteAddr(), err)
 			return

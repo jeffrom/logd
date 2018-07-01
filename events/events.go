@@ -137,6 +137,8 @@ func (q *EventQ) loop() { // nolint: gocyclo
 				resp, err = q.handleReadV2(req)
 			case protocol.CmdTailV2:
 				resp, err = q.handleTailV2(req)
+			case protocol.CmdStatsV2:
+				resp, err = q.handleStatsV2(req)
 			default:
 				log.Printf("unhandled request type passed: %v", req.Name)
 				continue
@@ -342,6 +344,16 @@ func (q *EventQ) handleTailV2(req *protocol.Request) (*protocol.ResponseV2, erro
 		if aerr := resp.AddReader(p); aerr != nil {
 			return errResponse(q.conf, req, resp, aerr)
 		}
+	}
+	return resp, nil
+}
+
+func (q *EventQ) handleStatsV2(req *protocol.Request) (*protocol.ResponseV2, error) {
+	resp := protocol.NewResponseV2(q.conf)
+	cr := protocol.NewClientMultiResponseV2(q.conf, q.Stats.Bytes())
+	_, err := req.WriteResponse(resp, cr)
+	if err != nil {
+		return errResponse(q.conf, req, resp, err)
 	}
 	return resp, nil
 }
