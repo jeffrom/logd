@@ -231,6 +231,10 @@ func newDebugCounts(started time.Time) *debugCounts {
 	}
 }
 
+var countByteTypes = map[string]bool{
+	"in": true,
+}
+
 func (c *debugCounts) String() string {
 	// return fmt.Sprintf("")
 	b := bytes.Buffer{}
@@ -239,7 +243,7 @@ func (c *debugCounts) String() string {
 	for k, v := range c.counts {
 		var formatted string
 		var formattedPer string
-		if k == "in" {
+		if _, ok := countByteTypes[k]; ok {
 			formatted = prettyNumBytes(float64(v))
 			formattedPer = prettyNumBytes(float64(v) / float64(dur.Seconds()))
 		} else {
