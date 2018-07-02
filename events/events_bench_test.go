@@ -17,12 +17,10 @@ func init() {
 }
 
 func eventQBenchConfig() *config.Config {
-	config := config.NewConfig()
+	config := config.New()
 	config.ServerTimeout = 500
-	config.ClientTimeout = 500
 	config.GracefulShutdownTimeout = 500
 	config.MaxBatchSize = 1024 * 10
-	config.IndexCursorSize = 1000
 	config.PartitionSize = 2048
 	config.MaxPartitions = 5
 

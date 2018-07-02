@@ -5,5 +5,5 @@ import (
 )
 
 func protocolBenchConfig() *config.Config {
-	return config.DefaultConfig
+	return config.Default
 }

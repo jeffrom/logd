@@ -119,7 +119,7 @@ func (s *Socket) accept() {
 		}
 		if s.isShuttingDown() {
 			log.Printf("Closed new connection from %s because shutting down", rawConn.RemoteAddr())
-			internal.IgnoreError(rawConn.Close())
+			internal.LogError(rawConn.Close())
 			break
 		}
 
@@ -287,7 +287,7 @@ func (s *Socket) handleConnection(conn *Conn) {
 			internal.Debugf(s.conf, "%s: read request %v", conn.RemoteAddr(), req)
 			resp, rerr := s.q.PushRequest(ctx, req)
 			if rerr != nil {
-				internal.IgnoreError(conn.Flush())
+				internal.LogError(conn.Flush())
 				log.Printf("%s error: %+v", conn.RemoteAddr(), rerr)
 				return
 			}
@@ -295,18 +295,20 @@ func (s *Socket) handleConnection(conn *Conn) {
 
 			n, rerr := s.sendResponse(conn, resp)
 			if rerr != nil {
-				internal.IgnoreError(conn.Flush())
+				internal.LogError(conn.Flush())
 				log.Printf("%s response error: %+v", conn.RemoteAddr(), rerr)
 				return
 			}
 			internal.Debugf(s.conf, "%s: sent response (%d bytes)", conn.RemoteAddr(), n)
 
-			internal.IgnoreError(conn.Flush())
+			internal.LogError(conn.Flush())
 			continue
 			// } else if terr, ok := err.(net.Error); ok && terr.Timeout() {
 			// 	log.Printf("%s timeout, so passing through to legacy command handler: %+v", conn.RemoteAddr(), terr)
 		} else if err != nil {
-			log.Printf("%s wait error: %+v", conn.RemoteAddr(), err)
+			if err != io.EOF {
+				log.Printf("%s wait error: %+v", conn.RemoteAddr(), err)
+			}
 			return
 		}
 	}
@@ -336,7 +338,7 @@ func (s *Socket) sendResponse(conn *Conn, resp *protocol.Response) (int, error) 
 		readOne = true
 
 		n, serr := conn.readFrom(r)
-		internal.IgnoreError(r.Close())
+		internal.LogError(r.Close())
 		total += int(n)
 		if serr != nil {
 			return total, serr

@@ -59,7 +59,7 @@ func DialConfig(addr string, conf *Config) (*Client, error) {
 	conn, err = net.Dial("tcp", addr)
 	if err != nil {
 		if conn != nil {
-			internal.IgnoreError(conn.Close())
+			internal.LogError(conn.Close())
 		}
 
 		return nil, err
@@ -125,12 +125,12 @@ func (c *Client) ReadOffset(offset uint64, limit int) (*protocol.BatchScanner, e
 	}
 
 	c.bs.Reset(c.br)
-	internal.IgnoreError(c.SetReadDeadline(time.Now().Add(c.readTimeout)))
+	internal.LogError(c.SetReadDeadline(time.Now().Add(c.readTimeout)))
 	return c.bs, nil
 }
 
 func (c *Client) send(wt io.WriterTo) (int64, error) {
-	internal.IgnoreError(c.SetWriteDeadline(time.Now().Add(c.writeTimeout)))
+	internal.LogError(c.SetWriteDeadline(time.Now().Add(c.writeTimeout)))
 	n, err := wt.WriteTo(c.bw)
 	if c.handleErr(err) != nil {
 		return 0, err
@@ -142,7 +142,7 @@ func (c *Client) send(wt io.WriterTo) (int64, error) {
 		return n, err
 	}
 
-	internal.IgnoreError(c.SetWriteDeadline(time.Time{}))
+	internal.LogError(c.SetWriteDeadline(time.Time{}))
 	return n, err
 }
 
@@ -150,10 +150,10 @@ func (c *Client) send(wt io.WriterTo) (int64, error) {
 func (c *Client) flush() error {
 	if c.bw.Buffered() > 0 {
 		internal.Debugf(c.gconf, "client.Flush() (%d bytes)", c.bw.Buffered())
-		internal.IgnoreError(c.SetWriteDeadline(time.Now().Add(c.writeTimeout)))
+		internal.LogError(c.SetWriteDeadline(time.Now().Add(c.writeTimeout)))
 		err := c.bw.Flush()
 		internal.Debugf(c.gconf, "client.Flush() complete")
-		internal.IgnoreError(c.SetWriteDeadline(time.Time{}))
+		internal.LogError(c.SetWriteDeadline(time.Time{}))
 		return err
 	}
 	return nil
@@ -161,9 +161,9 @@ func (c *Client) flush() error {
 
 func (c *Client) readBatchResponse() (uint64, error) {
 	c.cr.Reset()
-	internal.IgnoreError(c.SetReadDeadline(time.Now().Add(c.readTimeout)))
+	internal.LogError(c.SetReadDeadline(time.Now().Add(c.readTimeout)))
 	n, err := c.cr.ReadFrom(c.br)
-	internal.IgnoreError(c.SetReadDeadline(time.Time{}))
+	internal.LogError(c.SetReadDeadline(time.Time{}))
 	internal.Debugf(c.gconf, "read %d bytes from %s: %+v", n, c.Conn.RemoteAddr(), c.cr)
 	c.handleErr(err)
 	if err != nil {

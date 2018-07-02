@@ -20,7 +20,7 @@ import (
 
 func runApp(args []string) {
 	conf := &config.Config{}
-	*conf = *config.DefaultConfig
+	*conf = *config.Default
 
 	var check bool
 
@@ -59,44 +59,43 @@ func runApp(args []string) {
 			Name:        "timeout",
 			Usage:       "Time, in milliseconds, to wait for a response to be acknowledged",
 			EnvVar:      "LOGD_TIMEOUT",
-			Value:       1000,
+			Value:       config.Default.ServerTimeout,
 			Destination: &conf.ServerTimeout,
 		}),
 		altsrc.NewStringFlag(cli.StringFlag{
 			Name:        "log_file",
 			Usage:       "Log file name",
 			EnvVar:      "LOGD_FILE",
-			Value:       "__",
+			Value:       config.Default.LogFile,
 			Destination: &conf.LogFile,
 		}),
 		altsrc.NewIntFlag(cli.IntFlag{
 			Name:        "log_file_mode",
 			Usage:       "Integer representation of file mode",
 			EnvVar:      "LOGD_FILE_MODE",
-			Value:       0644,
+			Value:       config.Default.LogFileMode,
 			Destination: &conf.LogFileMode,
 		}),
 		altsrc.NewIntFlag(cli.IntFlag{
 			Name:        "max_batch_size",
 			Usage:       "Size, in bytes, of maximum chunk length",
-			EnvVar:      "LOGD_MAX_CHUNK_SIZE",
-			Value:       1024 * 20,
+			EnvVar:      "LOGD_MAX_BATCH_SIZE",
+			Value:       config.Default.MaxBatchSize,
 			Destination: &conf.MaxBatchSize,
 		}),
 		altsrc.NewIntFlag(cli.IntFlag{
 			Name:        "partition_size",
 			Usage:       "Size, in bytes, of partition",
 			EnvVar:      "LOGD_PARTITION_SIZE",
-			Value:       1024 * 1024,
+			Value:       config.Default.PartitionSize,
 			Destination: &conf.PartitionSize,
 		}),
-		altsrc.NewUint64Flag(cli.Uint64Flag{
-			Name:   "index_cursor_size",
-			Usage:  "Distance between index entries",
-			EnvVar: "LOGD_INDEX_CURSOR_SIZE",
-			// Value:       1000,
-			Value:       10,
-			Destination: &conf.IndexCursorSize,
+		altsrc.NewIntFlag(cli.IntFlag{
+			Name:        "max_partitions",
+			Usage:       "number of partitions to save on disk",
+			EnvVar:      "LOGD_MAX_PARTITIONS",
+			Value:       config.Default.MaxPartitions,
+			Destination: &conf.MaxPartitions,
 		}),
 		altsrc.NewBoolFlag(cli.BoolFlag{
 			Name:        "can_shutdown",
@@ -128,7 +127,7 @@ func runApp(args []string) {
 		go func() {
 			for range stopC {
 				log.Print("Caught signal. Exiting...")
-				internal.IgnoreError(q.Stop())
+				internal.LogError(q.Stop())
 			}
 		}()
 

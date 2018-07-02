@@ -148,6 +148,10 @@ func (req *Request) readFromBuf(r *bufio.Reader) (int64, error) {
 		return total, err
 	}
 
+	if req.Name == 0 { // unknown command
+		return total, ErrInvalid
+	}
+
 	expectedArgs, ok := argLens[req.Name]
 	if !ok {
 		return total, errors.Errorf("type %v has no specified length", req.Name)
@@ -177,7 +181,7 @@ func (req *Request) readFromBuf(r *bufio.Reader) (int64, error) {
 // envelope.
 func (req *Request) WriteResponse(resp *Response, cr *ClientResponse) (int64, error) {
 	n, err := cr.WriteTo(req.respBuf)
-	internal.IgnoreError(resp.AddReader(req.respBuf))
+	internal.LogError(resp.AddReader(req.respBuf))
 	return n, err
 }
 

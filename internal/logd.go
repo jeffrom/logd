@@ -45,7 +45,7 @@ func stdlog(distance int, s string, args ...interface{}) {
 	linearg := fmt.Sprintf("%s:%d:", file, line)
 	args = append([]interface{}{time.Now().Format("2006/01/02 15:04:05.000"), linearg}, args...)
 	_, err := fmt.Fprintf(os.Stdout, s, args...)
-	IgnoreError(err)
+	LogError(err)
 }
 
 // Debugf prints a debug log message to stdout
@@ -74,7 +74,7 @@ func Logf(s string, args ...interface{}) {
 func doTrace() func() {
 	f, err := os.Create("trace.out")
 	PanicOnError(err)
-	IgnoreError(trace.Start(f))
+	LogError(trace.Start(f))
 	return trace.Stop
 }
 
@@ -123,8 +123,8 @@ func CloseAll(c []io.Closer) error {
 	return firstErr
 }
 
-// IgnoreError logs the error if one occurred
-func IgnoreError(err error) {
+// LogError logs the error if one occurred
+func LogError(err error) {
 	if err != nil {
 		stdlog(2, "error ignored: %+v", err)
 	}

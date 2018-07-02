@@ -61,7 +61,7 @@ func (s *MockServer) handleRespond(cb func([]byte) io.WriterTo) {
 	}()
 
 	read := 0
-	internal.IgnoreError(s.c.SetReadDeadline(time.Now().Add(50 * time.Millisecond)))
+	internal.LogError(s.c.SetReadDeadline(time.Now().Add(50 * time.Millisecond)))
 	n, err := s.c.Read(s.b[read:])
 	if err == io.ErrClosedPipe {
 		return
@@ -71,7 +71,7 @@ func (s *MockServer) handleRespond(cb func([]byte) io.WriterTo) {
 	}
 
 	for err == nil {
-		internal.IgnoreError(s.c.SetReadDeadline(time.Now().Add(20 * time.Millisecond)))
+		internal.LogError(s.c.SetReadDeadline(time.Now().Add(20 * time.Millisecond)))
 		n, err = s.c.Read(s.b[read:])
 		read += n
 		if err == io.ErrClosedPipe {
@@ -106,7 +106,7 @@ func (s *MockServer) Respond(cb func([]byte) io.WriterTo) {
 }
 
 func (s *MockServer) handleExpectation(cb func([]byte) io.WriterTo) {
-	internal.IgnoreError(s.c.SetReadDeadline(time.Now().Add(50 * time.Millisecond)))
+	internal.LogError(s.c.SetReadDeadline(time.Now().Add(50 * time.Millisecond)))
 	n, err := s.c.Read(s.b)
 	log.Printf("%s: read %d bytes: %q (err: %+v)", s.c.RemoteAddr(), n, s.b[:n], err)
 	if err != nil {

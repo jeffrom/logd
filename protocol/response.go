@@ -40,6 +40,9 @@ var (
 	// server.
 	ErrInternal = errors.New("internal server error")
 
+	// ErrInvalid refers to an invalid request.
+	ErrInvalid = errors.New("invalid request")
+
 	// errTooLarge is returned when the batch size is larger than the
 	// configured max batch size.
 	errTooLarge = errors.New("too large")
@@ -98,6 +101,16 @@ func NewResponse(conf *config.Config) *Response {
 		conf:    conf,
 		readers: make([]io.ReadCloser, conf.MaxPartitions+1),
 	}
+}
+
+// NewResponseErr returns a new instance of Response and writes it to the request
+func NewResponseErr(conf *config.Config, req *Request, err error) (*Response, error) {
+	clientResp := NewClientErrResponse(conf, err)
+	resp := NewResponse(conf)
+	if _, werr := req.WriteResponse(resp, clientResp); werr != nil {
+		return resp, werr
+	}
+	return resp, err
 }
 
 // Reset sets the response to its initial values

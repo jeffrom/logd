@@ -68,7 +68,7 @@ func (c *Config) getWriteTimeout() time.Duration {
 // just copies what is needed for shared modules (internal, protocol)
 func (c *Config) toGeneralConfig() *config.Config {
 	gconf := &config.Config{}
-	*gconf = *config.DefaultConfig
+	*gconf = *config.Default
 	gconf.Verbose = c.Verbose
 	gconf.Hostport = c.Hostport
 	gconf.MaxBatchSize = c.BatchSize

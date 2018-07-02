@@ -202,7 +202,7 @@ func (c *Conn) setWaitForCmdDeadline() error {
 	defer c.mu.Unlock()
 
 	if c.state == connStateReading {
-		internal.IgnoreError(c.SetDeadline(time.Time{}))
+		internal.LogError(c.SetDeadline(time.Time{}))
 	} else {
 		timeout := time.Duration(c.config.ServerTimeout) * time.Millisecond
 		err := c.SetReadDeadline(time.Now().Add(timeout))

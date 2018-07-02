@@ -173,6 +173,31 @@ func TestReadNotFound(t *testing.T) {
 	}
 }
 
+func TestUnknownCommand(t *testing.T) {
+	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	q := NewEventQ(conf)
+	doStartQ(t, q)
+	defer doShutdownQ(t, q)
+
+	req := protocol.NewRequest(conf)
+	resp, err := q.PushRequest(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := resp.ScanReader()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cr := protocol.NewClientResponse(conf)
+	if _, rerr := cr.ReadFrom(bufio.NewReader(r)); rerr != nil {
+		t.Fatalf("unexpected error reading response: %+v", rerr)
+	}
+	if err := cr.Error(); err != protocol.ErrInvalid {
+		t.Fatalf("expected error %s but got %s", protocol.ErrInvalid, err)
+	}
+}
+
 func checkNotFound(t testing.TB, conf *config.Config, b []byte) {
 	if !bytes.HasPrefix(b, []byte("ERR")) {
 		log.Panicf("response was not an error: %q", b)

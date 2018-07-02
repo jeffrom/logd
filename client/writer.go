@@ -122,7 +122,7 @@ func (w *Writer) Flush() error {
 
 // Close implements the LogWriter interface
 func (w *Writer) Close() error {
-	internal.IgnoreError(w.Client.Close())
+	internal.LogError(w.Client.Close())
 	return nil
 }
 
@@ -133,17 +133,17 @@ func (w *Writer) start() {
 			select {
 			case <-w.stopC:
 				internal.Debugf(w.gconf, "<-stopC")
-				internal.IgnoreError(w.flushPending(false))
+				internal.LogError(w.flushPending(false))
 				return
 			// case <-w.flushC:
 			// 	internal.Debugf(w.gconf, "<-flushC")
 			// 	internal.IgnoreError(w.flushPending(false))
 			case <-w.flushSyncC:
 				internal.Debugf(w.gconf, "<-flushSyncC")
-				internal.IgnoreError(w.flushPending(true))
+				internal.LogError(w.flushPending(true))
 			case <-time.After(w.conf.WaitInterval):
 				internal.Debugf(w.gconf, "<-WaitInterval")
-				internal.IgnoreError(w.flushPending(false))
+				internal.LogError(w.flushPending(false))
 			}
 
 		}
@@ -185,7 +185,7 @@ func (w *Writer) flushPending(sync bool) error {
 	}
 
 	if w.state != nil {
-		internal.IgnoreError(w.state.Push(off))
+		internal.LogError(w.state.Push(off))
 	}
 	w.signalReadySync(err, sync)
 	return err
