@@ -232,9 +232,7 @@ func (s *Socket) addConn(conn *Conn) {
 }
 
 func (s *Socket) removeConn(conn *Conn) {
-	if err := conn.Close(); err != nil {
-		internal.Debugf(s.conf, "error removing connection: %+v", err)
-	}
+	internal.IgnoreError(s.conf.Verbose, conn.Close())
 
 	s.connMu.Lock()
 	delete(s.conns, conn)
