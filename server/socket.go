@@ -69,11 +69,13 @@ func (s *Socket) SetQPusher(q transport.QPusher) {
 func (s *Socket) listenAndServe(wait bool) error {
 	var outerErr error
 
-	s.mu.Lock()
-	s.ln, outerErr = net.Listen("tcp", s.addr)
-	s.mu.Unlock()
-	if outerErr != nil {
-		return outerErr
+	if s.ln == nil {
+		s.mu.Lock()
+		s.ln, outerErr = net.Listen("tcp", s.addr)
+		s.mu.Unlock()
+		if outerErr != nil {
+			return outerErr
+		}
 	}
 
 	log.Printf("Serving at %s", s.ln.Addr())
@@ -302,9 +304,12 @@ func (s *Socket) handleConnection(conn *Conn) {
 			internal.Debugf(s.conf, "%s: sent response (%d bytes)", conn.RemoteAddr(), n)
 
 			internal.LogError(conn.Flush())
+
+			if req.Name == protocol.CmdClose {
+				internal.Debugf(s.conf, "%s: closing", conn.RemoteAddr())
+				return
+			}
 			continue
-			// } else if terr, ok := err.(net.Error); ok && terr.Timeout() {
-			// 	log.Printf("%s timeout, so passing through to legacy command handler: %+v", conn.RemoteAddr(), terr)
 		} else if err != nil {
 			if err != io.EOF {
 				log.Printf("%s wait error: %+v", conn.RemoteAddr(), err)

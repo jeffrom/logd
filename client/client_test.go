@@ -106,14 +106,6 @@ func TestRead(t *testing.T) {
 	}
 }
 
-func DefaultTestConfig(verbose bool) *Config {
-	c := &Config{}
-	*c = *DefaultConfig
-	c.Verbose = verbose
-	// c.BatchSize = 1024 * 10
-	return c
-}
-
 type multiWriterTo struct {
 	wt []io.WriterTo
 }

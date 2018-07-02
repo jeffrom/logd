@@ -84,3 +84,12 @@ type BenchConfig struct {
 var DefaultBenchConfig = &BenchConfig{
 	Verbose: false,
 }
+
+// DefaultTestConfig returns a testing configuration
+func DefaultTestConfig(verbose bool) *Config {
+	c := &Config{}
+	*c = *DefaultConfig
+	c.Verbose = verbose
+	// c.BatchSize = 1024 * 10
+	return c
+}

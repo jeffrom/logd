@@ -58,16 +58,21 @@ func NewEventQ(conf *config.Config) *EventQ {
 	}
 
 	if conf.Hostport != "" {
-		q.servers = append(q.servers, server.NewSocket(conf.Hostport, conf))
+		q.Register(server.NewSocket(conf.Hostport, conf))
 	}
 
 	return q
 }
 
+// Register adds a server to the event queue. The queue should be stopped when
+// Register is called.
+func (q *EventQ) Register(server transport.Server) {
+	server.SetQPusher(q)
+	q.servers = append(q.servers, server)
+}
+
 // GoStart begins handling messages
 func (q *EventQ) GoStart() error {
-	// TODO refactor socket to register LifecycleManagers with events so events
-	// can control shutdown order of loggers AND servers
 	if lc, ok := q.parts.logp.(internal.LifecycleManager); ok {
 		if err := lc.Setup(); err != nil {
 			return err
@@ -86,7 +91,6 @@ func (q *EventQ) GoStart() error {
 	go q.loop()
 
 	for _, server := range q.servers {
-		server.SetQPusher(q)
 		server.GoServe()
 	}
 	return nil
@@ -170,6 +174,8 @@ func (q *EventQ) loop() { // nolint: gocyclo
 				resp, err = q.handleTail(req)
 			case protocol.CmdStats:
 				resp, err = q.handleStats(req)
+			case protocol.CmdClose:
+				resp, err = q.handleClose(req)
 			default:
 				log.Printf("unhandled request type passed: %v", req.Name)
 				resp, err = protocol.NewResponseErr(q.conf, req, protocol.ErrInvalid)
@@ -322,6 +328,16 @@ func (q *EventQ) handleTail(req *protocol.Request) (*protocol.Response, error) {
 func (q *EventQ) handleStats(req *protocol.Request) (*protocol.Response, error) {
 	resp := protocol.NewResponse(q.conf)
 	cr := protocol.NewClientMultiResponse(q.conf, q.Stats.Bytes())
+	_, err := req.WriteResponse(resp, cr)
+	if err != nil {
+		return errResponse(q.conf, req, resp, err)
+	}
+	return resp, nil
+}
+
+func (q *EventQ) handleClose(req *protocol.Request) (*protocol.Response, error) {
+	resp := protocol.NewResponse(q.conf)
+	cr := protocol.NewClientOKResponse(q.conf)
 	_, err := req.WriteResponse(resp, cr)
 	if err != nil {
 		return errResponse(q.conf, req, resp, err)

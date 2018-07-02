@@ -29,7 +29,7 @@ const (
 	CmdStats
 
 	// CmdClose is a close command type.
-	// CmdClose
+	CmdClose
 
 	// CmdShutdown is a shutdown command type.
 	// CmdShutdown
@@ -45,9 +45,8 @@ func (cmd *CmdType) String() string {
 		return "TAIL"
 	case CmdStats:
 		return "STATS"
-
-		// case CmdClose:
-		// 	return "CLOSE"
+	case CmdClose:
+		return "CLOSE"
 		// case CmdShutdown:
 		// 	return "SHUTDOWN"
 	}
@@ -65,8 +64,8 @@ func (cmd *CmdType) Bytes() []byte {
 		return []byte("TAIL")
 	case CmdStats:
 		return []byte("STATS")
-		// case CmdClose:
-		// 	return []byte("CLOSE")
+	case CmdClose:
+		return []byte("CLOSE")
 		// case CmdShutdown:
 		// 	return []byte("SHUTDOWN")
 	}
@@ -86,9 +85,9 @@ func cmdNamefromBytes(b []byte) CmdType {
 	if bytes.Equal(b, []byte("STATS")) {
 		return CmdStats
 	}
-	// if bytes.Equal(b, []byte("CLOSE")) {
-	// 	return CmdClose
-	// }
+	if bytes.Equal(b, []byte("CLOSE")) {
+		return CmdClose
+	}
 	// if bytes.Equal(b, []byte("SHUTDOWN")) {
 	// 	return CmdShutdown
 	// }
@@ -100,7 +99,7 @@ var argLens = map[CmdType]int{
 	CmdRead:  2,
 	CmdTail:  1,
 	CmdStats: 0,
-	// CmdClose:    0,
+	CmdClose: 0,
 	// CmdShutdown: 0,
 }
 

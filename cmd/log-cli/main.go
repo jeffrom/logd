@@ -304,7 +304,8 @@ func doWrite(conf *client.Config, args cli.Args) error {
 	}
 
 	if conf.Count {
-		fmt.Println(counts)
+		_, err := fmt.Fprintln(os.Stderr, counts)
+		internal.LogError(err)
 	}
 	return w.Flush()
 }

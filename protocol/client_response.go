@@ -38,6 +38,7 @@ func parseError(p []byte) error {
 
 // ClientResponse is the response clients receive after making a request.
 // There are a few possible responses:
+// OK\r\n
 // OK <offset>\r\n
 // BATCH <size> <checksum> <messages>\r\n<data>...
 // MOK <size>\r\n<body>\r\n
@@ -45,6 +46,7 @@ func parseError(p []byte) error {
 // ERR\r\n
 type ClientResponse struct {
 	conf     *config.Config
+	ok       bool
 	offset   uint64
 	err      error
 	mokBuf   []byte
@@ -62,6 +64,13 @@ func NewClientResponse(conf *config.Config) *ClientResponse {
 func NewClientBatchResponse(conf *config.Config, off uint64) *ClientResponse {
 	cr := NewClientResponse(conf)
 	cr.SetOffset(off)
+	return cr
+}
+
+// NewClientOKResponse returns a successful batch *ClientResponse
+func NewClientOKResponse(conf *config.Config) *ClientResponse {
+	cr := NewClientResponse(conf)
+	cr.ok = true
 	return cr
 }
 
@@ -88,6 +97,7 @@ func (cr *ClientResponse) Reset() {
 	cr.offset = 0
 	cr.err = nil
 	cr.mokBuf = nil
+	cr.ok = false
 }
 
 // SetOffset sets the offset number for a batch response
@@ -115,6 +125,11 @@ func (cr *ClientResponse) SetMultiResp(p []byte) {
 	cr.mokBuf = p
 }
 
+// Ok returns true if the request has succeeded
+func (cr *ClientResponse) Ok() bool {
+	return cr.ok
+}
+
 // MultiResp returns the responses MOK response body
 func (cr *ClientResponse) MultiResp() []byte {
 	return cr.mokBuf
@@ -122,13 +137,16 @@ func (cr *ClientResponse) MultiResp() []byte {
 
 // WriteTo implements io.WriterTo
 func (cr *ClientResponse) WriteTo(w io.Writer) (int64, error) {
+	if cr.ok {
+		return cr.writeOK(w)
+	}
 	if cr.err != nil {
 		return cr.writeERR(w)
 	}
 	if cr.mokBuf != nil {
 		return cr.writeMOK(w)
 	}
-	return cr.writeOK(w)
+	return cr.writeBatchOK(w)
 }
 
 func (cr *ClientResponse) writeMOK(w io.Writer) (int64, error) {
@@ -196,7 +214,7 @@ func (cr *ClientResponse) writeERR(w io.Writer) (int64, error) {
 	return total, nil
 }
 
-func (cr *ClientResponse) writeOK(w io.Writer) (int64, error) {
+func (cr *ClientResponse) writeBatchOK(w io.Writer) (int64, error) {
 	var total int64
 	n, err := w.Write(bok)
 	total += int64(n)
@@ -226,6 +244,24 @@ func (cr *ClientResponse) writeOK(w io.Writer) (int64, error) {
 	return total, nil
 }
 
+func (cr *ClientResponse) writeOK(w io.Writer) (int64, error) {
+	var total int64
+
+	n, err := w.Write(bok)
+	total += int64(n)
+	if err != nil {
+		return total, err
+	}
+
+	n, err = w.Write(bnewLine)
+	total += int64(n)
+	if err != nil {
+		return total, err
+	}
+
+	return total, nil
+}
+
 // ReadFrom implements io.ReaderFrom
 func (cr *ClientResponse) ReadFrom(r io.Reader) (int64, error) {
 	if br, ok := r.(*bufio.Reader); ok {
@@ -240,6 +276,11 @@ func (cr *ClientResponse) readFromBuf(r *bufio.Reader) (int64, error) {
 	line, err := r.ReadSlice('\n')
 	total += int64(len(line))
 	if err != nil {
+		return total, err
+	}
+
+	if bytes.Equal(line, bokResp) {
+		cr.ok = true
 		return total, err
 	}
 

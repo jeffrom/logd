@@ -151,7 +151,11 @@ func (c *Conn) readFrom(r io.Reader) (int64, error) {
 	var err error
 	if p, ok := r.(*logger.Partition); ok {
 		// sendfile optimization
-		n, err = c.Conn.(*net.TCPConn).ReadFrom(p.Reader())
+		if tcpConn, ok := c.Conn.(*net.TCPConn); ok {
+			n, err = tcpConn.ReadFrom(p.Reader())
+		} else {
+			n, err = io.Copy(c.Conn, p.Reader())
+		}
 	} else {
 		n, err = io.Copy(c.Conn, r)
 	}

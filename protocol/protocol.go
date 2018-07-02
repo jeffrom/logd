@@ -59,10 +59,12 @@ var bbatchStart = []byte("BATCH ")
 var breadStart = []byte("READ ")
 var btailStart = []byte("TAIL ")
 var bok = []byte("OK")
+var bokResp = []byte("OK\r\n")
 var bokStart = []byte("OK ")
 var berr = []byte("ERR")
 var bmok = []byte("MOK")
 var bmokStart = []byte("MOK ")
+var bclose = []byte("CLOSE")
 
 // ReadLine reads a line from a bufio.Reader
 // NOTE the line data will be overwritten the next time the bufio.Reader is

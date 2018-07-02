@@ -10,6 +10,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/internal"
 	"github.com/jeffrom/logd/protocol"
 	"github.com/jeffrom/logd/testhelper"
@@ -24,6 +25,7 @@ func TestWriter(t *testing.T) {
 	c := New(conf).SetConn(client)
 	w := WriterForClient(c)
 	defer w.Close()
+	defer expectServerClose(t, gconf, server)
 
 	server.Expect(func(p []byte) io.WriterTo {
 		if !bytes.Equal(fixture, p) {
@@ -44,6 +46,7 @@ func TestWriterFillBatch(t *testing.T) {
 	c := New(conf).SetConn(client)
 	w := WriterForClient(c)
 	defer w.Close()
+	defer expectServerClose(t, gconf, server)
 	msg := []byte("pretty cool message!")
 	buf := newLockedBuffer()
 
@@ -77,6 +80,7 @@ func TestWriterTwoBatches(t *testing.T) {
 	c := New(conf).SetConn(client)
 	w := WriterForClient(c)
 	defer w.Close()
+	defer expectServerClose(t, gconf, server)
 	buf := newLockedBuffer()
 
 	f, err := os.Open("testdata/work_of_art.txt")
@@ -131,6 +135,16 @@ func flushBatch(t *testing.T, w *Writer) {
 	if err := w.Flush(); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func expectServerClose(t testing.TB, conf *config.Config, server *testhelper.MockServer) {
+	server.Expect(func(p []byte) io.WriterTo {
+		expect := []byte("CLOSE\r\n")
+		if !bytes.Equal(p, expect) {
+			t.Fatalf("expected:\n\n\t%q but got:\n\n\t%q", expect, p)
+		}
+		return protocol.NewClientOKResponse(conf)
+	})
 }
 
 func confForTimerTest(conf *Config) *Config {

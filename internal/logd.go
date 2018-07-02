@@ -130,6 +130,13 @@ func LogError(err error) {
 	}
 }
 
+// IgnoreError logs the error if one occurred
+func IgnoreError(verbose bool, err error) {
+	if verbose && err != nil {
+		stdlog(2, "error ignored: %+v", err)
+	}
+}
+
 // CopyBytes returns a copy of p
 func CopyBytes(p []byte) []byte {
 	b := make([]byte, len(p))

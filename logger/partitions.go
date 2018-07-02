@@ -262,6 +262,10 @@ func (p *Partitions) removeFile(off uint64) error {
 	fullpath := filepath.Join(p.tempDir, ppath)
 
 	if _, err := os.Stat(fullpath); err != nil {
+		if os.IsNotExist(err) {
+			internal.IgnoreError(p.conf.Verbose, err)
+			return nil
+		}
 		return err
 	}
 	go func() {

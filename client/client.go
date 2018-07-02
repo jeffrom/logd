@@ -2,6 +2,7 @@ package client
 
 import (
 	"bufio"
+	"errors"
 	"io"
 	"log"
 	"net"
@@ -129,6 +130,24 @@ func (c *Client) ReadOffset(offset uint64, limit int) (*protocol.BatchScanner, e
 	return c.bs, nil
 }
 
+// Close sends a CLOSE request and then closes the connection
+func (c *Client) Close() error {
+	defer func() {
+		internal.LogError(c.Conn.Close())
+	}()
+
+	closereq := protocol.NewCloseRequest(c.gconf)
+	if _, err := c.send(closereq); err != nil {
+		return err
+	}
+
+	if err := c.readCloseResponse(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (c *Client) send(wt io.WriterTo) (int64, error) {
 	internal.LogError(c.SetWriteDeadline(time.Now().Add(c.writeTimeout)))
 	n, err := wt.WriteTo(c.bw)
@@ -170,6 +189,22 @@ func (c *Client) readBatchResponse() (uint64, error) {
 		return 0, err
 	}
 	return c.cr.Offset(), c.cr.Error()
+}
+
+func (c *Client) readCloseResponse() error {
+	c.cr.Reset()
+	internal.LogError(c.SetReadDeadline(time.Now().Add(c.readTimeout)))
+	n, err := c.cr.ReadFrom(c.br)
+	internal.LogError(c.SetReadDeadline(time.Time{}))
+	internal.Debugf(c.gconf, "read %d bytes from %s: %+v", n, c.Conn.RemoteAddr(), c.cr)
+	c.handleErr(err)
+	if err != nil {
+		return err
+	}
+	if !c.cr.Ok() {
+		return errors.New("close failed")
+	}
+	return nil
 }
 
 func (c *Client) handleErr(err error) error {
