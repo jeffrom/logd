@@ -189,10 +189,32 @@ func handleKills(c chan struct{}) {
 	}()
 }
 
-// var counts = map[string]int{
-// 	"messages": 0,
-// 	"bytes in": 0,
-// }
+func prettyNumBytes(n float64) string {
+	if n > 1024*1024 {
+		return fmt.Sprintf("%.2fMb", n/1024/1024)
+	}
+	if n > 1024 {
+		return fmt.Sprintf("%.2fKb", n/1024)
+	}
+	return fmt.Sprintf("%.1fb", n)
+}
+
+func prettyNum(n float64) string {
+	if n > 1000*1000 {
+		return fmt.Sprintf("%.2fM", n/1000/1000)
+	}
+	if n > 1000 {
+		return fmt.Sprintf("%.2fK", n/1000)
+	}
+	return fmt.Sprintf("%.0f", n)
+}
+
+func fill(s string, l int) string {
+	for len(s) < l {
+		s += " "
+	}
+	return s
+}
 
 type debugCounts struct {
 	started time.Time
@@ -204,7 +226,7 @@ func newDebugCounts(started time.Time) *debugCounts {
 		started: started,
 		counts: map[string]int{
 			"messages": 0,
-			"bytes in": 0,
+			"in":       0,
 		},
 	}
 }
@@ -213,9 +235,20 @@ func (c *debugCounts) String() string {
 	// return fmt.Sprintf("")
 	b := bytes.Buffer{}
 	dur := time.Now().Sub(c.started)
-	b.WriteString(fmt.Sprintf("elapsed:\t%s\n", dur))
+	b.WriteString(fmt.Sprintf("elapsed :\t\t%s\n", dur))
 	for k, v := range c.counts {
-		b.WriteString(fmt.Sprintf("%s:\t%d\t%.2f %s/s\n", k, v, float64(v)/float64(dur.Seconds()), k))
+		var formatted string
+		var formattedPer string
+		if k == "in" {
+			formatted = prettyNumBytes(float64(v))
+			formattedPer = prettyNumBytes(float64(v) / float64(dur.Seconds()))
+		} else {
+			formatted = prettyNum(float64(v))
+			formattedPer = prettyNum(float64(v) / float64(dur.Seconds()))
+		}
+
+		b.WriteString(fmt.Sprintf("%s:\t\t%s\t\t%s %s/s\n",
+			fill(k, 10), formatted, formattedPer, k))
 	}
 	return b.String()
 }
@@ -268,7 +301,7 @@ func doWrite(conf *client.Config, args cli.Args) error {
 		}
 
 		n, err := w.Write([]byte(arg))
-		counts.counts["bytes in"] += n
+		counts.counts["in"] += n
 		if err != nil {
 			return err
 		}
@@ -292,7 +325,7 @@ func doWrite(conf *client.Config, args cli.Args) error {
 			}
 
 			n, err := w.Write(internal.CopyBytes(b))
-			counts.counts["bytes in"] += n
+			counts.counts["in"] += n
 			if err != nil {
 				return err
 			}
