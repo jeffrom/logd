@@ -379,6 +379,13 @@ func doRead(conf *client.Config, c *cli.Context) error {
 	}
 	defer scanner.Close()
 
+	go func() {
+		select {
+		case <-done:
+			scanner.Stop()
+		}
+	}()
+
 	for scanner.Scan() {
 		_, err := out.Write(scanner.Message().BodyBytes())
 		internal.LogError(err)

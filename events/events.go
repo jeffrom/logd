@@ -180,7 +180,7 @@ func (q *EventQ) loop() { // nolint: gocyclo
 				resp, err = protocol.NewResponseErr(q.conf, req, protocol.ErrInvalid)
 			}
 
-			if err != nil {
+			if err != nil && err != protocol.ErrNotFound {
 				log.Printf("error handling %s request: %+v", &req.Name, err)
 			}
 			req.Respond(resp)
@@ -239,7 +239,7 @@ func (q *EventQ) handleBatch(req *protocol.Request) (*protocol.Response, error) 
 	}
 
 	// respond
-	cr := protocol.NewClientBatchResponse(q.conf, respOffset)
+	cr := protocol.NewClientBatchResponse(q.conf, respOffset, 1)
 	_, err = req.WriteResponse(resp, cr)
 	if err != nil {
 		return errResponse(q.conf, req, resp, err)
@@ -268,8 +268,8 @@ func (q *EventQ) handleRead(req *protocol.Request) (*protocol.Response, error) {
 		return errResponse(q.conf, req, resp, err)
 	}
 
-	// respond OK <offset>\r\n
-	cr := protocol.NewClientBatchResponse(q.conf, readreq.Offset)
+	// respond OK
+	cr := protocol.NewClientBatchResponse(q.conf, readreq.Offset, partArgs.nbatches)
 	_, err = req.WriteResponse(resp, cr)
 	if err != nil {
 		return errResponse(q.conf, req, resp, err)
@@ -309,8 +309,8 @@ func (q *EventQ) handleTail(req *protocol.Request) (*protocol.Response, error) {
 		return errResponse(q.conf, req, resp, err)
 	}
 
-	// respond OK <offset>\r\n
-	cr := protocol.NewClientBatchResponse(q.conf, off)
+	// respond OK
+	cr := protocol.NewClientBatchResponse(q.conf, off, partArgs.nbatches)
 	_, err = req.WriteResponse(resp, cr)
 	if err != nil {
 		return errResponse(q.conf, req, resp, err)
@@ -378,6 +378,7 @@ Loop:
 
 		scanner.Reset(p)
 		for scanner.Scan() {
+			q.partArgBuf.nbatches++
 			b := scanner.Batch()
 			n += b.Messages
 			if n >= messages {
@@ -405,22 +406,6 @@ Loop:
 
 	return q.partArgBuf, nil
 }
-
-// func (q *EventQ) parseBatch(cmd *protocol.Command) error {
-// 	if cmd.Batch == nil {
-// 		return errors.New("missing batch")
-// 	}
-// 	return nil
-// }
-
-// func (q *EventQ) handleClose(cmd *protocol.Command) {
-// 	if len(cmd.Args) != 0 {
-// 		cmd.Respond(protocol.NewClientErrResponse(q.conf, protocol.ErrRespInvalid))
-// 		return
-// 	}
-
-// 	cmd.Respond(protocol.NewResponse(q.conf, protocol.RespOK))
-// }
 
 // handleShutdown handles a shutdown request
 func (q *EventQ) handleShutdown() error {

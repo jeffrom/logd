@@ -11,6 +11,7 @@ func TestWriteClientResponse(t *testing.T) {
 	conf := testhelper.TestConfig(testing.Verbose())
 	resp := NewClientResponse(conf)
 	resp.SetOffset(10)
+	resp.SetBatches(20)
 	fixture := testhelper.LoadFixture("batch_response.simple")
 	b := &bytes.Buffer{}
 

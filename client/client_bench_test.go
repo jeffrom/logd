@@ -18,7 +18,7 @@ func BenchmarkBatch(b *testing.B) {
 	if _, err := batch.ReadFrom(bufio.NewReader(bytes.NewBuffer(fixture))); err != nil {
 		panic(err)
 	}
-	cr := protocol.NewClientBatchResponse(gconf, 10)
+	cr := protocol.NewClientBatchResponse(gconf, 10, 1)
 	c, _ := newBenchmarkConns(conf, fixture, cr)
 
 	b.ResetTimer()

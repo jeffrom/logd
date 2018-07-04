@@ -81,7 +81,7 @@ func testQFileLogger(t *testing.T, conf *config.Config) {
 
 		cr := pushBatch(t, q, fixture)
 
-		checkBatch(t, q, fixture, cr.Offset())
+		checkBatch(t, q, fixture, cr.Offset(), 1)
 		checkReadMultipleBatches(t, q, fixture, offs)
 
 		testhelper.CheckError(q.Stop())
@@ -89,21 +89,23 @@ func testQFileLogger(t *testing.T, conf *config.Config) {
 
 		cr = pushBatch(t, q, fixture)
 
-		checkBatch(t, q, fixture, cr.Offset())
+		checkBatch(t, q, fixture, cr.Offset(), 1)
 		checkReadMultipleBatches(t, q, fixture, offs)
 
 		offs = append(offs, cr.Offset())
 	}
 }
 
-func addReadRespEnvelope(off uint64, b []byte) []byte {
-	return append([]byte(fmt.Sprintf("OK %d\r\n", off)), b...)
+func addReadRespEnvelope(off uint64, batches int, b []byte) []byte {
+	return append([]byte(fmt.Sprintf("OK %d %d\r\n", off, batches)), b...)
 }
 
-func checkBatch(t *testing.T, q *EventQ, fixture []byte, off uint64) {
+func checkBatch(t *testing.T, q *EventQ, fixture []byte, off uint64, batches int) {
 	respb := pushRead(t, q, off, 3)
-	if !bytes.Equal(respb, addReadRespEnvelope(off, fixture)) {
-		t.Fatalf("expected (%d):\n\t%q\nbut got\n\t%q", off, fixture, respb)
+	expect := addReadRespEnvelope(off, batches, fixture)
+	if !bytes.Equal(respb, expect) {
+		log.Panicf("expected (%d):\n\t%q\nbut got\n\t%q", off, expect, respb)
+		// t.Fatalf("expected (%d):\n\t%q\nbut got\n\t%q", off, fixture, respb)
 	}
 }
 
@@ -120,7 +122,7 @@ func checkReadMultipleBatches(t *testing.T, q *EventQ, fixture []byte, offs []ui
 		remainingMessages := (left * 3)
 		for j := 0; j < 3; j++ {
 			respb := pushRead(t, q, off, remainingMessages-j)
-			envelope := []byte(fmt.Sprintf("OK %d\r\n", off))
+			envelope := []byte(fmt.Sprintf("OK %d %d\r\n", off, (remainingMessages-j)/3))
 			if len(respb)-len(envelope) != len(fixture)*left {
 				t.Logf("failed attempt at READ(%d, %d), expected %d remaining batches. Log location: %s", off, remainingMessages, left, q.conf.LogFile)
 				log.Panicf("expected (%d):\n\t(%dx)%q\nbut got\n\t%q", off, left, fixture, respb)

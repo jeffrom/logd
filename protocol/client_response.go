@@ -39,7 +39,7 @@ func parseError(p []byte) error {
 // ClientResponse is the response clients receive after making a request.
 // There are a few possible responses:
 // OK\r\n
-// OK <offset>\r\n
+// OK <offset> <batches>\r\n
 // BATCH <size> <checksum> <messages>\r\n<data>...
 // MOK <size>\r\n<body>\r\n
 // ERR <reason>\r\n
@@ -48,6 +48,7 @@ type ClientResponse struct {
 	conf     *config.Config
 	ok       bool
 	offset   uint64
+	nbatches int
 	err      error
 	mokBuf   []byte
 	digitbuf [32]byte
@@ -61,9 +62,10 @@ func NewClientResponse(conf *config.Config) *ClientResponse {
 }
 
 // NewClientBatchResponse returns a successful batch *ClientResponse
-func NewClientBatchResponse(conf *config.Config, off uint64) *ClientResponse {
+func NewClientBatchResponse(conf *config.Config, off uint64, batches int) *ClientResponse {
 	cr := NewClientResponse(conf)
 	cr.SetOffset(off)
+	cr.SetBatches(batches)
 	return cr
 }
 
@@ -89,12 +91,25 @@ func NewClientErrResponse(conf *config.Config, err error) *ClientResponse {
 }
 
 func (cr *ClientResponse) String() string {
-	return fmt.Sprintf("ClientResponse<offset: %d, err: %v>", cr.offset, cr.err)
+	if cr.ok {
+		return fmt.Sprintf("OK")
+	}
+	if cr.err != nil {
+		return cr.err.Error()
+	}
+	if cr.mokBuf != nil {
+		return fmt.Sprintf("MOK %d", len(cr.mokBuf))
+	}
+	if cr.nbatches == 0 {
+		cr.nbatches = 1
+	}
+	return fmt.Sprintf("OK %d %d", cr.offset, cr.nbatches)
 }
 
 // Reset sets ClientResponse to initial values
 func (cr *ClientResponse) Reset() {
 	cr.offset = 0
+	cr.nbatches = 0
 	cr.err = nil
 	cr.mokBuf = nil
 	cr.ok = false
@@ -109,6 +124,16 @@ func (cr *ClientResponse) SetOffset(off uint64) {
 // for a batch.
 func (cr *ClientResponse) Offset() uint64 {
 	return cr.offset
+}
+
+// SetBatches sets the number of batches in an OK response
+func (cr *ClientResponse) SetBatches(n int) {
+	cr.nbatches = n
+}
+
+// Batches returns the number of batches in an OK response
+func (cr *ClientResponse) Batches() int {
+	return cr.nbatches
 }
 
 // SetError sets the error on the response
@@ -228,7 +253,28 @@ func (cr *ClientResponse) writeBatchOK(w io.Writer) (int64, error) {
 		return total, err
 	}
 
-	l := uintToASCII(uint64(cr.offset), &cr.digitbuf)
+	l := uintToASCII(cr.offset, &cr.digitbuf)
+	n, err = w.Write(cr.digitbuf[l:])
+	total += int64(n)
+	if err != nil {
+		return total, err
+	}
+
+	n, err = w.Write(bspace)
+	total += int64(n)
+	if err != nil {
+		return total, err
+	}
+
+	// writing batches is only one at a time, so the number of batches written
+	// to the log from a request isn't calculated during writes. if it's 0,
+	// just set it to one.
+	// TODO events should probably do this. it may be better not to have this
+	// calculation here at all for correctness sake
+	if cr.nbatches == 0 {
+		cr.nbatches = 1
+	}
+	l = uintToASCII(uint64(cr.nbatches), &cr.digitbuf)
 	n, err = w.Write(cr.digitbuf[l:])
 	total += int64(n)
 	if err != nil {
@@ -309,7 +355,7 @@ func (cr *ClientResponse) readFromBuf(r *bufio.Reader) (int64, error) {
 	} else if isMok {
 		panic("MOK read not implemented")
 	} else {
-		_, word, err = parseWord(line)
+		line, word, err = parseWord(line)
 		if err != nil {
 			return total, err
 		}
@@ -320,6 +366,18 @@ func (cr *ClientResponse) readFromBuf(r *bufio.Reader) (int64, error) {
 			return total, err
 		}
 		cr.offset = n
+
+		_, word, err = parseWord(line)
+		if err != nil {
+			return total, err
+		}
+
+		n, perr = asciiToUint(word)
+		err = perr
+		if err != nil {
+			return total, err
+		}
+		cr.nbatches = int(n)
 	}
 
 	return total, err

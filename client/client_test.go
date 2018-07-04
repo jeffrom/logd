@@ -39,7 +39,7 @@ func TestBatchWrite(t *testing.T) {
 		if !bytes.Equal(fixture, p) {
 			t.Fatalf("expected:\n\n\t%q\n\nbut got:\n\n\t%q\n", fixture, p)
 		}
-		return protocol.NewClientBatchResponse(gconf, expectedID)
+		return protocol.NewClientBatchResponse(gconf, expectedID, 1)
 	})
 
 	off, err := c.Batch(batch)
@@ -77,10 +77,10 @@ func TestRead(t *testing.T) {
 			log.Panicf("expected:\n\n\t%q\n\n but got:\n\n\t%q", expected, p)
 		}
 
-		return readOKResponse(gconf, 10, fixture)
+		return readOKResponse(gconf, 10, 1, fixture)
 	})
 
-	scanner, err := c.ReadOffset(10, 3)
+	_, scanner, err := c.ReadOffset(10, 3)
 	if err != nil {
 		t.Fatalf("ReadOffset: %+v", err)
 	}
@@ -100,7 +100,7 @@ func TestRead(t *testing.T) {
 		return protocol.NewClientErrResponse(gconf, protocol.ErrNotFound)
 	})
 
-	scanner, err = c.ReadOffset(10, 3)
+	_, scanner, err = c.ReadOffset(10, 3)
 	if err != protocol.ErrNotFound {
 		t.Fatalf("expected %v but got %+v", protocol.ErrNotFound, err)
 	}
@@ -122,8 +122,8 @@ func (wt *multiWriterTo) WriteTo(w io.Writer) (int64, error) {
 	return b.WriteTo(w)
 }
 
-func readOKResponse(gconf *config.Config, off uint64, batches ...[]byte) io.WriterTo {
-	wt := []io.WriterTo{protocol.NewClientBatchResponse(gconf, off)}
+func readOKResponse(gconf *config.Config, off uint64, nbatches int, batches ...[]byte) io.WriterTo {
+	wt := []io.WriterTo{protocol.NewClientBatchResponse(gconf, off, nbatches)}
 	for _, b := range batches {
 		wt = append(wt, bytes.NewBuffer(b))
 	}

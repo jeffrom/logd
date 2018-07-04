@@ -206,9 +206,10 @@ func (b *batch) reset() {
 }
 
 type partitionArgList struct {
-	conf   *config.Config
-	parts  []*partitionArgs
-	nparts int
+	conf     *config.Config
+	parts    []*partitionArgs
+	nparts   int
+	nbatches int
 }
 
 func (pl *partitionArgList) String() string {
@@ -240,6 +241,7 @@ func newPartitionArgList(conf *config.Config) *partitionArgList {
 
 func (pl *partitionArgList) reset() {
 	pl.nparts = 0
+	pl.nbatches = 0
 }
 
 func (pl *partitionArgList) add(soff uint64, delta int, limit int) {

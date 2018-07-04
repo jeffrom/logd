@@ -31,7 +31,7 @@ func TestWriter(t *testing.T) {
 		if !bytes.Equal(fixture, p) {
 			t.Fatalf("expected:\n\n\t%q\n\nbut got:\n\n\t%q\n", fixture, p)
 		}
-		return protocol.NewClientBatchResponse(gconf, 10)
+		return protocol.NewClientBatchResponse(gconf, 10, 1)
 	})
 
 	writeBatch(t, w, "hi", "hallo", "sup")
@@ -53,7 +53,7 @@ func TestWriterFillBatch(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		server.Expect(func(p []byte) io.WriterTo {
 			buf.Write(p)
-			return protocol.NewClientBatchResponse(gconf, 10)
+			return protocol.NewClientBatchResponse(gconf, 10, 1)
 		})
 	}
 
@@ -93,7 +93,7 @@ func TestWriterTwoBatches(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		server.Expect(func(p []byte) io.WriterTo {
 			buf.Write(p)
-			cr := protocol.NewClientBatchResponse(gconf, uint64(n))
+			cr := protocol.NewClientBatchResponse(gconf, uint64(n), 1)
 			n += len(p)
 			return cr
 		})

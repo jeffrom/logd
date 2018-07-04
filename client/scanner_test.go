@@ -30,7 +30,7 @@ func TestScanner(t *testing.T) {
 			log.Panicf("expected:\n\n\t%q\n\n but got:\n\n\t%q", expected, p)
 		}
 
-		return readOKResponse(gconf, 0, fixture)
+		return readOKResponse(gconf, 0, 1, fixture)
 	})
 
 	expectedMsgs := [][]byte{

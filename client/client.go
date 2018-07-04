@@ -103,12 +103,13 @@ func (c *Client) Batch(batch *protocol.Batch) (uint64, error) {
 	if _, err := c.send(batch); err != nil {
 		return 0, err
 	}
-	return c.readBatchResponse()
+	off, _, err := c.readBatchResponse()
+	return off, err
 }
 
 // ReadOffset sends a READ request, returning a scanner that can be used to
 // iterate over the messages in the response.
-func (c *Client) ReadOffset(offset uint64, limit int) (*protocol.BatchScanner, error) {
+func (c *Client) ReadOffset(offset uint64, limit int) (int, *protocol.BatchScanner, error) {
 	internal.Debugf(c.gconf, "READ %d %d -> %s", offset, limit, c.Conn.RemoteAddr())
 	req := c.readreq
 	req.Reset()
@@ -116,43 +117,43 @@ func (c *Client) ReadOffset(offset uint64, limit int) (*protocol.BatchScanner, e
 	req.Messages = limit
 
 	if _, err := c.send(req); err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 
-	respOff, err := c.readBatchResponse()
+	respOff, nbatches, err := c.readBatchResponse()
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 	if respOff != offset {
 		log.Printf("response offset (%d) did not match request (%d)", respOff, offset)
-		return nil, protocol.ErrInternal
+		return 0, nil, protocol.ErrInternal
 	}
 
 	c.bs.Reset(c.br)
 	internal.LogError(c.SetReadDeadline(time.Now().Add(c.readTimeout)))
-	return c.bs, nil
+	return nbatches, c.bs, nil
 }
 
 // Tail sends a TAIL request, returning the initial offset and a scanner
 // starting from the first available batch.
-func (c *Client) Tail(limit int) (uint64, *protocol.BatchScanner, error) {
+func (c *Client) Tail(limit int) (uint64, int, *protocol.BatchScanner, error) {
 	internal.Debugf(c.gconf, "TAIL %d -> %s", limit, c.Conn.RemoteAddr())
 	req := c.tailreq
 	req.Reset()
 	req.Messages = limit
 
 	if _, err := c.send(req); err != nil {
-		return 0, nil, err
+		return 0, 0, nil, err
 	}
 
-	respOff, err := c.readBatchResponse()
+	respOff, nbatches, err := c.readBatchResponse()
 	if err != nil {
-		return 0, nil, err
+		return 0, 0, nil, err
 	}
 
 	c.bs.Reset(c.br)
 	internal.LogError(c.SetReadDeadline(time.Now().Add(c.readTimeout)))
-	return respOff, c.bs, nil
+	return respOff, nbatches, c.bs, nil
 }
 
 // Close sends a CLOSE request and then closes the connection
@@ -203,7 +204,7 @@ func (c *Client) flush() error {
 	return nil
 }
 
-func (c *Client) readBatchResponse() (uint64, error) {
+func (c *Client) readBatchResponse() (uint64, int, error) {
 	c.cr.Reset()
 	internal.LogError(c.SetReadDeadline(time.Now().Add(c.readTimeout)))
 	n, err := c.cr.ReadFrom(c.br)
@@ -211,9 +212,9 @@ func (c *Client) readBatchResponse() (uint64, error) {
 	internal.Debugf(c.gconf, "read %d bytes from %s: %+v", n, c.Conn.RemoteAddr(), c.cr)
 	c.handleErr(err)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	return c.cr.Offset(), c.cr.Error()
+	return c.cr.Offset(), c.cr.Batches(), c.cr.Error()
 }
 
 func (c *Client) readCloseResponse() error {
