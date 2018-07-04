@@ -9,10 +9,10 @@ import (
 	"syscall"
 	"time"
 
+	cli "github.com/jeffrom/cli"
 	"github.com/jeffrom/logd/client"
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/internal"
-	cli "github.com/urfave/cli"
 	// cli "gopkg.in/urfave/cli.v2"
 )
 

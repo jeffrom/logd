@@ -8,6 +8,11 @@
   version = "v0.3.0"
 
 [[projects]]
+  name = "github.com/jeffrom/cli"
+  packages = ["."]
+  revision = "f4c09791ad1e785b974378f2b227bc9047497567"
+
+[[projects]]
   name = "github.com/pkg/errors"
   packages = ["."]
   revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
@@ -15,15 +20,12 @@
 
 [[projects]]
   name = "gopkg.in/urfave/cli.v1"
-  packages = [".","altsrc"]
+  packages = [
+    ".",
+    "altsrc"
+  ]
   revision = "cfb38830724cc34fedffe9a2a29fb54fa9169cd1"
   version = "v1.20.0"
-
-[[projects]]
-  branch = "v2"
-  name = "gopkg.in/urfave/cli.v2"
-  packages = ["."]
-  revision = "d3ae77c26ac8db90639677e4831a728d33c36111"
 
 [[projects]]
   branch = "v2"
@@ -34,6 +36,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "158d4eb57339bef5506d1bc855bd285a073db84faf06216c596e04b5a765bbc8"
+  inputs-digest = "1e27363034ff35217e4ba1ae7b52ebdf845621ae8ae5632b3d707ee2ed1887fb"
   solver-name = "gps-cdcl"
   solver-version = 1
