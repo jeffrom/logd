@@ -31,4 +31,4 @@
 
 [[constraint]]
   name = "github.com/jeffrom/cli"
-  revision = "f4c09791ad1e785b974378f2b227bc9047497567"
+  revision = "fix-uint64-alias"

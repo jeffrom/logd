@@ -10,7 +10,7 @@
 [[projects]]
   name = "github.com/jeffrom/cli"
   packages = ["."]
-  revision = "f4c09791ad1e785b974378f2b227bc9047497567"
+  revision = "fix-uint64-alias"
 
 [[projects]]
   name = "github.com/pkg/errors"
@@ -36,6 +36,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "1e27363034ff35217e4ba1ae7b52ebdf845621ae8ae5632b3d707ee2ed1887fb"
+  inputs-digest = "4ed9fa94f4759c8963d1aed29befb8cb968ec597985305b70123f3ac7f550d38"
   solver-name = "gps-cdcl"
   solver-version = 1
