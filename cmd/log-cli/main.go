@@ -12,7 +12,8 @@ import (
 	"github.com/jeffrom/logd/client"
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/internal"
-	cli "gopkg.in/urfave/cli.v2"
+	cli "github.com/urfave/cli"
+	// cli "gopkg.in/urfave/cli.v2"
 )
 
 var tmpConfig = &client.Config{}
@@ -114,6 +115,15 @@ var writeForeverFlag = &cli.BoolFlag{
 	Value:       client.DefaultConfig.WriteForever,
 	EnvVars:     []string{"LOG_WRITE_FOREVER"},
 	Destination: &tmpConfig.WriteForever,
+}
+
+var readForeverFlag = &cli.BoolFlag{
+	Name:        "read-forever",
+	Aliases:     []string{"F"},
+	Usage:       "Keep reading input until the program is killed",
+	Value:       client.DefaultConfig.ReadForever,
+	EnvVars:     []string{"LOG_READ_FOREVER"},
+	Destination: &tmpConfig.ReadForever,
 }
 
 var inputPathFlag = &cli.PathFlag{
@@ -347,9 +357,21 @@ func doWrite(conf *client.Config, args cli.Args) error {
 	return w.Flush()
 }
 
-func doRead(conf *client.Config) error {
+func doRead(conf *client.Config, c *cli.Context) error {
+	conf.UseTail = !c.IsSet("offset")
+	// if conf.ReadForever {
+	// 	conf.Limit = 1000
+	// }
 	done := make(chan struct{})
 	handleKills(done)
+
+	out, err := getFile(conf.OutputPath, false)
+	if err != nil {
+		return err
+	}
+	if out != nil {
+		defer out.Close()
+	}
 
 	scanner, err := client.DialScannerConfig(conf.Hostport, conf)
 	if err != nil {
@@ -358,7 +380,10 @@ func doRead(conf *client.Config) error {
 	defer scanner.Close()
 
 	for scanner.Scan() {
-		fmt.Printf("%q\n", scanner.Message().BodyBytes())
+		_, err := out.Write(scanner.Message().BodyBytes())
+		internal.LogError(err)
+		_, err = out.Write([]byte("\n"))
+		internal.LogError(err)
 	}
 
 	return nil
@@ -393,10 +418,10 @@ func runApp(args []string) {
 				Usage:   "reads messages from the log",
 				Flags: withSharedFlags([]cli.Flag{
 					batchSizeFlag,
-					limitFlag, offsetFlag,
+					limitFlag, offsetFlag, readForeverFlag,
 				}),
 				Action: func(c *cli.Context) error {
-					return doRead(buildConfig(c))
+					return doRead(buildConfig(c), c)
 				},
 			},
 		},

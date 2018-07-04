@@ -2,6 +2,7 @@ package events
 
 import (
 	"context"
+	stderrors "errors"
 	"io"
 	"log"
 	"time"
@@ -21,9 +22,7 @@ import (
 // message is received, it is written to a backend, and a log id is returned to
 // the caller.
 
-//
-// abstract error types
-//
+var errInvalidFormat = stderrors.New("Invalid command format")
 
 // EventQ manages the receiving, processing, and responding to events.
 type EventQ struct {
@@ -259,6 +258,13 @@ func (q *EventQ) handleRead(req *protocol.Request) (*protocol.Response, error) {
 	partArgs, err := q.gatherReadArgs(readreq.Offset, readreq.Messages)
 	if err != nil {
 		// fmt.Println("gatherReadArgs error:", err)
+
+		// TODO test this. When the offset pointing to the very end of the file
+		// is requested (which happens often when reading forever), we get
+		// io.ErrUnexpectedEOF
+		if err == io.ErrUnexpectedEOF {
+			return errResponse(q.conf, req, resp, protocol.ErrNotFound)
+		}
 		return errResponse(q.conf, req, resp, err)
 	}
 
@@ -399,8 +405,6 @@ Loop:
 
 	return q.partArgBuf, nil
 }
-
-var errInvalidFormat = errors.New("Invalid command format")
 
 // func (q *EventQ) parseBatch(cmd *protocol.Command) error {
 // 	if cmd.Batch == nil {

@@ -10,6 +10,9 @@ import (
 	"github.com/jeffrom/logd/testhelper"
 )
 
+// TODO that if the server doesn't send back enough to reach conf.Limit, the
+// scanner requests more.
+
 func TestScanner(t *testing.T) {
 	conf := DefaultTestConfig(testing.Verbose())
 	conf.Offset = 0

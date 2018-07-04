@@ -31,6 +31,7 @@ package protocol
 import (
 	"bufio"
 	"bytes"
+	stderrors "errors"
 	"fmt"
 	"hash/crc32"
 	"io"
@@ -41,13 +42,13 @@ import (
 const termLen = 2
 const maxCRCSize = 10
 
-var errInvalidFirstByte = errors.New("invalid first byte")
-var errInvalidNumArgs = errors.New("invalid number of arguments")
-var errReadStopped = errors.New("read stopped by other side")
-var errInvalidProtocolLine = errors.New("invalid protocol line")
-var errInvalidBodyLength = errors.New("invalid body length")
-var errCrcChecksumMismatch = errors.New("crc checksum mismatch")
-var errRangeNotFound = errors.New("id range not found")
+var errInvalidFirstByte = stderrors.New("invalid first byte")
+var errInvalidNumArgs = stderrors.New("invalid number of arguments")
+var errReadStopped = stderrors.New("read stopped by other side")
+var errInvalidProtocolLine = stderrors.New("invalid protocol line")
+var errInvalidBodyLength = stderrors.New("invalid body length")
+var errCrcChecksumMismatch = stderrors.New("crc checksum mismatch")
+var errRangeNotFound = stderrors.New("id range not found")
 
 var crcTable = crc32.MakeTable(crc32.Koopman)
 

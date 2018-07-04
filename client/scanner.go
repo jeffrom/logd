@@ -71,41 +71,67 @@ func (s *Scanner) Reset() {
 // Scan reads the next message. If it encounters an error, it returns false.
 func (s *Scanner) Scan() bool {
 	if s.s == nil { // initial state
-		bs, err := s.Client.ReadOffset(s.curr, s.conf.Limit)
+		var bs *protocol.BatchScanner
+		var err error
+		if s.conf.UseTail {
+			s.curr, bs, err = s.Client.Tail(s.conf.Limit)
+		} else {
+			bs, err = s.Client.ReadOffset(s.curr, s.conf.Limit)
+		}
 		if err != nil {
 			return s.scanErr(err)
 		}
 		s.s = bs
-		s.s.Batch().MessageBytes()
+		internal.Debugf(s.gconf, "started reading from %d", s.curr)
+
+		if !s.s.Scan() {
+			return s.scanErr(s.s.Error())
+		}
+
+		if err := s.setNextBatch(); err != nil {
+			return s.scanErr(err)
+		}
 	}
 
 	// if we've finished reading a batch, maybe scan another batch or make
-	// another request for more batches
-	if s.batchRead >= len(s.s.Batch().MessageBytes()) {
-		s.curr += uint64(s.batchRead)
-		if !s.conf.ReadForever && s.messagesRead >= s.conf.Limit {
-			return s.scanErr(nil)
+	// another request for more batches.
+	// if s.batchRead >= len(s.s.Batch().MessageBytes()) {
+	// 	s.curr += uint64(s.batchRead)
+	if !s.conf.ReadForever && s.messagesRead >= s.conf.Limit { // done with this batch
+		return s.scanErr(nil)
+	}
+
+	// XXX we should be checking the number of remaining batches for this
+	// request here
+	if s.messagesRead >= s.batch.Messages {
+		if err := s.requestMoreBatches(); err != nil {
+			return s.scanErr(err)
 		}
 
-		ok := s.bs.Scan()
+		// fmt.Println(s.batchRead, len(s.s.Batch().MessageBytes()))
+
+		ok := s.s.Scan()
 		if !ok {
-			err := s.bs.Error()
+			err := s.s.Error()
 			if err != nil && err != io.EOF {
 				return s.scanErr(err)
 			}
 
-			bs, err := s.Client.ReadOffset(s.curr, s.conf.Limit)
-			if err != nil {
+			// we're out of pending batches now, TODO should poll for more
+			if err := s.requestMoreBatches(); err != nil {
 				return s.scanErr(err)
 			}
-			s.s = bs
+
+			// read the next batch
+			if !s.s.Scan() {
+				// unexpectedly failing to scan now
+				if err := s.s.Error(); err != nil {
+					return s.scanErr(err)
+				}
+			}
 		}
 
-		s.batch = s.bs.Batch()
-		s.batchRead = 0
-		s.batchBuf.Reset()
-		s.batchBufBr = bufio.NewReader(s.batchBuf)
-		if _, err := s.batchBuf.Write(s.batch.MessageBytes()); err != nil {
+		if err := s.setNextBatch(); err != nil {
 			return s.scanErr(err)
 		}
 	}
@@ -119,6 +145,29 @@ func (s *Scanner) Scan() bool {
 	}
 	s.messagesRead++
 	return true
+}
+
+func (s *Scanner) requestMoreBatches() error {
+	s.curr += uint64(s.bs.Scanned())
+	bs, err := s.Client.ReadOffset(s.curr, s.conf.Limit)
+	if err != nil {
+		return err
+	}
+	s.s = bs
+	s.messagesRead = 0
+
+	return nil
+}
+
+func (s *Scanner) setNextBatch() error {
+	s.batch = s.s.Batch()
+	s.batchRead = 0
+	s.batchBuf.Reset()
+	s.batchBufBr = bufio.NewReader(s.batchBuf)
+	if _, err := s.batchBuf.Write(s.batch.MessageBytes()); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *Scanner) scanErr(err error) bool {

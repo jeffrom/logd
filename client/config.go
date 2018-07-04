@@ -28,6 +28,7 @@ type Config struct {
 	Limit       int    `json:"limit"`
 	Offset      uint64 `json:"offset"`
 	ReadForever bool   `json:"read-forever"`
+	UseTail     bool   `json:"use-tail"`
 }
 
 // DefaultConfig is the default client configuration

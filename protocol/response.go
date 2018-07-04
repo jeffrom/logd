@@ -1,10 +1,10 @@
 package protocol
 
 import (
+	"errors"
 	"io"
 
 	"github.com/jeffrom/logd/config"
-	"github.com/pkg/errors"
 )
 
 // RespType is the response status return type

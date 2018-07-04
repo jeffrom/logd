@@ -26,6 +26,7 @@ type Client struct { // nolint: golint
 	br      *bufio.Reader
 	cr      *protocol.ClientResponse
 	readreq *protocol.Read
+	tailreq *protocol.Tail
 	bs      *protocol.BatchScanner
 }
 
@@ -39,6 +40,7 @@ func New(conf *Config) *Client {
 		cr:           protocol.NewClientResponse(gconf),
 		bs:           protocol.NewBatchScanner(gconf, nil),
 		readreq:      protocol.NewRead(gconf),
+		tailreq:      protocol.NewTail(gconf),
 		readTimeout:  conf.getReadTimeout(),
 		writeTimeout: conf.getWriteTimeout(),
 	}
@@ -76,6 +78,7 @@ func DialConfig(addr string, conf *Config) (*Client, error) {
 func (c *Client) reset() {
 	c.cr.Reset()
 	c.readreq.Reset()
+	c.tailreq.Reset()
 }
 
 // SetConn sets net.Conn for a client.
@@ -116,18 +119,40 @@ func (c *Client) ReadOffset(offset uint64, limit int) (*protocol.BatchScanner, e
 		return nil, err
 	}
 
-	respID, err := c.readBatchResponse()
+	respOff, err := c.readBatchResponse()
 	if err != nil {
 		return nil, err
 	}
-	if respID != offset {
-		log.Printf("response offset (%d) did not match request (%d)", respID, offset)
+	if respOff != offset {
+		log.Printf("response offset (%d) did not match request (%d)", respOff, offset)
 		return nil, protocol.ErrInternal
 	}
 
 	c.bs.Reset(c.br)
 	internal.LogError(c.SetReadDeadline(time.Now().Add(c.readTimeout)))
 	return c.bs, nil
+}
+
+// Tail sends a TAIL request, returning the initial offset and a scanner
+// starting from the first available batch.
+func (c *Client) Tail(limit int) (uint64, *protocol.BatchScanner, error) {
+	internal.Debugf(c.gconf, "TAIL %d -> %s", limit, c.Conn.RemoteAddr())
+	req := c.tailreq
+	req.Reset()
+	req.Messages = limit
+
+	if _, err := c.send(req); err != nil {
+		return 0, nil, err
+	}
+
+	respOff, err := c.readBatchResponse()
+	if err != nil {
+		return 0, nil, err
+	}
+
+	c.bs.Reset(c.br)
+	internal.LogError(c.SetReadDeadline(time.Now().Add(c.readTimeout)))
+	return respOff, c.bs, nil
 }
 
 // Close sends a CLOSE request and then closes the connection

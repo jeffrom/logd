@@ -38,13 +38,13 @@ func getFileLine(distance int) (string, int) {
 	return file, line
 }
 
-func stdlog(distance int, s string, args ...interface{}) {
+func stdlog(f *os.File, distance int, s string, args ...interface{}) {
 	file, line := getFileLine(distance)
 
 	s = "%s %s " + s + "\n"
 	linearg := fmt.Sprintf("%s:%d:", file, line)
 	args = append([]interface{}{time.Now().Format("2006/01/02 15:04:05.000"), linearg}, args...)
-	_, err := fmt.Fprintf(os.Stdout, s, args...)
+	_, err := fmt.Fprintf(f, s, args...)
 	LogError(err)
 }
 
@@ -54,7 +54,7 @@ func Debugf(conf *config.Config, s string, args ...interface{}) {
 		return
 	}
 
-	stdlog(2, s, args...)
+	stdlog(os.Stdout, 2, s, args...)
 }
 
 // DebugfDepth prints a debug log message to stdout
@@ -63,12 +63,26 @@ func DebugfDepth(conf *config.Config, depth int, s string, args ...interface{}) 
 		return
 	}
 
-	stdlog(2+depth, s, args...)
+	stdlog(os.Stdout, 2+depth, s, args...)
 }
 
 // Logf logs to stdout
 func Logf(s string, args ...interface{}) {
-	stdlog(3, s, args...)
+	stdlog(os.Stdout, 3, s, args...)
+}
+
+// LogError logs the error if one occurred
+func LogError(err error) {
+	if err != nil {
+		stdlog(os.Stderr, 2, "error ignored: %+v", err)
+	}
+}
+
+// IgnoreError logs the error if one occurred
+func IgnoreError(verbose bool, err error) {
+	if verbose && err != nil {
+		stdlog(os.Stderr, 2, "error ignored: %+v", err)
+	}
 }
 
 func doTrace() func() {
@@ -121,20 +135,6 @@ func CloseAll(c []io.Closer) error {
 		}
 	}
 	return firstErr
-}
-
-// LogError logs the error if one occurred
-func LogError(err error) {
-	if err != nil {
-		stdlog(2, "error ignored: %+v", err)
-	}
-}
-
-// IgnoreError logs the error if one occurred
-func IgnoreError(verbose bool, err error) {
-	if verbose && err != nil {
-		stdlog(2, "error ignored: %+v", err)
-	}
 }
 
 // CopyBytes returns a copy of p
