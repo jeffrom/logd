@@ -3,44 +3,27 @@
 # TODO
 
 * [X] Client graceful reconnect
-* [ ] migrate logd to my cli.v2 fork
+* [ ] migrate logd/log-cli to cobra
 * [ ] config validation
 * [ ] Repairer to truncate partitions with corrupt data
 * [ ] remove state management stuff from scanner for now
-* [ ] configurable at-least-once guarantee
+* [ ] make consistency guarantees configurable. fast by default (at-most-once),
+      but also force disk flush before returning success (at-least-once) if
+      that's desired.
+  * most strict can use `creat(O_SYNC)`, or maybe just flush before
+    responding to each command
+  * least strict just needs to fsync during shutdown
+  * have a flush interval option. also document how it may be better to just
+    change the dirty page cache kernel settings. this can be implemented by
+    just putting a flush command into the queue at an interval.
 * [ ] topics?
 * [ ] simple replication, scanner failover
 
-
-
-# DONE
-
-* [ ] fix sendfile. internal.LogFile needs to be able to return a seeked
-  os.File wrapped in an io.LimitReader
-* [ ] read from a partition:offset, not just an id
-* [ ] add batch to protocol so we can seek quickly around the logfile without an index
-* [ ] replication. replicas ACK to master. instrument replica delay
-* [ ] protocol.Reader, Writer should not hold their own buffers, should
-  implement something similar to io.ReaderFrom and io.WriterTo
-  - may want to just have Command, Response, Message have ReadFrom and WriteTo methods
-  - then we can add Batch
-
-
 # maybe later
 
-* [ ] Store head/tail id in index
-  * [X] head
-  * [ ] tail
-* [ ] clear index entries that have been deleted
-* [ ] refuse/accept functionality
-  * `refuse(_at)` / `accept(_at)` should be able to synchronize switching at
-    partition boundaries, as well as ids.
-  * probably want to be able to have the server close a connection and tell the
-    client where they should try to reconnect?
+* [ ] track / limit / reuse concurrent fds in use
+* [ ] record READ misses
 * [ ] log file compression
-* [ ] `STATS` is a lot simpler after refactoring response logic. there
-      shouldn't be cmd.respC AND resp.readerC. all server response bytes should go
-      through one channel.
 * [ ] documentation with many use cases, event log, pub sub, replication,
       changing master
 * [ ] figure out linting
@@ -48,24 +31,12 @@
   * [X] server/client startup/shutdown
   * [ ] all commands
   * [ ] error handling cases
-* [ ] minimize IO abstractions as much as possible. io.Copy is ideal, probably.
-  * would syscall.Fdatasync instead of Flush help? seems likely.
-* [ ] track / limit / reuse concurrent fds in use
 * [ ] optimize. shoot for 0 allocations and do as little work as possible.
   * where we can use a mutex instead of channels?
   * using preallocated buffer + end position pointer so the buffer doesn't
     need to be cleared
-* [ ] make consistency guarantees configurable. fast by default but also force
-      disk flush before returning success if that's desired.
-  * most strict can use `creat(O_SYNC)`, or maybe just flush before
-    responding to each command
-  * least strict just needs to fsync during shutdown
-  * have a flush interval option. also document how it may be better to just
-    change the dirty page cache kernel settings. this can be implemented by
-    just putting a flush command into the queue at an interval.
 * [ ] some tests that spin up containers to replicate, switch masters, etc
       while under load
-* [ ] record READ misses
 * [ ] put delete hooks in a queue, keep track of running delete hooks, make
       part of graceful shutdown
       * continue on startup when there are still pending delete hooks
@@ -110,3 +81,31 @@
 * [x] test suite should also include system-level tests with coverage
 
 * [X] make synchronization idiomatic w/ stuff like https://udhos.github.io/golang-concurrency-tricks/
+
+
+
+# OBSOLETE
+
+* [ ] fix sendfile. internal.LogFile needs to be able to return a seeked
+  os.File wrapped in an io.LimitReader
+* [ ] read from a partition:offset, not just an id
+* [ ] add batch to protocol so we can seek quickly around the logfile without an index
+* [ ] replication. replicas ACK to master. instrument replica delay
+* [ ] protocol.Reader, Writer should not hold their own buffers, should
+  implement something similar to io.ReaderFrom and io.WriterTo
+  - may want to just have Command, Response, Message have ReadFrom and WriteTo methods
+  - then we can add Batch
+* [ ] Store head/tail id in index
+  * [X] head
+  * [ ] tail
+* [ ] clear index entries that have been deleted
+* [ ] refuse/accept functionality
+  * `refuse(_at)` / `accept(_at)` should be able to synchronize switching at
+    partition boundaries, as well as ids.
+  * probably want to be able to have the server close a connection and tell the
+    client where they should try to reconnect?
+* [ ] `STATS` is a lot simpler after refactoring response logic. there
+      shouldn't be cmd.respC AND resp.readerC. all server response bytes should go
+      through one channel.
+
+

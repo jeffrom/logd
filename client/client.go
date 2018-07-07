@@ -319,8 +319,7 @@ func (c *Client) readClientResponse() (int64, error) {
 	n, err := c.cr.ReadFrom(c.br)
 	internal.LogError(c.SetReadDeadline(time.Time{}))
 	internal.Debugf(c.gconf, "read %d bytes from %s: %+v (err: %v)", n, c.Conn.RemoteAddr(), c.cr, err)
-	c.handleErr(err)
-	return n, err
+	return n, c.handleErr(err)
 }
 
 func (c *Client) readBatchResponse(wt io.WriterTo) (uint64, int, error) {
