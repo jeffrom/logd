@@ -2,6 +2,17 @@
 
 # TODO
 
+* [X] Client graceful reconnect
+* [ ] migrate logd to my cli.v2 fork
+* [ ] config validation
+* [ ] Repairer to truncate partitions with corrupt data
+* [ ] remove state management stuff from scanner for now
+* [ ] configurable at-least-once guarantee
+* [ ] topics?
+* [ ] simple replication, scanner failover
+
+# DONE
+
 * [ ] fix sendfile. internal.LogFile needs to be able to return a seeked
   os.File wrapped in an io.LimitReader
 * [ ] read from a partition:offset, not just an id
