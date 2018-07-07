@@ -17,20 +17,21 @@ var ErrStopped = errors.New("stopped")
 // Scanner is used to read batches from the log, scanning message by message
 type Scanner struct {
 	*Client
-	conf         *Config
-	state        StatePuller
-	s            *protocol.BatchScanner
-	batch        *protocol.Batch
-	msg          *protocol.Message
-	batchBuf     *bytes.Buffer
-	batchBufBr   *bufio.Reader
-	batchRead    int
-	batchesRead  int
-	nbatches     int
-	messagesRead int
-	curr         uint64
-	err          error
-	done         chan struct{}
+	conf              *Config
+	state             StatePuller
+	s                 *protocol.BatchScanner
+	batch             *protocol.Batch
+	msg               *protocol.Message
+	batchBuf          *bytes.Buffer
+	batchBufBr        *bufio.Reader
+	batchRead         int
+	batchesRead       int
+	nbatches          int
+	messagesRead      int
+	totalMessagesRead int
+	curr              uint64
+	err               error
+	done              chan struct{}
 }
 
 // NewScanner returns a new instance of *Scanner
@@ -72,6 +73,7 @@ func (s *Scanner) Reset() {
 	s.msg.Reset()
 	s.curr = s.conf.Offset
 	s.messagesRead = 0
+	s.totalMessagesRead = 0
 	s.batchBuf.Reset()
 	s.batchBufBr = bufio.NewReader(s.batchBuf)
 	s.batchRead = 0
@@ -86,7 +88,7 @@ func (s *Scanner) Reset() {
 
 // Scan reads the next message. If it encounters an error, it returns false.
 func (s *Scanner) Scan() bool {
-	if !s.conf.ReadForever && s.messagesRead >= s.conf.Limit {
+	if !s.conf.ReadForever && s.totalMessagesRead >= s.conf.Limit {
 		return s.scanErr(nil)
 	}
 
@@ -114,7 +116,7 @@ func (s *Scanner) Scan() bool {
 			return s.scanErr(err)
 		}
 	} else if s.messagesRead >= s.batch.Messages {
-		if !s.conf.ReadForever && s.messagesRead >= s.conf.Limit {
+		if !s.conf.ReadForever && s.totalMessagesRead >= s.conf.Limit {
 			return s.scanErr(nil)
 		}
 
@@ -149,6 +151,7 @@ func (s *Scanner) Scan() bool {
 		return s.scanErr(err)
 	}
 	s.messagesRead++
+	s.totalMessagesRead++
 	return true
 }
 
@@ -192,6 +195,9 @@ func (s *Scanner) setNextBatch() error {
 }
 
 func (s *Scanner) pollBatch() error {
+	if !s.conf.ReadForever {
+		return protocol.ErrNotFound
+	}
 	for {
 		time.Sleep(s.conf.WaitInterval)
 		err := s.requestMoreBatches(true)

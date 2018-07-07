@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"math"
 	"net"
 	"time"
 
@@ -13,14 +14,29 @@ import (
 	"github.com/jeffrom/logd/protocol"
 )
 
+// Dialer defines an interface for connecting to servers. It can be used for
+// mocking in tests.
+type Dialer interface {
+	DialTimeout(network, addr string, timeout time.Duration) (net.Conn, error)
+}
+
+type netDialer struct{}
+
+func (nd *netDialer) DialTimeout(network, addr string, timeout time.Duration) (net.Conn, error) {
+	return net.DialTimeout(network, addr, timeout)
+}
+
 // Client represents a connection to the database
 type Client struct { // nolint: golint
 	net.Conn
 	conf  *Config
 	gconf *config.Config
 
-	readTimeout  time.Duration
-	writeTimeout time.Duration
+	dialer        Dialer
+	readTimeout   time.Duration
+	writeTimeout  time.Duration
+	retries       int
+	retryInterval time.Duration
 
 	bw      *bufio.Writer
 	br      *bufio.Reader
@@ -28,6 +44,8 @@ type Client struct { // nolint: golint
 	readreq *protocol.Read
 	tailreq *protocol.Tail
 	bs      *protocol.BatchScanner
+
+	done chan struct{}
 }
 
 // New returns a new instance of Client without a net.Conn
@@ -37,12 +55,14 @@ func New(conf *Config) *Client {
 	c := &Client{
 		conf:         conf,
 		gconf:        gconf,
+		dialer:       &netDialer{},
+		readTimeout:  conf.getReadTimeout(),
+		writeTimeout: conf.getWriteTimeout(),
 		cr:           protocol.NewClientResponse(gconf),
 		bs:           protocol.NewBatchScanner(gconf, nil),
 		readreq:      protocol.NewRead(gconf),
 		tailreq:      protocol.NewTail(gconf),
-		readTimeout:  conf.getReadTimeout(),
-		writeTimeout: conf.getWriteTimeout(),
+		done:         make(chan struct{}),
 	}
 
 	return c
@@ -56,22 +76,11 @@ func Dial(addr string) (*Client, error) {
 // DialConfig returns a configured Conn
 func DialConfig(addr string, conf *Config) (*Client, error) {
 	// internal.Debugf(conf, "starting options: %s", conf)
-	var conn net.Conn
-	var err error
-
-	conn, err = net.Dial("tcp", addr)
-	if err != nil {
-		if conn != nil {
-			internal.LogError(conn.Close())
-		}
-
+	c := New(conf)
+	if err := c.connect(addr); err != nil {
 		return nil, err
 	}
 
-	c := New(conf)
-	c.Conn = conn
-	c.bw = bufio.NewWriterSize(conn, conf.BatchSize)
-	c.br = bufio.NewReaderSize(conn, conf.BatchSize)
 	return c, nil
 }
 
@@ -79,10 +88,39 @@ func (c *Client) reset() {
 	c.cr.Reset()
 	c.readreq.Reset()
 	c.tailreq.Reset()
+	select {
+	case <-c.done:
+	default:
+	}
+}
+
+func (c *Client) resetRetries() {
+	c.retries = 0
+	c.retryInterval = 0
+}
+
+func (c *Client) connect(addr string) error {
+	conn, err := c.dialer.DialTimeout("tcp", addr, c.conf.Timeout)
+	if err != nil {
+		internal.IgnoreError(c.conf.Verbose, conn.Close())
+		return err
+	}
+	c.reset()
+	c.SetConn(conn)
+	return nil
+}
+
+// Stop causes any pending blocking operation to return ErrStopped
+func (c *Client) Stop() {
+	c.done <- struct{}{}
 }
 
 // SetConn sets net.Conn for a client.
 func (c *Client) SetConn(conn net.Conn) *Client {
+	if c.Conn != nil {
+		internal.LogError(c.Conn.Close())
+	}
+
 	c.Conn = conn
 	if c.bw == nil {
 		c.bw = bufio.NewWriterSize(conn, c.conf.BatchSize)
@@ -100,10 +138,10 @@ func (c *Client) SetConn(conn net.Conn) *Client {
 // Batch sends a batch request and returns the response.
 func (c *Client) Batch(batch *protocol.Batch) (uint64, error) {
 	internal.Debugf(c.gconf, "%v -> %s", batch, c.Conn.RemoteAddr())
-	if _, err := c.send(batch); err != nil {
+	if _, _, err := c.doRequest(batch); err != nil {
 		return 0, err
 	}
-	off, _, err := c.readBatchResponse()
+	off, _, err := c.readBatchResponse(batch)
 	return off, err
 }
 
@@ -116,11 +154,11 @@ func (c *Client) ReadOffset(offset uint64, limit int) (int, *protocol.BatchScann
 	req.Offset = offset
 	req.Messages = limit
 
-	if _, err := c.send(req); err != nil {
+	if _, _, err := c.doRequest(req); err != nil {
 		return 0, nil, err
 	}
 
-	respOff, nbatches, err := c.readBatchResponse()
+	respOff, nbatches, err := c.readBatchResponse(req)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -142,11 +180,11 @@ func (c *Client) Tail(limit int) (uint64, int, *protocol.BatchScanner, error) {
 	req.Reset()
 	req.Messages = limit
 
-	if _, err := c.send(req); err != nil {
+	if _, _, err := c.doRequest(req); err != nil {
 		return 0, 0, nil, err
 	}
 
-	respOff, nbatches, err := c.readBatchResponse()
+	respOff, nbatches, err := c.readBatchResponse(req)
 	if err != nil {
 		return 0, 0, nil, err
 	}
@@ -163,7 +201,7 @@ func (c *Client) Close() error {
 	}()
 
 	closereq := protocol.NewCloseRequest(c.gconf)
-	if _, err := c.send(closereq); err != nil {
+	if _, _, err := c.doRequest(closereq); err != nil {
 		return err
 	}
 
@@ -174,21 +212,92 @@ func (c *Client) Close() error {
 	return nil
 }
 
-func (c *Client) send(wt io.WriterTo) (int64, error) {
+func (c *Client) doRequest(wt io.WriterTo) (int64, int64, error) {
+	sent, recv, err := c.do(wt)
+	if err != nil {
+		return c.retryRequest(wt, sent, recv, err)
+	}
+	return sent, recv, err
+}
+
+func (c *Client) do(wt io.WriterTo) (int64, int64, error) {
 	internal.LogError(c.SetWriteDeadline(time.Now().Add(c.writeTimeout)))
-	n, err := wt.WriteTo(c.bw)
-	if c.handleErr(err) != nil {
-		return 0, err
-	}
-	internal.Debugf(c.gconf, "wrote %d bytes to %s", n, c.Conn.RemoteAddr())
-
-	err = c.flush()
-	if c.handleErr(err) != nil {
-		return n, err
-	}
-
+	sent, err := wt.WriteTo(c.bw)
 	internal.LogError(c.SetWriteDeadline(time.Time{}))
-	return n, err
+	if err != nil {
+		return sent, 0, err
+	}
+
+	internal.LogError(c.SetWriteDeadline(time.Now().Add(c.writeTimeout)))
+	err = c.flush()
+	internal.LogError(c.SetWriteDeadline(time.Time{}))
+	internal.Debugf(c.gconf, "wrote %d bytes to %s (err: %v)", sent, c.Conn.RemoteAddr(), err)
+	if err != nil {
+		return sent, 0, err
+	}
+
+	recv, err := c.readClientResponse()
+	if err != nil {
+		return sent, recv, err
+	}
+	return sent, recv, nil
+}
+
+func (c *Client) retryRequest(wt io.WriterTo, origSent, origRecv int64, err error) (int64, int64, error) {
+	if c.conf.ConnRetries == 0 {
+		return origSent, origRecv, err
+	}
+	if !isRetryable(err) {
+		return origSent, origRecv, err
+	}
+
+	var retryErr error
+	var sent int64
+	var recv int64
+	conn := c.Conn
+	for c.conf.ConnRetries < 0 || c.retries < c.conf.ConnRetries {
+		if retryErr != nil && !isRetryable(err) {
+			break
+		}
+		c.retries++
+		if c.retryInterval == 0 {
+			c.retryInterval = c.conf.ConnRetryInterval
+		} else {
+			next := int(math.Round(float64(c.retryInterval) * c.conf.ConnRetryMultiplier))
+			c.retryInterval = time.Duration(next)
+		}
+		if c.retryInterval > c.conf.ConnRetryMaxInterval {
+			c.retryInterval = c.conf.ConnRetryMaxInterval
+		}
+
+		select {
+		case <-time.After(c.retryInterval):
+		case <-c.done:
+			return 0, 0, ErrStopped
+		}
+		log.Printf("retrying after %s (attempt %d)", c.retryInterval, c.retries)
+
+		if conn != nil {
+			internal.IgnoreError(c.conf.Verbose, conn.Close())
+		}
+		retryErr = c.connect(c.conf.Hostport)
+		if retryErr != nil {
+			continue
+		}
+
+		sent, recv, retryErr = c.do(wt)
+		if retryErr != nil {
+			continue
+		}
+
+		c.resetRetries()
+		break
+	}
+
+	if retryErr != nil {
+		return sent, recv, retryErr
+	}
+	return sent, recv, nil
 }
 
 // flush flushes all pending data to the server
@@ -197,36 +306,28 @@ func (c *Client) flush() error {
 		internal.Debugf(c.gconf, "client.Flush() (%d bytes)", c.bw.Buffered())
 		internal.LogError(c.SetWriteDeadline(time.Now().Add(c.writeTimeout)))
 		err := c.bw.Flush()
-		internal.Debugf(c.gconf, "client.Flush() complete")
+		internal.Debugf(c.gconf, "client.Flush() complete (err: %v)", err)
 		internal.LogError(c.SetWriteDeadline(time.Time{}))
 		return err
 	}
 	return nil
 }
 
-func (c *Client) readBatchResponse() (uint64, int, error) {
+func (c *Client) readClientResponse() (int64, error) {
 	c.cr.Reset()
 	internal.LogError(c.SetReadDeadline(time.Now().Add(c.readTimeout)))
 	n, err := c.cr.ReadFrom(c.br)
 	internal.LogError(c.SetReadDeadline(time.Time{}))
-	internal.Debugf(c.gconf, "read %d bytes from %s: %+v", n, c.Conn.RemoteAddr(), c.cr)
+	internal.Debugf(c.gconf, "read %d bytes from %s: %+v (err: %v)", n, c.Conn.RemoteAddr(), c.cr, err)
 	c.handleErr(err)
-	if err != nil {
-		return 0, 0, err
-	}
+	return n, err
+}
+
+func (c *Client) readBatchResponse(wt io.WriterTo) (uint64, int, error) {
 	return c.cr.Offset(), c.cr.Batches(), c.cr.Error()
 }
 
 func (c *Client) readCloseResponse() error {
-	c.cr.Reset()
-	internal.LogError(c.SetReadDeadline(time.Now().Add(c.readTimeout)))
-	n, err := c.cr.ReadFrom(c.br)
-	internal.LogError(c.SetReadDeadline(time.Time{}))
-	internal.Debugf(c.gconf, "read %d bytes from %s: %+v", n, c.Conn.RemoteAddr(), c.cr)
-	c.handleErr(err)
-	if err != nil {
-		return err
-	}
 	if !c.cr.Ok() {
 		return errors.New("close failed")
 	}
@@ -243,4 +344,14 @@ func (c *Client) handleErr(err error) error {
 		internal.DebugfDepth(c.gconf, 1, "%+v", err)
 	}
 	return err
+}
+
+func isRetryable(err error) bool {
+	if err == io.EOF || err == io.ErrClosedPipe {
+		return true
+	}
+	if nerr, ok := err.(net.Error); ok && nerr.Timeout() || nerr.Temporary() {
+		return true
+	}
+	return false
 }

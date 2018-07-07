@@ -1,6 +1,7 @@
 package client
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -10,14 +11,18 @@ import (
 // Config is used for client configuration
 type Config struct {
 	// shared options
-	Verbose      bool          `json:"verbose"`
-	Hostport     string        `json:"host"`
-	Timeout      time.Duration `json:"timeout"`
-	WriteTimeout time.Duration `json:"write-timeout"`
-	ReadTimeout  time.Duration `json:"read-timeout"`
-	Count        bool          `json:"count"`
-	OutputPath   string        `json:"output"`
-	WaitInterval time.Duration `json:"wait-interval"`
+	Verbose              bool          `json:"verbose"`
+	Hostport             string        `json:"host"`
+	Timeout              time.Duration `json:"timeout"`
+	WriteTimeout         time.Duration `json:"write-timeout"`
+	ReadTimeout          time.Duration `json:"read-timeout"`
+	Count                bool          `json:"count"`
+	OutputPath           string        `json:"output"`
+	WaitInterval         time.Duration `json:"wait-interval"`
+	ConnRetries          int           `json:"connection-retries"`
+	ConnRetryInterval    time.Duration `json:"connection-retry-interval"`
+	ConnRetryMaxInterval time.Duration `json:"connection-retry-max-interval"`
+	ConnRetryMultiplier  float64       `json:"connection-retry-multiplier"`
 
 	// write options
 	BatchSize    int    `json:"batch-size"`
@@ -33,19 +38,32 @@ type Config struct {
 
 // DefaultConfig is the default client configuration
 var DefaultConfig = &Config{
-	Verbose:      false,
-	Hostport:     "127.0.0.1:1774",
-	Timeout:      500 * time.Millisecond,
-	WriteTimeout: -1 * time.Millisecond,
-	ReadTimeout:  -1 * time.Millisecond,
-	Count:        false,
-	OutputPath:   "-",
-	WaitInterval: 400 * time.Millisecond,
+	Verbose:              false,
+	Hostport:             "127.0.0.1:1774",
+	Timeout:              1 * time.Second,
+	WriteTimeout:         -1,
+	ReadTimeout:          -1,
+	Count:                false,
+	OutputPath:           "-",
+	WaitInterval:         400 * time.Millisecond,
+	ConnRetries:          50,
+	ConnRetryInterval:    1 * time.Second,
+	ConnRetryMaxInterval: 30 * time.Second,
+	ConnRetryMultiplier:  2.0,
 
 	BatchSize: 1024 * 20,
 	InputPath: "-",
 
 	Limit: 15,
+}
+
+// Validate returns an error pointing to incorrect values for the
+// configuration, if any.
+func (c *Config) Validate() error {
+	if c.ConnRetryMultiplier < 1.0 {
+		return errors.New("conn-retry-multiplier must be >= 1.0")
+	}
+	return nil
 }
 
 func (c *Config) String() string {
@@ -92,5 +110,12 @@ func DefaultTestConfig(verbose bool) *Config {
 	*c = *DefaultConfig
 	c.Verbose = verbose
 	// c.BatchSize = 1024 * 10
+	c.ReadTimeout = 100 * time.Millisecond
+	c.WriteTimeout = 100 * time.Millisecond
+	c.WaitInterval = 100 * time.Millisecond
+	c.ConnRetries = 3
+	c.ConnRetryInterval = 1
+	c.ConnRetryMaxInterval = 1
+	c.ConnRetryMultiplier = 2
 	return c
 }

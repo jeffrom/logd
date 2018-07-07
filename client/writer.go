@@ -145,7 +145,6 @@ func (w *Writer) start() {
 				internal.Debugf(w.gconf, "<-WaitInterval")
 				internal.LogError(w.flushPending(false))
 			}
-
 		}
 	}()
 }

@@ -7,6 +7,7 @@ import (
 	"log"
 	"testing"
 
+	"github.com/jeffrom/logd/protocol"
 	"github.com/jeffrom/logd/testhelper"
 )
 
@@ -23,6 +24,8 @@ func TestScanner(t *testing.T) {
 	defer server.Close()
 	c := New(conf).SetConn(clientConn)
 	s := ScannerForClient(c)
+	defer s.Close()
+	defer expectServerClose(t, gconf, server)
 
 	expected := []byte(fmt.Sprintf("READ 0 %d\r\n", conf.Limit))
 	server.Expect(func(p []byte) io.WriterTo {
@@ -57,5 +60,145 @@ func TestScanner(t *testing.T) {
 
 	if s.Scan() {
 		t.Fatalf("did not expect to scan another batch")
+	}
+}
+
+func TestScannerLimit(t *testing.T) {
+	nbatches := 5
+	conf := DefaultTestConfig(testing.Verbose())
+	conf.Offset = 0
+	conf.Limit = 15
+	gconf := conf.toGeneralConfig()
+	fixture := testhelper.LoadFixture("batch.small")
+	server, clientConn := testhelper.Pipe()
+	defer server.Close()
+	c := New(conf).SetConn(clientConn)
+	s := ScannerForClient(c)
+	defer s.Close()
+	defer expectServerClose(t, gconf, server)
+
+	// requested works around an issue where the the value of i in the callback
+	// is always -1
+	requested := 0
+	for i := 0; i < nbatches; i++ {
+		server.Expect(func(p []byte) io.WriterTo {
+			n := requested
+			offset := n * len(fixture)
+			expected := []byte(fmt.Sprintf("READ %d %d\r\n", offset, conf.Limit))
+			if !bytes.Equal(p, expected) {
+				log.Panicf("expected:\n\n\t%q\n\n but got:\n\n\t%q", expected, p)
+			}
+
+			// fmt.Println(n, len(fixture), n*len(fixture))
+			resp := readOKResponse(gconf, uint64(offset), 1, fixture)
+
+			requested++
+			return resp
+		})
+	}
+
+	expectedMsgs := [][]byte{
+		[]byte("hi"),
+		[]byte("hallo"),
+		[]byte("sup"),
+	}
+	for i := 0; i < nbatches*len(expectedMsgs); i++ {
+		expectedMsg := expectedMsgs[i%3]
+		ok := s.Scan()
+		if !ok {
+			t.Fatalf("stopped scanning too early (%d/%d) (err: %+v)", i, nbatches, s.Error())
+		}
+
+		actual := s.Message().BodyBytes()
+		if !bytes.Equal(expectedMsg, actual) {
+			t.Fatalf("expected:\n\n\t%q\n\nbut got:\n\n\t%q", expectedMsg, actual)
+		}
+	}
+
+	if err := s.Error(); err != nil {
+		t.Fatalf("scan: %+v", err)
+	}
+
+	if s.Scan() {
+		t.Fatalf("did not expect to scan another batch")
+	}
+}
+
+func TestScannerReadForever(t *testing.T) {
+	// t.SkipNow()
+	nbatches := 5
+	conf := DefaultTestConfig(testing.Verbose())
+	conf.Offset = 0
+	conf.Limit = 3
+	conf.ReadForever = true
+	gconf := conf.toGeneralConfig()
+	fixture := testhelper.LoadFixture("batch.small")
+	server, clientConn := testhelper.Pipe()
+	defer server.Close()
+	c := New(conf).SetConn(clientConn)
+	s := ScannerForClient(c)
+	defer s.Close()
+	defer expectServerClose(t, gconf, server)
+
+	// requested works around an issue where the the value of i in the callback
+	// is always -1
+	requested := 0
+	for i := 0; i < nbatches; i++ {
+		server.Expect(func(p []byte) io.WriterTo {
+			n := requested
+			offset := n * len(fixture)
+			expected := []byte(fmt.Sprintf("READ %d %d\r\n", offset, conf.Limit))
+			if !bytes.Equal(p, expected) {
+				log.Panicf("expected:\n\n\t%q\n\n but got:\n\n\t%q", expected, p)
+			}
+
+			// fmt.Println(n, len(fixture), n*len(fixture))
+			resp := readOKResponse(gconf, uint64(offset), 1, fixture)
+
+			requested++
+			return resp
+		})
+	}
+
+	expectedMsgs := [][]byte{
+		[]byte("hi"),
+		[]byte("hallo"),
+		[]byte("sup"),
+	}
+	for i := 0; i < nbatches*len(expectedMsgs); i++ {
+		expectedMsg := expectedMsgs[i%3]
+		ok := s.Scan()
+		if !ok {
+			t.Fatalf("stopped scanning too early (%d/%d) (err: %+v)", i, nbatches, s.Error())
+		}
+
+		actual := s.Message().BodyBytes()
+		if !bytes.Equal(expectedMsg, actual) {
+			t.Fatalf("expected:\n\n\t%q\n\nbut got:\n\n\t%q", expectedMsg, actual)
+		}
+	}
+
+	if err := s.Error(); err != nil {
+		t.Fatalf("scan: %+v", err)
+	}
+
+	server.Expect(func(p []byte) io.WriterTo {
+		offset := nbatches * len(fixture)
+		expected := []byte(fmt.Sprintf("READ %d %d\r\n", offset, conf.Limit))
+		if !bytes.Equal(p, expected) {
+			log.Panicf("expected:\n\n\t%q\n\n but got:\n\n\t%q", expected, p)
+		}
+		return protocol.NewClientErrResponse(gconf, protocol.ErrNotFound)
+	})
+
+	// not a great way to test, but all i can think the way polling works now
+	conf.ReadForever = false
+	s.totalMessagesRead = 0
+	if s.Scan() {
+		t.Fatalf("did not expect to scan another batch")
+	}
+
+	if err := s.Error(); err != protocol.ErrNotFound {
+		t.Fatalf("expected error %v but got %+v", protocol.ErrNotFound, err)
 	}
 }

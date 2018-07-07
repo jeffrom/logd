@@ -106,6 +106,88 @@ func TestRead(t *testing.T) {
 	}
 }
 
+func TestTail(t *testing.T) {
+	conf := DefaultTestConfig(testing.Verbose())
+	gconf := conf.toGeneralConfig()
+	fixture := testhelper.LoadFixture("batch.small")
+	server, clientConn := testhelper.Pipe()
+	defer server.Close()
+	c := New(conf).SetConn(clientConn)
+
+	expected := []byte("TAIL 3\r\n")
+	server.Expect(func(p []byte) io.WriterTo {
+		if !bytes.Equal(p, expected) {
+			log.Panicf("expected:\n\n\t%q\n\n but got:\n\n\t%q", expected, p)
+		}
+
+		return readOKResponse(gconf, 10, 1, fixture)
+	})
+
+	_, _, scanner, err := c.Tail(3)
+	if err != nil {
+		t.Fatalf("Tail: %+v", err)
+	}
+
+	ok := scanner.Scan()
+	if !ok {
+		t.Fatalf("failed to scan: %+v", scanner.Error())
+	}
+
+	batch := scanner.Batch()
+	t.Logf("read %+v", batch)
+	if serr := scanner.Error(); serr != nil {
+		t.Fatalf("scanner: %+v", serr)
+	}
+}
+
+func TestClose(t *testing.T) {
+	conf := DefaultTestConfig(testing.Verbose())
+	gconf := conf.toGeneralConfig()
+	server, clientConn := testhelper.Pipe()
+	defer server.Close()
+	c := New(conf).SetConn(clientConn)
+
+	server.Expect(func(p []byte) io.WriterTo {
+		if !bytes.Equal(p, []byte("CLOSE\r\n")) {
+			log.Panicf("expected:\n\n\t%q\n\n but got:\n\n\t%q", "CLOSE\r\n", p)
+		}
+		return protocol.NewClientOKResponse(gconf)
+	})
+
+	err := c.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestReconnect(t *testing.T) {
+	conf := DefaultTestConfig(testing.Verbose())
+	gconf := conf.toGeneralConfig()
+	server, clientConn := testhelper.Pipe()
+	defer server.Close()
+	c := New(conf).SetConn(clientConn)
+	c.dialer = server
+
+	var expectedID uint64
+	batch := protocol.NewBatch(gconf)
+	batch.Append([]byte("hi"))
+	batch.Append([]byte("hallo"))
+	batch.Append([]byte("sup"))
+
+	server.CloseN(3)
+	server.Expect(func(p []byte) io.WriterTo {
+		return protocol.NewClientBatchResponse(gconf, expectedID, 1)
+	})
+
+	off, err := c.Batch(batch)
+	if err != nil {
+		t.Fatalf("sending batch: %+v", err)
+	}
+	if off != expectedID {
+		t.Fatalf("expected resp offset %d but got %d", expectedID, off)
+	}
+}
+
 type multiWriterTo struct {
 	wt []io.WriterTo
 }
