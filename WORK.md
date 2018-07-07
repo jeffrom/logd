@@ -11,6 +11,8 @@
 * [ ] topics?
 * [ ] simple replication, scanner failover
 
+
+
 # DONE
 
 * [ ] fix sendfile. internal.LogFile needs to be able to return a seeked
