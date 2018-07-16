@@ -11,7 +11,6 @@ import (
 
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/internal"
-	"github.com/jeffrom/logd/logger"
 	"github.com/jeffrom/logd/protocol"
 	"github.com/jeffrom/logd/server"
 	"github.com/jeffrom/logd/transport"
@@ -24,15 +23,16 @@ import (
 
 var errInvalidFormat = stderrors.New("Invalid command format")
 
+const defaultTopic = "default"
+
 // EventQ manages the receiving, processing, and responding to events.
 type EventQ struct {
 	conf         *config.Config
 	in           chan *protocol.Request
 	stopC        chan error
 	shutdownC    chan error
-	parts        *partitions
+	topics       *topics
 	partArgBuf   *partitionArgList
-	logw         logger.LogWriter
 	batchScanner *protocol.BatchScanner
 	servers      []transport.Server
 	Stats        *internal.Stats
@@ -42,16 +42,14 @@ type EventQ struct {
 func NewEventQ(conf *config.Config) *EventQ {
 	log.Printf("starting options: %s", conf)
 
-	logp := logger.NewPartitions(conf)
 	q := &EventQ{
 		conf:         conf,
 		Stats:        internal.NewStats(),
 		in:           make(chan *protocol.Request, 1000),
 		stopC:        make(chan error),
 		shutdownC:    make(chan error, 1),
-		parts:        newPartitions(conf, logp), // partition state manager
+		topics:       newTopics(conf),
 		partArgBuf:   newPartitionArgList(conf), // partition arguments buffer
-		logw:         logger.NewWriter(conf),
 		batchScanner: protocol.NewBatchScanner(conf, nil),
 		servers:      []transport.Server{},
 	}
@@ -72,19 +70,8 @@ func (q *EventQ) Register(server transport.Server) {
 
 // GoStart begins handling messages
 func (q *EventQ) GoStart() error {
-	if lc, ok := q.parts.logp.(internal.LifecycleManager); ok {
-		if err := lc.Setup(); err != nil {
-			return err
-		}
-	}
-	if err := q.setupPartitions(); err != nil {
+	if err := q.topics.Setup(); err != nil {
 		return err
-	}
-
-	if lc, ok := q.logw.(internal.LifecycleManager); ok {
-		if err := lc.Setup(); err != nil {
-			return err
-		}
 	}
 
 	go q.loop()
@@ -107,34 +94,6 @@ func (q *EventQ) Start() error {
 			return err
 		}
 	}
-	return nil
-}
-
-func (q *EventQ) setupPartitions() error {
-	q.parts.reset()
-	parts, err := q.parts.logp.List()
-	if err != nil {
-		return err
-	}
-
-	for _, part := range parts {
-		if err := q.parts.add(part.Offset(), part.Size()); err != nil {
-			return err
-		}
-	}
-
-	if len(parts) == 0 {
-		if err := q.parts.add(0, 0); err != nil {
-			return err
-		}
-	}
-
-	head := q.parts.head
-	if serr := q.logw.SetPartition(head.startOffset); serr != nil {
-		return serr
-	}
-
-	log.Printf("Starting at %d (partition %d, delta %d)", q.parts.headOffset(), head.startOffset, head.size)
 	return nil
 }
 
@@ -219,22 +178,27 @@ func (q *EventQ) handleBatch(req *protocol.Request) (*protocol.Response, error) 
 		return errResponse(q.conf, req, resp, err)
 	}
 
+	topic, err := q.topics.get(batch.Topic())
+	if err != nil {
+		return errResponse(q.conf, req, resp, err)
+	}
+
 	// set next write partition if needed
-	if q.parts.shouldRotate(req.FullSize()) {
-		nextStartOffset := q.parts.nextOffset()
-		if sperr := q.logw.SetPartition(nextStartOffset); sperr != nil {
+	if topic.parts.shouldRotate(req.FullSize()) {
+		nextStartOffset := topic.parts.nextOffset()
+		if sperr := topic.logw.SetPartition(nextStartOffset); sperr != nil {
 			return errResponse(q.conf, req, resp, sperr)
 		}
 	}
 	// write the log
-	_, err = q.logw.Write(req.Bytes())
+	_, err = topic.logw.Write(req.Bytes())
 	if err != nil {
 		return errResponse(q.conf, req, resp, err)
 	}
 
 	// update log state
-	respOffset := q.parts.nextOffset()
-	if aerr := q.parts.addBatch(batch, req.FullSize()); aerr != nil {
+	respOffset := topic.parts.nextOffset()
+	if aerr := topic.parts.addBatch(batch, req.FullSize()); aerr != nil {
 		return errResponse(q.conf, req, resp, aerr)
 	}
 
@@ -255,7 +219,12 @@ func (q *EventQ) handleRead(req *protocol.Request) (*protocol.Response, error) {
 		return errResponse(q.conf, req, resp, err)
 	}
 
-	partArgs, err := q.gatherReadArgs(readreq.Offset, readreq.Messages)
+	topic, err := q.topics.get(readreq.Topic())
+	if err != nil {
+		return errResponse(q.conf, req, resp, err)
+	}
+
+	partArgs, err := q.gatherReadArgs(topic, readreq.Offset, readreq.Messages)
 	if err != nil {
 		// fmt.Println("gatherReadArgs error:", err)
 
@@ -278,7 +247,7 @@ func (q *EventQ) handleRead(req *protocol.Request) (*protocol.Response, error) {
 	// respond with the batch(es)
 	for i := 0; i < partArgs.nparts; i++ {
 		args := partArgs.parts[i]
-		p, gerr := q.parts.logp.Get(args.offset, args.delta, args.limit)
+		p, gerr := topic.parts.logp.Get(args.offset, args.delta, args.limit)
 		if gerr != nil {
 			return errResponse(q.conf, req, resp, gerr)
 		}
@@ -298,13 +267,18 @@ func (q *EventQ) handleTail(req *protocol.Request) (*protocol.Response, error) {
 		return errResponse(q.conf, req, resp, err)
 	}
 
-	firstPart := q.parts.parts[0]
+	topic, err := q.topics.get(tailreq.Topic())
+	if err != nil {
+		return errResponse(q.conf, req, resp, err)
+	}
+
+	firstPart := topic.parts.parts[0]
 	if firstPart.size <= 0 {
 		return errResponse(q.conf, req, resp, protocol.ErrNotFound)
 	}
 	off := firstPart.startOffset
 
-	partArgs, err := q.gatherReadArgs(off, tailreq.Messages)
+	partArgs, err := q.gatherReadArgs(topic, off, tailreq.Messages)
 	if err != nil {
 		return errResponse(q.conf, req, resp, err)
 	}
@@ -319,7 +293,7 @@ func (q *EventQ) handleTail(req *protocol.Request) (*protocol.Response, error) {
 	// respond with the batch(es)
 	for i := 0; i < partArgs.nparts; i++ {
 		args := partArgs.parts[i]
-		p, gerr := q.parts.logp.Get(args.offset, args.delta, args.limit)
+		p, gerr := topic.parts.logp.Get(args.offset, args.delta, args.limit)
 		if gerr != nil {
 			return errResponse(q.conf, req, resp, gerr)
 		}
@@ -351,9 +325,9 @@ func (q *EventQ) handleClose(req *protocol.Request) (*protocol.Response, error) 
 	return resp, nil
 }
 
-func (q *EventQ) gatherReadArgs(offset uint64, messages int) (*partitionArgList, error) {
-	soff, delta, err := q.parts.lookup(offset)
-	// fmt.Printf("%v\ngatherReadArgs: offset: %d, partition: %d, delta: %d, err: %v\n", q.parts, offset, soff, delta, err)
+func (q *EventQ) gatherReadArgs(topic *topic, offset uint64, messages int) (*partitionArgList, error) {
+	soff, delta, err := topic.parts.lookup(offset)
+	// fmt.Printf("%v\ngatherReadArgs: offset: %d, partition: %d, delta: %d, err: %v\n", topic.parts, offset, soff, delta, err)
 	if err != nil {
 		return nil, err
 	}
@@ -364,7 +338,7 @@ func (q *EventQ) gatherReadArgs(offset uint64, messages int) (*partitionArgList,
 	currstart := soff
 Loop:
 	for n < messages {
-		p, gerr := q.parts.logp.Get(currstart, delta, 0)
+		p, gerr := topic.parts.logp.Get(currstart, delta, 0)
 		if gerr != nil {
 			// if we've successfully read anything, we've read the last
 			// partition by now
@@ -413,15 +387,8 @@ func (q *EventQ) handleShutdown() error {
 	// work here
 	// TODO try all shutdowns or give up after the first error?
 
-	if lc, ok := q.logw.(internal.LifecycleManager); ok {
-		if err := lc.Shutdown(); err != nil {
-			return err
-		}
-	}
-	if lc, ok := q.parts.logp.(internal.LifecycleManager); ok {
-		if err := lc.Shutdown(); err != nil {
-			return err
-		}
+	if err := q.topics.Shutdown(); err != nil {
+		return err
 	}
 	return nil
 }

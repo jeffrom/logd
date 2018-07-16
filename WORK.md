@@ -3,10 +3,14 @@
 # TODO
 
 * [X] Client graceful reconnect
+* [X] topics?
 * [ ] migrate logd/log-cli to cobra
-* [ ] config validation
 * [ ] Repairer to truncate partitions with corrupt data
 * [ ] remove state management stuff from scanner for now
+* [ ] scanner should read all pending response batches over the wire before
+      beginning to iterate through them
+* [ ] config validation
+* [ ] send config to new connections so it can be validated
 * [ ] make consistency guarantees configurable. fast by default (at-most-once),
       but also force disk flush before returning success (at-least-once) if
       that's desired.
@@ -16,8 +20,8 @@
   * have a flush interval option. also document how it may be better to just
     change the dirty page cache kernel settings. this can be implemented by
     just putting a flush command into the queue at an interval.
-* [ ] topics?
 * [ ] simple replication, scanner failover
+* [ ] failure handling for writer
 
 # maybe later
 

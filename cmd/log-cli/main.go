@@ -126,6 +126,14 @@ var readForeverFlag = &cli.BoolFlag{
 	Destination: &tmpConfig.ReadForever,
 }
 
+var topicFlag = &cli.StringFlag{
+	Name: "topic",
+	// Aliases: []string{""},
+	Value:   "default",
+	Usage:   "a `TOPIC` for the operation",
+	EnvVars: []string{"LOG_TOPIC"},
+}
+
 var inputPathFlag = &cli.PathFlag{
 	Name:        "input",
 	Usage:       "A file path to read messages into the log",
@@ -155,7 +163,7 @@ var sharedFlags = []cli.Flag{
 	verboseFlag, hostFlag,
 	timeoutFlag, writeTimeoutFlag, readTimeoutFlag,
 	waitIntervalFlag, outputPathFlag,
-	countFlag,
+	countFlag, topicFlag,
 }
 
 func withSharedFlags(flags []cli.Flag) []cli.Flag {
@@ -267,7 +275,8 @@ func (c *debugCounts) String() string {
 	return b.String()
 }
 
-func doWrite(conf *client.Config, args cli.Args) error {
+func doWrite(conf *client.Config, c *cli.Context) error {
+	args := c.Args()
 	done := make(chan struct{})
 	handleKills(done)
 
@@ -294,6 +303,14 @@ func doWrite(conf *client.Config, args cli.Args) error {
 		return err
 	}
 	defer w.Close()
+
+	t := c.String("topic")
+	if !c.IsSet("topic") {
+		t = "default"
+	}
+	if err := w.SetTopic(t); err != nil {
+		return err
+	}
 
 	var m client.StatePusher
 	if out == nil {
@@ -379,6 +396,12 @@ func doRead(conf *client.Config, c *cli.Context) error {
 	}
 	defer scanner.Close()
 
+	t := c.String("topic")
+	if !c.IsSet("topic") {
+		t = "default"
+	}
+	scanner.SetTopic(t)
+
 	go func() {
 		select {
 		case <-done:
@@ -416,7 +439,7 @@ func runApp(args []string) {
 					inputPathFlag,
 				}),
 				Action: func(c *cli.Context) error {
-					return doWrite(buildConfig(c), c.Args())
+					return doWrite(buildConfig(c), c)
 				},
 			},
 			{

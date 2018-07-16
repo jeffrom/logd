@@ -124,7 +124,7 @@ func checkReadMultipleBatches(t *testing.T, q *EventQ, fixture []byte, offs []ui
 			respb := pushRead(t, q, off, remainingMessages-j)
 			envelope := []byte(fmt.Sprintf("OK %d %d\r\n", off, (remainingMessages-j)/3))
 			if len(respb)-len(envelope) != len(fixture)*left {
-				t.Logf("failed attempt at READ(%d, %d), expected %d remaining batches. Log location: %s", off, remainingMessages, left, q.conf.LogFile)
+				t.Logf("failed attempt at READ('default', %d, %d), expected %d remaining batches. Log location: %s", off, remainingMessages, left, q.conf.WorkDir)
 				log.Panicf("expected (%d):\n\t(%dx)%q\nbut got\n\t%q", off, left, fixture, respb)
 			}
 		}
@@ -137,9 +137,14 @@ func TestPartitionRemoval(t *testing.T) {
 	doStartQ(t, q)
 	defer doShutdownQ(t, q)
 
+	topic, err := q.topics.get("default")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	for i := 0; i < conf.MaxPartitions*3; i++ {
 		fillPartition(t, q)
-		parts, err := q.parts.logp.List()
+		parts, err := topic.parts.logp.List()
 		if err != nil {
 			t.Fatalf("unexpected failure listing partitions: %+v", err)
 		}
@@ -271,7 +276,7 @@ func checkReadResp(t testing.TB, conf *config.Config, resp *protocol.Response) [
 }
 
 func doStartQ(b testing.TB, q *EventQ) {
-	dir, _ := filepath.Split(q.conf.LogFile)
+	dir, _ := filepath.Split(q.conf.WorkDir)
 	log.Printf("starting log dir: %s", dir)
 	if err := q.GoStart(); err != nil {
 		b.Fatalf("unexpected error starting event queue: %+v", err)
@@ -280,7 +285,7 @@ func doStartQ(b testing.TB, q *EventQ) {
 
 func doShutdownQ(t testing.TB, q *EventQ) {
 	if t.Failed() {
-		t.Logf("failed: not removing files in %s", q.conf.LogFile)
+		t.Logf("failed: not removing files in %s", q.conf.WorkDir)
 		return
 	}
 	if err := q.Stop(); err != nil {
@@ -311,15 +316,19 @@ func pushBatch(t testing.TB, q *EventQ, fixture []byte) *protocol.ClientResponse
 	return checkBatchResp(t, q.conf, resp)
 }
 
-func pushRead(t testing.TB, q *EventQ, off uint64, limit int) []byte {
+func pushReadTopic(t testing.TB, q *EventQ, topic string, off uint64, limit int) []byte {
 	ctx := context.Background()
-	fixture := []byte(fmt.Sprintf("READ %d %d\r\n", off, limit))
+	fixture := []byte(fmt.Sprintf("READ %s %d %d\r\n", topic, off, limit))
 	req := newRequest(t, q.conf, fixture)
 	resp, err := q.PushRequest(ctx, req)
 	if err != nil {
 		t.Fatalf("%+v", err)
 	}
 	return checkReadResp(t, q.conf, resp)
+}
+
+func pushRead(t testing.TB, q *EventQ, off uint64, limit int) []byte {
+	return pushReadTopic(t, q, "default", off, limit)
 }
 
 func partitionIterations(conf *config.Config, fixtureLen int) (int, int) {

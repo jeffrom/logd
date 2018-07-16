@@ -55,6 +55,7 @@ func TestWriteBatchLarge(t *testing.T) {
 
 func testWriteBatch(t *testing.T, conf *config.Config, goldenFileName string, args []string) {
 	batch := NewBatch(conf)
+	batch.SetTopic([]byte("default"))
 	for _, arg := range args {
 		batch.AppendMessage(newTestMessage(conf, arg))
 	}
@@ -66,6 +67,7 @@ func testWriteBatch(t *testing.T, conf *config.Config, goldenFileName string, ar
 	testhelper.CheckGoldenFile(goldenFileName, b.Bytes(), testhelper.Golden)
 
 	batch.Reset()
+	batch.SetTopic([]byte("default"))
 	b.Reset()
 	for _, arg := range args {
 		batch.Append([]byte(arg))

@@ -5,10 +5,8 @@ import (
 	"log"
 	"runtime/debug"
 	"testing"
-	"time"
 
 	"github.com/jeffrom/logd/config"
-	"github.com/jeffrom/logd/protocol"
 	"github.com/jeffrom/logd/testhelper"
 )
 
@@ -32,7 +30,7 @@ func eventQBenchConfig() *config.Config {
 func startQForBench(b *testing.B) (*EventQ, func()) {
 	config := eventQBenchConfig()
 	config.LogFileMode = 0644
-	config.LogFile = testhelper.TmpLog()
+	config.WorkDir = testhelper.TmpLog()
 
 	q := NewEventQ(config)
 	if err := q.GoStart(); err != nil {
@@ -45,28 +43,12 @@ func startQForBench(b *testing.B) (*EventQ, func()) {
 func BenchmarkEventQLifecycle(b *testing.B) {
 	config := eventQBenchConfig()
 	config.LogFileMode = 0644
-	config.LogFile = testhelper.TmpLog()
+	config.WorkDir = testhelper.TmpLog()
 
 	for i := 0; i < b.N; i++ {
 		q := NewEventQ(config)
 		q.GoStart()
 		q.handleShutdown()
 		q.Stop()
-	}
-}
-
-func drainReaderChan(readerC chan protocol.ReadPart) {
-	n := 0
-	for {
-		select {
-		case <-readerC:
-			n++
-		case <-time.After(time.Millisecond * 500):
-			panic("timed out waiting for messages on readerC")
-		default:
-			if n > 0 {
-				return
-			}
-		}
 	}
 }

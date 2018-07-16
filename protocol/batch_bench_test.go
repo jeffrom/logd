@@ -32,6 +32,7 @@ func BenchmarkBatchWriteNew(b *testing.B) {
 	conf := protocolBenchConfig()
 
 	batch := NewBatch(conf)
+	batch.topic = []byte("default")
 	batch.AppendMessage(newTestMessage(conf, string(testhelper.SomeLines[0])))
 	batch.AppendMessage(newTestMessage(conf, string(testhelper.SomeLines[1])))
 	batch.AppendMessage(newTestMessage(conf, string(testhelper.SomeLines[2])))

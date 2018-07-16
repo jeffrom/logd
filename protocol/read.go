@@ -7,18 +7,21 @@ import (
 )
 
 // Read represents a read request
-// READ <offset> <messages>\r\n
+// READ <topic> <offset> <messages>\r\n
 type Read struct {
 	conf     *config.Config
 	Offset   uint64
 	Messages int
+	topic    []byte
+	ntopic   int
 	digitbuf [32]byte
 }
 
 // NewRead returns a new instance of a READ request
 func NewRead(conf *config.Config) *Read {
 	r := &Read{
-		conf: conf,
+		conf:  conf,
+		topic: make([]byte, MaxTopicSize),
 	}
 
 	return r
@@ -28,6 +31,24 @@ func NewRead(conf *config.Config) *Read {
 func (r *Read) Reset() {
 	r.Offset = 0
 	r.Messages = 0
+	r.ntopic = 0
+}
+
+// SetTopic sets the topic for a batch.
+func (r *Read) SetTopic(topic []byte) {
+	copy(r.topic, topic)
+	r.ntopic = len(topic)
+}
+
+// Topic returns the topic for the batch.
+func (r *Read) Topic() string {
+	return string(r.TopicSlice())
+}
+
+// TopicSlice returns the topic for the batch as a byte slice. The byte slice
+// is not copied.
+func (r *Read) TopicSlice() []byte {
+	return r.topic[:r.ntopic]
 }
 
 // FromRequest parses a request, populating the Read struct. If validation
@@ -37,13 +58,15 @@ func (r *Read) FromRequest(req *Request) (*Read, error) {
 		return r, errInvalidNumArgs
 	}
 
-	n, err := asciiToUint(req.args[0])
+	r.SetTopic(req.args[0])
+
+	n, err := asciiToUint(req.args[1])
 	if err != nil {
 		return r, err
 	}
 	r.Offset = n
 
-	n, err = asciiToUint(req.args[1])
+	n, err = asciiToUint(req.args[2])
 	if err != nil {
 		return r, err
 	}
@@ -61,6 +84,18 @@ func (r *Read) Validate() error {
 func (r *Read) WriteTo(w io.Writer) (int64, error) {
 	var total int64
 	n, err := w.Write(breadStart)
+	total += int64(n)
+	if err != nil {
+		return total, err
+	}
+
+	n, err = w.Write(r.TopicSlice())
+	total += int64(n)
+	if err != nil {
+		return total, err
+	}
+
+	n, err = w.Write(bspace)
 	total += int64(n)
 	if err != nil {
 		return total, err

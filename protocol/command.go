@@ -95,15 +95,15 @@ func cmdNamefromBytes(b []byte) CmdType {
 }
 
 var argLens = map[CmdType]int{
-	CmdBatch: 3,
-	CmdRead:  2,
-	CmdTail:  1,
+	CmdBatch: 4,
+	CmdRead:  3,
+	CmdTail:  2,
 	CmdStats: 0,
 	CmdClose: 0,
 	// CmdShutdown: 0,
 }
 
-const maxArgs = 3
+const maxArgs = 4
 
 // ParseNumber parses a uint64 from bytes
 func ParseNumber(b []byte) (uint64, error) {

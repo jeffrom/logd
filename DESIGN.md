@@ -1,3 +1,5 @@
+# OLD VERSION
+
 # overview
 
 logd - A networked, sequenced logging system designed to be simple and fast,

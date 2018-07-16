@@ -12,11 +12,11 @@ import (
 	"github.com/jeffrom/logd/testhelper"
 )
 
-func BenchmarkBatchDiscard(b *testing.B) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
-	mw := logger.NewDiscardWriter(conf)
-	benchmarkBatch(b, conf, mw)
-}
+// func BenchmarkBatchDiscard(b *testing.B) {
+// 	conf := testhelper.DefaultTestConfig(testing.Verbose())
+// 	mw := logger.NewDiscardWriter(conf)
+// 	benchmarkBatch(b, conf, mw)
+// }
 
 func BenchmarkBatchFile(b *testing.B) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
@@ -25,9 +25,9 @@ func BenchmarkBatchFile(b *testing.B) {
 
 func benchmarkBatch(b *testing.B, conf *config.Config, logw logger.LogWriter) {
 	q := NewEventQ(conf)
-	if logw != nil {
-		q.logw = logw
-	}
+	// if logw != nil {
+	// 	q.logw = logw
+	// }
 	if err := q.GoStart(); err != nil {
 		b.Fatalf("unexpected startup error: %+v", err)
 	}

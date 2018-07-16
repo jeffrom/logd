@@ -11,14 +11,20 @@ import (
 	"github.com/pkg/errors"
 )
 
+// MaxTopicSize represents the maximum topic length. It is 255, as that is the
+// maximum directory length in linux.
+const MaxTopicSize = 255
+
 // Batch represents a collection of Messages
-// BATCH <size> <checksum> <messages>\r\n<data>
+// BATCH <size> <topic> <checksum> <messages>\r\n<data>
 // NOTE no trailing newline after the data
 type Batch struct {
 	conf     *config.Config
 	Size     uint64
 	Checksum uint32
 	Messages int
+	topic    []byte
+	ntopic   int
 	msgs     []*Message
 	body     []byte
 	digitbuf [32]byte
@@ -32,6 +38,7 @@ func NewBatch(conf *config.Config) *Batch {
 	b := &Batch{
 		conf:   conf,
 		msgBuf: &bytes.Buffer{},
+		topic:  make([]byte, MaxTopicSize),
 		msgs:   make([]*Message, 1000),
 	}
 
@@ -47,6 +54,7 @@ func (b *Batch) Reset() {
 	b.Size = 0
 	b.Checksum = 0
 	b.Messages = 0
+	b.ntopic = 0
 	b.firstOff = 0
 	b.wasRead = false
 	b.msgBuf.Reset()
@@ -56,6 +64,23 @@ func (b *Batch) ensureBuf() {
 	if b.body == nil {
 		b.body = make([]byte, b.conf.MaxBatchSize)
 	}
+}
+
+// SetTopic sets the topic for a batch.
+func (b *Batch) SetTopic(topic []byte) {
+	copy(b.topic, topic)
+	b.ntopic = len(topic)
+}
+
+// Topic returns the topic for the batch.
+func (b *Batch) Topic() string {
+	return string(b.TopicSlice())
+}
+
+// TopicSlice returns the topic for the batch as a byte slice. The byte slice
+// is not copied.
+func (b *Batch) TopicSlice() []byte {
+	return b.topic[:b.ntopic]
 }
 
 // FromRequest parses a request, populating the batch. If validation fails, an
@@ -72,13 +97,15 @@ func (b *Batch) FromRequest(req *Request) (*Batch, error) {
 	}
 	b.Size = n
 
-	n, err = asciiToUint(req.args[1])
+	b.SetTopic(req.args[1])
+
+	n, err = asciiToUint(req.args[2])
 	if err != nil {
 		return b, err
 	}
 	b.Checksum = uint32(n)
 
-	n, err = asciiToUint(req.args[2])
+	n, err = asciiToUint(req.args[3])
 	if err != nil {
 		return b, err
 	}
@@ -184,6 +211,8 @@ func (b *Batch) CalcSize() int {
 	l := len(bbatchStart)       // `BATCH `
 	l += asciiSize(int(b.Size)) // <size>
 	l += len(bspace)            // ` `
+	l += b.ntopic               // `<topic>`
+	l += len(bspace)            // ` `
 	l += maxCRCSize             // <crc>
 	l += len(bspace)            // ` `
 	l += asciiSize(b.Messages)  // <messages>
@@ -247,6 +276,18 @@ func (b *Batch) WriteTo(w io.Writer) (int64, error) {
 
 	l := uintToASCII(uint64(b.Size), &b.digitbuf)
 	n, err = w.Write(b.digitbuf[l:])
+	total += int64(n)
+	if err != nil {
+		return total, err
+	}
+
+	n, err = w.Write(bspace)
+	total += int64(n)
+	if err != nil {
+		return total, err
+	}
+
+	n, err = w.Write(b.TopicSlice())
 	total += int64(n)
 	if err != nil {
 		return total, err
@@ -357,6 +398,14 @@ func (b *Batch) readEnvelope(r *bufio.Reader) (int64, error) {
 		return total, err
 	}
 
+	b.SetTopic(word[:len(word)-1])
+
+	word, err = r.ReadSlice(' ')
+	total += int64(len(word))
+	if err != nil {
+		return total, err
+	}
+
 	n, err = asciiToUint(word[:len(word)-1])
 	if err != nil {
 		return total, err
@@ -412,7 +461,8 @@ func (b *Batch) calculateFirstOffset() uint64 {
 		uintToASCII(b.Size, &b.digitbuf) +
 		len(bspace) +
 		uintToASCII(uint64(b.Messages), &b.digitbuf) +
-		termLen)
+		termLen +
+		b.ntopic)
 
 	return n
 }

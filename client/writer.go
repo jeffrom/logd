@@ -14,6 +14,7 @@ type Writer struct {
 	*Client
 	conf  *Config
 	gconf *config.Config
+	topic []byte
 	state StatePusher
 
 	stopC      chan struct{}
@@ -73,8 +74,23 @@ func (w *Writer) Reset() {
 	w.stop()
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	w.topic = nil
 	w.batch.Reset()
 	w.start()
+}
+
+// SetTopic sets the topic for a writer
+func (w *Writer) SetTopic(topic string) error {
+	if err := w.Flush(); err != nil {
+		return err
+	}
+	w.topic = []byte(topic)
+	return nil
+}
+
+// Topic returns the current topic for the writer.
+func (w *Writer) Topic() string {
+	return string(w.topic)
 }
 
 // TODO have a zero copy version, WriteSlice, but Write should copy, probably
@@ -168,6 +184,7 @@ func (w *Writer) flushPending(sync bool) error {
 	}()
 	internal.Debugf(w.gconf, "flushing %v: sync: %t", w.batch, sync)
 	batch := w.batch
+	batch.SetTopic(w.topic)
 	var err error
 
 	if batch.Messages <= 0 {

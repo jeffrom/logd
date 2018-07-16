@@ -147,10 +147,11 @@ func (c *Client) Batch(batch *protocol.Batch) (uint64, error) {
 
 // ReadOffset sends a READ request, returning a scanner that can be used to
 // iterate over the messages in the response.
-func (c *Client) ReadOffset(offset uint64, limit int) (int, *protocol.BatchScanner, error) {
-	internal.Debugf(c.gconf, "READ %d %d -> %s", offset, limit, c.Conn.RemoteAddr())
+func (c *Client) ReadOffset(topic []byte, offset uint64, limit int) (int, *protocol.BatchScanner, error) {
+	internal.Debugf(c.gconf, "READ %s %d %d -> %s", topic, offset, limit, c.Conn.RemoteAddr())
 	req := c.readreq
 	req.Reset()
+	req.SetTopic(topic)
 	req.Offset = offset
 	req.Messages = limit
 
@@ -174,10 +175,11 @@ func (c *Client) ReadOffset(offset uint64, limit int) (int, *protocol.BatchScann
 
 // Tail sends a TAIL request, returning the initial offset and a scanner
 // starting from the first available batch.
-func (c *Client) Tail(limit int) (uint64, int, *protocol.BatchScanner, error) {
-	internal.Debugf(c.gconf, "TAIL %d -> %s", limit, c.Conn.RemoteAddr())
+func (c *Client) Tail(topic []byte, limit int) (uint64, int, *protocol.BatchScanner, error) {
+	internal.Debugf(c.gconf, "TAIL %s %d -> %s", topic, limit, c.Conn.RemoteAddr())
 	req := c.tailreq
 	req.Reset()
+	req.SetTopic(topic)
 	req.Messages = limit
 
 	if _, _, err := c.doRequest(req); err != nil {

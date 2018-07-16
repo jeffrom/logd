@@ -12,6 +12,7 @@ func TestWriteRead(t *testing.T) {
 	read := NewRead(conf)
 	read.Offset = 1234567
 	read.Messages = 100
+	read.SetTopic([]byte("default"))
 
 	b := &bytes.Buffer{}
 	if _, err := read.WriteTo(b); err != nil {

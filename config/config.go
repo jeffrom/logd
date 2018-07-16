@@ -7,17 +7,15 @@ import (
 // Config holds configuration variables
 type Config struct {
 	Verbose                 bool   `json:"verbose"`
-	CanShutdown             bool   `json:"can_shutdown"`
+	CanShutdown             bool   `json:"can-shutdown"`
 	Hostport                string `json:"host"`
-	MasterHostport          string `json:"master_host"`
-	ServerTimeout           uint   `json:"server_timeout"`
-	GracefulShutdownTimeout uint   `json:"graceful_shutdown_timeout"`
-	LogFile                 string `json:"log_file"`
-	LogFileMode             int    `json:"log_file_mode"`
-	MaxBatchSize            int    `json:"max_batch_size"`
-	PartitionSize           int    `json:"partition_size"`
-	MaxPartitions           int    `json:"max_partitions"`
-	PartitionDeleteHook     string `json:"partition_delete_hook"`
+	ServerTimeout           uint   `json:"server-timeout"`
+	GracefulShutdownTimeout uint   `json:"graceful-shutdown-timeout"`
+	WorkDir                 string `json:"work-dir"`
+	LogFileMode             int    `json:"log-file-mode"`
+	MaxBatchSize            int    `json:"max-batch-size"`
+	PartitionSize           int    `json:"partition-size"`
+	MaxPartitions           int    `json:"max-partitions"`
 }
 
 // New returns a new configuration object
@@ -34,27 +32,12 @@ func (c *Config) String() string {
 }
 
 // Default is the default application config
-var Default *Config
-
-func init() {
-	Default = New()
-	Default.ServerTimeout = 1000
-	Default.GracefulShutdownTimeout = 1000
-	Default.LogFile = "__"
-	Default.LogFileMode = 0644
-	Default.MaxBatchSize = 1024 * 20
-	// Default.MaxBatchSize = 1024 * 1024 * 2
-	// Default.PartitionSize = 1024 * 1024
-	Default.PartitionSize = 1024 * 1024 * 2000
-	// Default.MaxPartitions = 5
-	Default.MaxPartitions = 8
-	// Default.IndexCursorSize = 1000
-
-	// XXX just for dev
-	Default.CanShutdown = true
-}
-
-// IndexFileName returns the path of the index file
-func (c *Config) IndexFileName() string {
-	return c.LogFile + ".index"
+var Default = &Config{
+	ServerTimeout:           1000,
+	GracefulShutdownTimeout: 1000,
+	WorkDir:                 "logs/",
+	LogFileMode:             0600,
+	MaxBatchSize:            1024 * 64,
+	PartitionSize:           1024 * 1024 * 2000,
+	MaxPartitions:           8,
 }

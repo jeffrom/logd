@@ -17,7 +17,7 @@ func DefaultTestConfig(verbose bool) *config.Config {
 		ServerTimeout:           200,
 		GracefulShutdownTimeout: 1000,
 		LogFileMode:             0644,
-		LogFile:                 TmpLog(),
+		WorkDir:                 TmpLog(),
 		MaxBatchSize:            1024 * 2,
 		PartitionSize:           1024 * 5,
 		MaxPartitions:           5,
@@ -30,7 +30,7 @@ func TestConfig(verbose bool) *config.Config {
 	conf.GracefulShutdownTimeout = 1000
 	conf.MaxBatchSize = 1024 * 10
 	conf.PartitionSize = 1024 * 1024 * 500
-	conf.LogFile = TmpLog()
+	conf.WorkDir = TmpLog()
 	conf.LogFileMode = 0644
 	conf.MaxPartitions = 5
 

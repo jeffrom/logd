@@ -31,7 +31,7 @@ func init() {
 // TmpLog creates a temporary directory for testing purposes
 func TmpLog() string {
 	tmpdir := getTempdir()
-	return path.Join(tmpdir, "__")
+	return path.Join(tmpdir, "logs")
 }
 
 func getTempdir() string {
@@ -113,7 +113,7 @@ func GetLogOutput(config *config.Config, l io.Reader) []byte {
 }
 
 func ListPartitions(conf *config.Config) []string {
-	matches, err := filepath.Glob(conf.LogFile + ".*")
+	matches, err := filepath.Glob(conf.WorkDir + ".*")
 	if err != nil {
 		panic(err)
 	}

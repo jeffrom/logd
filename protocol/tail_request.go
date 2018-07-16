@@ -7,23 +7,43 @@ import (
 )
 
 // Tail represents a TAIL request
-// TAIL <messages>\r\n
+// TAIL <topic> <messages>\r\n
 type Tail struct {
 	conf     *config.Config
 	Messages int
+	topic    []byte
+	ntopic   int
 	digitbuf [32]byte
 }
 
 // NewTail returns a new instance of a TAIL request
 func NewTail(conf *config.Config) *Tail {
 	return &Tail{
-		conf: conf,
+		conf:  conf,
+		topic: make([]byte, MaxTopicSize),
 	}
 }
 
 // Reset puts TAIL in an initial state so it can be reused
 func (t *Tail) Reset() {
 	t.Messages = 0
+	t.ntopic = 0
+}
+
+// SetTopic sets the topic of the TAIL request
+func (t *Tail) SetTopic(topic []byte) {
+	copy(t.topic, topic)
+	t.ntopic = len(topic)
+}
+
+// Topic returns the topic as a string
+func (t *Tail) Topic() string {
+	return string(t.TopicSlice())
+}
+
+// TopicSlice returns the topic as a byte slice reference. It is not copied.
+func (t *Tail) TopicSlice() []byte {
+	return t.topic[:t.ntopic]
 }
 
 // FromRequest parses a request, populating the Tail struct. If validation
@@ -33,7 +53,9 @@ func (t *Tail) FromRequest(req *Request) (*Tail, error) {
 		return t, errInvalidNumArgs
 	}
 
-	n, err := asciiToUint(req.args[0])
+	t.SetTopic(req.args[0])
+
+	n, err := asciiToUint(req.args[1])
 	if err != nil {
 		return t, err
 	}
@@ -50,6 +72,18 @@ func (t *Tail) Validate() error {
 func (t *Tail) WriteTo(w io.Writer) (int64, error) {
 	var total int64
 	n, err := w.Write(btailStart)
+	total += int64(n)
+	if err != nil {
+		return total, err
+	}
+
+	n, err = w.Write(t.TopicSlice())
+	total += int64(n)
+	if err != nil {
+		return total, err
+	}
+
+	n, err = w.Write(bspace)
 	total += int64(n)
 	if err != nil {
 		return total, err

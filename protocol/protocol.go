@@ -121,7 +121,7 @@ func parseWord(line []byte) ([]byte, []byte, error) {
 		return line, nil, errors.New("invalid bytes")
 	}
 	word := line[:n]
-	if word[n-1] == '\r' {
+	if len(word) > 1 && word[n-1] == '\r' {
 		word = line[:n-1]
 	}
 	return line[n+1:], word, nil

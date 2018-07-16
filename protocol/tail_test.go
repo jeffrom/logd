@@ -11,6 +11,7 @@ func TestWriteTail(t *testing.T) {
 	conf := testhelper.TestConfig(testing.Verbose())
 	tail := NewTail(conf)
 	tail.Messages = 100
+	tail.SetTopic([]byte("default"))
 
 	b := &bytes.Buffer{}
 	if _, err := tail.WriteTo(b); err != nil {

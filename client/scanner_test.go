@@ -26,8 +26,9 @@ func TestScanner(t *testing.T) {
 	s := ScannerForClient(c)
 	defer s.Close()
 	defer expectServerClose(t, gconf, server)
+	s.SetTopic("default")
 
-	expected := []byte(fmt.Sprintf("READ 0 %d\r\n", conf.Limit))
+	expected := []byte(fmt.Sprintf("READ default 0 %d\r\n", conf.Limit))
 	server.Expect(func(p []byte) io.WriterTo {
 		if !bytes.Equal(p, expected) {
 			log.Panicf("expected:\n\n\t%q\n\n but got:\n\n\t%q", expected, p)
@@ -76,6 +77,7 @@ func TestScannerLimit(t *testing.T) {
 	s := ScannerForClient(c)
 	defer s.Close()
 	defer expectServerClose(t, gconf, server)
+	s.SetTopic("default")
 
 	// requested works around an issue where the the value of i in the callback
 	// is always -1
@@ -84,7 +86,7 @@ func TestScannerLimit(t *testing.T) {
 		server.Expect(func(p []byte) io.WriterTo {
 			n := requested
 			offset := n * len(fixture)
-			expected := []byte(fmt.Sprintf("READ %d %d\r\n", offset, conf.Limit))
+			expected := []byte(fmt.Sprintf("READ default %d %d\r\n", offset, conf.Limit))
 			if !bytes.Equal(p, expected) {
 				log.Panicf("expected:\n\n\t%q\n\n but got:\n\n\t%q", expected, p)
 			}
@@ -139,6 +141,7 @@ func TestScannerReadForever(t *testing.T) {
 	s := ScannerForClient(c)
 	defer s.Close()
 	defer expectServerClose(t, gconf, server)
+	s.SetTopic("default")
 
 	// requested works around an issue where the the value of i in the callback
 	// is always -1
@@ -147,7 +150,7 @@ func TestScannerReadForever(t *testing.T) {
 		server.Expect(func(p []byte) io.WriterTo {
 			n := requested
 			offset := n * len(fixture)
-			expected := []byte(fmt.Sprintf("READ %d %d\r\n", offset, conf.Limit))
+			expected := []byte(fmt.Sprintf("READ default %d %d\r\n", offset, conf.Limit))
 			if !bytes.Equal(p, expected) {
 				log.Panicf("expected:\n\n\t%q\n\n but got:\n\n\t%q", expected, p)
 			}
@@ -184,7 +187,7 @@ func TestScannerReadForever(t *testing.T) {
 
 	server.Expect(func(p []byte) io.WriterTo {
 		offset := nbatches * len(fixture)
-		expected := []byte(fmt.Sprintf("READ %d %d\r\n", offset, conf.Limit))
+		expected := []byte(fmt.Sprintf("READ default %d %d\r\n", offset, conf.Limit))
 		if !bytes.Equal(p, expected) {
 			log.Panicf("expected:\n\n\t%q\n\n but got:\n\n\t%q", expected, p)
 		}

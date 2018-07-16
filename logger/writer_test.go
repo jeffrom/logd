@@ -6,10 +6,16 @@ import (
 	"github.com/jeffrom/logd/testhelper"
 )
 
+const defaultTopic = "default"
+
 func TestWrite(t *testing.T) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
-	logw := NewWriter(conf)
+	logw := NewWriter(conf, defaultTopic)
 	fixture := testhelper.LoadFixture("batch.small")
+
+	if err := logw.Setup(); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := logw.SetPartition(0); err != nil {
 		t.Fatalf("unexpected error setting partition: %+v", err)

@@ -54,7 +54,7 @@ func (w *MockWriter) Write(p []byte) (int, error) {
 
 // Flush implements LogWriter
 func (w *MockWriter) Flush() error {
-	if fl, ok := w.w.(flusher); ok {
+	if fl, ok := w.w.(interface{ Flush() error }); ok {
 		return fl.Flush()
 	}
 	return nil

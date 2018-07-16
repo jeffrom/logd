@@ -3,9 +3,11 @@ package logger
 import (
 	"io"
 	"os"
+	"path"
 	"strconv"
 
 	"github.com/jeffrom/logd/config"
+	"github.com/jeffrom/logd/internal"
 )
 
 // LogWriter is the new log writer interface
@@ -17,14 +19,16 @@ type LogWriter interface {
 
 // Writer writes to the log
 type Writer struct {
-	conf *config.Config
-	f    *os.File
+	conf  *config.Config
+	f     *os.File
+	topic string
 }
 
 // NewWriter returns a new instance of Writer
-func NewWriter(conf *config.Config) *Writer {
+func NewWriter(conf *config.Config, topic string) *Writer {
 	return &Writer{
-		conf: conf,
+		conf:  conf,
+		topic: topic,
 	}
 }
 
@@ -44,7 +48,9 @@ func (w *Writer) SetPartition(off uint64) error {
 	}
 
 	s := strconv.FormatUint(off, 10)
-	f, err := os.OpenFile(w.conf.LogFile+s+".log", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0600)
+	p := path.Join(w.conf.WorkDir, w.topic, s+".log")
+	internal.Debugf(w.conf, "opening partition %s", p)
+	f, err := os.OpenFile(p, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0600)
 	w.f = f
 	return err
 }
@@ -55,6 +61,11 @@ func (w *Writer) Close() error {
 		return w.f.Close()
 	}
 	return nil
+}
+
+// Setup implements internal.LifecycleManager
+func (w *Writer) Setup() error {
+	return os.MkdirAll(path.Join(w.conf.WorkDir, w.topic), 0700)
 }
 
 // Shutdown implements LifecycleManager interface

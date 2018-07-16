@@ -31,6 +31,7 @@ func TestBatchWrite(t *testing.T) {
 	var expectedID uint64 = 10
 
 	batch := protocol.NewBatch(gconf)
+	batch.SetTopic([]byte("default"))
 	batch.Append([]byte("hi"))
 	batch.Append([]byte("hallo"))
 	batch.Append([]byte("sup"))
@@ -71,7 +72,7 @@ func TestRead(t *testing.T) {
 	defer server.Close()
 	c := New(conf).SetConn(clientConn)
 
-	expected := []byte("READ 10 3\r\n")
+	expected := []byte("READ default 10 3\r\n")
 	server.Expect(func(p []byte) io.WriterTo {
 		if !bytes.Equal(p, expected) {
 			log.Panicf("expected:\n\n\t%q\n\n but got:\n\n\t%q", expected, p)
@@ -80,7 +81,7 @@ func TestRead(t *testing.T) {
 		return readOKResponse(gconf, 10, 1, fixture)
 	})
 
-	_, scanner, err := c.ReadOffset(10, 3)
+	_, scanner, err := c.ReadOffset([]byte("default"), 10, 3)
 	if err != nil {
 		t.Fatalf("ReadOffset: %+v", err)
 	}
@@ -100,7 +101,7 @@ func TestRead(t *testing.T) {
 		return protocol.NewClientErrResponse(gconf, protocol.ErrNotFound)
 	})
 
-	_, scanner, err = c.ReadOffset(10, 3)
+	_, scanner, err = c.ReadOffset([]byte("default"), 10, 3)
 	if err != protocol.ErrNotFound {
 		t.Fatalf("expected %v but got %+v", protocol.ErrNotFound, err)
 	}
@@ -114,7 +115,7 @@ func TestTail(t *testing.T) {
 	defer server.Close()
 	c := New(conf).SetConn(clientConn)
 
-	expected := []byte("TAIL 3\r\n")
+	expected := []byte("TAIL default 3\r\n")
 	server.Expect(func(p []byte) io.WriterTo {
 		if !bytes.Equal(p, expected) {
 			log.Panicf("expected:\n\n\t%q\n\n but got:\n\n\t%q", expected, p)
@@ -123,7 +124,7 @@ func TestTail(t *testing.T) {
 		return readOKResponse(gconf, 10, 1, fixture)
 	})
 
-	_, _, scanner, err := c.Tail(3)
+	_, _, scanner, err := c.Tail([]byte("default"), 3)
 	if err != nil {
 		t.Fatalf("Tail: %+v", err)
 	}
@@ -170,6 +171,7 @@ func TestReconnect(t *testing.T) {
 
 	var expectedID uint64
 	batch := protocol.NewBatch(gconf)
+	batch.SetTopic([]byte("default"))
 	batch.Append([]byte("hi"))
 	batch.Append([]byte("hallo"))
 	batch.Append([]byte("sup"))

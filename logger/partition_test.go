@@ -9,10 +9,14 @@ import (
 
 func TestPartition(t *testing.T) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
-	t.Log("starting in", conf.LogFile)
-	p := NewPartitions(conf)
-	w := NewWriter(conf)
+	t.Log("starting in", conf.WorkDir)
+	p := NewPartitions(conf, defaultTopic)
+	w := NewWriter(conf, defaultTopic)
 	defer w.Close()
+
+	if err := w.Setup(); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := w.SetPartition(0); err != nil {
 		t.Fatalf("unexpected error setting partition: %+v", err)

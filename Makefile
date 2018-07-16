@@ -20,6 +20,7 @@ clean:
 	rm -rf $(TMPDIR)/logd-testdata*
 	rm -rf $(TMPDIR)/logd-artifacts.log*
 	rm -rf ./tmp
+	rm -rf logs/*
 
 .PHONY: clean.reports
 clean.reports:

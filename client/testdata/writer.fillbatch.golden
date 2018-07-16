@@ -1,4 +1,4 @@
-BATCH 20414 1413999645 543
+BATCH 20414 default 1413999645 543
 MSG 24
 0 pretty cool message! 0
 MSG 24
@@ -1085,7 +1085,7 @@ MSG 28
 541 pretty cool message! 541
 MSG 28
 542 pretty cool message! 542
-BATCH 7448 3271733996 196
+BATCH 7448 default 3271733996 196
 MSG 28
 543 pretty cool message! 543
 MSG 28

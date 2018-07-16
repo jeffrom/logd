@@ -66,8 +66,8 @@ func runApp(args []string) {
 			Name:        "log_file",
 			Usage:       "Log file name",
 			EnvVar:      "LOGD_FILE",
-			Value:       config.Default.LogFile,
-			Destination: &conf.LogFile,
+			Value:       config.Default.WorkDir,
+			Destination: &conf.WorkDir,
 		}),
 		altsrc.NewIntFlag(cli.IntFlag{
 			Name:        "log_file_mode",
@@ -142,6 +142,7 @@ func runApp(args []string) {
 	sort.Sort(cli.FlagsByName(app.Flags))
 
 	if err := app.Run(args); err != nil {
+		panic(err)
 	}
 }
 

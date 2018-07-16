@@ -18,6 +18,7 @@ var ErrStopped = errors.New("stopped")
 type Scanner struct {
 	*Client
 	conf              *Config
+	topic             []byte
 	state             StatePuller
 	s                 *protocol.BatchScanner
 	batch             *protocol.Batch
@@ -86,6 +87,16 @@ func (s *Scanner) Reset() {
 	}
 }
 
+// SetTopic sets the topic for the scanner.
+func (s *Scanner) SetTopic(topic string) {
+	s.topic = []byte(topic)
+}
+
+// Topic returns the topic for the scanner.
+func (s *Scanner) Topic() string {
+	return string(s.topic)
+}
+
 // Scan reads the next message. If it encounters an error, it returns false.
 func (s *Scanner) Scan() bool {
 	if !s.conf.ReadForever && s.totalMessagesRead >= s.conf.Limit {
@@ -97,9 +108,9 @@ func (s *Scanner) Scan() bool {
 		var err error
 		var nbatches int
 		if s.conf.UseTail {
-			s.curr, nbatches, bs, err = s.Client.Tail(s.conf.Limit)
+			s.curr, nbatches, bs, err = s.Client.Tail(s.topic, s.conf.Limit)
 		} else {
-			nbatches, bs, err = s.Client.ReadOffset(s.curr, s.conf.Limit)
+			nbatches, bs, err = s.Client.ReadOffset(s.topic, s.curr, s.conf.Limit)
 		}
 		if err != nil {
 			return s.scanErr(err)
@@ -170,7 +181,7 @@ func (s *Scanner) requestMoreBatches(poll bool) error {
 	if !poll {
 		s.curr += uint64(s.bs.Scanned())
 	}
-	nbatches, bs, err := s.Client.ReadOffset(s.curr, s.conf.Limit)
+	nbatches, bs, err := s.Client.ReadOffset(s.topic, s.curr, s.conf.Limit)
 	if err != nil {
 		return err
 	}

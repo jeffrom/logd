@@ -24,10 +24,12 @@ func TestWriter(t *testing.T) {
 	defer server.Close()
 	c := New(conf).SetConn(client)
 	w := WriterForClient(c)
+	w.SetTopic("default")
 	defer w.Close()
 	defer expectServerClose(t, gconf, server)
 
 	server.Expect(func(p []byte) io.WriterTo {
+		fmt.Println(string(p))
 		if !bytes.Equal(fixture, p) {
 			t.Fatalf("expected:\n\n\t%q\n\nbut got:\n\n\t%q\n", fixture, p)
 		}
@@ -45,6 +47,7 @@ func TestWriterFillBatch(t *testing.T) {
 	defer server.Close()
 	c := New(conf).SetConn(client)
 	w := WriterForClient(c)
+	w.SetTopic("default")
 	defer w.Close()
 	defer expectServerClose(t, gconf, server)
 	msg := []byte("pretty cool message!")
@@ -79,6 +82,7 @@ func TestWriterTwoBatches(t *testing.T) {
 	defer server.Close()
 	c := New(conf).SetConn(client)
 	w := WriterForClient(c)
+	w.SetTopic("default")
 	defer w.Close()
 	defer expectServerClose(t, gconf, server)
 	buf := newLockedBuffer()
@@ -156,6 +160,7 @@ func newTestWriterConn(conf *Config) (net.Conn, *Writer, func()) {
 	server, client := net.Pipe()
 	c := New(conf).SetConn(client)
 	w := WriterForClient(c)
+	w.SetTopic("default")
 
 	return server, w, func() {
 		w.Close()

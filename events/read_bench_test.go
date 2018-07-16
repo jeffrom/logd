@@ -42,7 +42,7 @@ func BenchmarkReadAll(b *testing.B) {
 func benchmarkRead(b *testing.B, conf *config.Config, q *EventQ, offs []uint64) {
 	var bufs [][]byte
 	for _, off := range offs {
-		buf := []byte(fmt.Sprintf("READ %d %d\r\n", off, 3))
+		buf := []byte(fmt.Sprintf("READ default %d %d\r\n", off, 3))
 		bufs = append(bufs, buf)
 	}
 	// b.Logf("%d read commands prepared", len(bufs))

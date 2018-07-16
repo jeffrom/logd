@@ -74,7 +74,7 @@ func Logf(s string, args ...interface{}) {
 // LogError logs the error if one occurred
 func LogError(err error) {
 	if err != nil {
-		stdlog(os.Stderr, 2, "error ignored: %+v", err)
+		stdlog(os.Stderr, 2, "error logged and ignored: %+v", err)
 	}
 }
 
@@ -83,6 +83,11 @@ func IgnoreError(verbose bool, err error) {
 	if verbose && err != nil {
 		stdlog(os.Stderr, 2, "error ignored: %+v", err)
 	}
+}
+
+// DiscardError does nothing with an error. Used for linting really
+func DiscardError(err error) {
+
 }
 
 func doTrace() func() {

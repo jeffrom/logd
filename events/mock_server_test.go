@@ -56,7 +56,7 @@ func TestMockServerBatchAndRead(t *testing.T) {
 		t.Fatalf("expected offset 0 but got %d", off)
 	}
 
-	_, scanner, err := client.ReadOffset(off, 3)
+	_, scanner, err := client.ReadOffset([]byte("default"), off, 3)
 	if err != nil {
 		t.Fatal(err)
 	}
