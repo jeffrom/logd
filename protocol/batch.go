@@ -440,22 +440,6 @@ func (b *Batch) readData(r *bufio.Reader) (int64, error) {
 	return total, err
 }
 
-func (b *Batch) makeMessages() error {
-	msgBytesRead := 0
-	for i := 0; i < b.Messages; i++ {
-		m := NewMessage(b.conf)
-
-		x, berr := m.FromBytes(b.body[msgBytesRead:b.Size])
-		if berr != nil {
-			return berr
-		}
-		msgBytesRead += x
-
-		b.msgs[i] = m
-	}
-	return nil
-}
-
 func (b *Batch) calculateFirstOffset() uint64 {
 	n := uint64(len(bbatchStart) +
 		uintToASCII(b.Size, &b.digitbuf) +

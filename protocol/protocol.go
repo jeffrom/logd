@@ -48,7 +48,6 @@ var errReadStopped = stderrors.New("read stopped by other side")
 var errInvalidProtocolLine = stderrors.New("invalid protocol line")
 var errInvalidBodyLength = stderrors.New("invalid body length")
 var errCrcChecksumMismatch = stderrors.New("crc checksum mismatch")
-var errRangeNotFound = stderrors.New("id range not found")
 
 var crcTable = crc32.MakeTable(crc32.Koopman)
 

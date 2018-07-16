@@ -9,10 +9,6 @@ import (
 	"github.com/jeffrom/logd/internal"
 )
 
-type logger interface {
-	Logf(string, ...interface{})
-}
-
 // MockServer sets expected requests and responds
 type MockServer struct {
 	c                 net.Conn

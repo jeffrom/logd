@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"sync"
 	"testing"
@@ -149,23 +148,6 @@ func expectServerClose(t testing.TB, conf *config.Config, server *testhelper.Moc
 		}
 		return protocol.NewClientOKResponse(conf)
 	})
-}
-
-func confForTimerTest(conf *Config) *Config {
-	conf.WaitInterval = 10
-	return conf
-}
-
-func newTestWriterConn(conf *Config) (net.Conn, *Writer, func()) {
-	server, client := net.Pipe()
-	c := New(conf).SetConn(client)
-	w := WriterForClient(c)
-	w.SetTopic("default")
-
-	return server, w, func() {
-		w.Close()
-		server.Close()
-	}
 }
 
 type lockedBuffer struct {

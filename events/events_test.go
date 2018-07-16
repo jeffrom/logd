@@ -343,7 +343,3 @@ func partitionIterations(conf *config.Config, fixtureLen int) (int, int) {
 	}
 	return n, interval
 }
-
-func calcOffset(l, i, interval int) uint64 {
-	return uint64(l * ((i / interval) + 1))
-}
