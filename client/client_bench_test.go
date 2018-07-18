@@ -12,7 +12,7 @@ import (
 
 func BenchmarkBatch(b *testing.B) {
 	conf := DefaultTestConfig(testing.Verbose())
-	gconf := conf.toGeneralConfig()
+	gconf := conf.ToGeneralConfig()
 	fixture := testhelper.LoadFixture("batch.small")
 	batch := protocol.NewBatch(gconf)
 	if _, err := batch.ReadFrom(bufio.NewReader(bytes.NewBuffer(fixture))); err != nil {

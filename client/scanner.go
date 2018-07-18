@@ -40,7 +40,7 @@ func NewScanner(conf *Config) *Scanner {
 	return &Scanner{
 		conf:     conf,
 		batchBuf: &bytes.Buffer{},
-		msg:      protocol.NewMessage(conf.toGeneralConfig()),
+		msg:      protocol.NewMessage(conf.ToGeneralConfig()),
 		done:     make(chan struct{}),
 	}
 }
@@ -110,6 +110,8 @@ func (s *Scanner) Scan() bool {
 		if s.conf.UseTail {
 			s.curr, nbatches, bs, err = s.Client.Tail(s.topic, s.conf.Limit)
 		} else {
+			// TODO test that s.conf.Offset is respected
+			s.curr = s.conf.Offset
 			nbatches, bs, err = s.Client.ReadOffset(s.topic, s.curr, s.conf.Limit)
 		}
 		if err != nil {

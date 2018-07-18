@@ -26,7 +26,7 @@ type Writer struct {
 
 // NewWriter returns a new instance of Writer
 func NewWriter(conf *Config) *Writer {
-	gconf := conf.toGeneralConfig()
+	gconf := conf.ToGeneralConfig()
 	w := &Writer{
 		conf:       conf,
 		gconf:      gconf,

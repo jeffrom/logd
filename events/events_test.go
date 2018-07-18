@@ -63,7 +63,7 @@ func TestQFileLogger(t *testing.T) {
 }
 
 func testQFileLogger(t *testing.T, conf *config.Config) {
-	t.Logf("testing with config: %s", conf)
+	t.Logf("testing with config: %+v", conf)
 	q := NewEventQ(conf)
 	doStartQ(t, q)
 	defer doShutdownQ(t, q)

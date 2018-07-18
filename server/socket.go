@@ -139,7 +139,7 @@ func (s *Socket) accept() {
 func (s *Socket) GoServe() {
 	go func() {
 		if err := s.listenAndServe(true); err != nil {
-			log.Printf("error serving: %v", err)
+			panic(err)
 		}
 	}()
 	s.ready()
@@ -169,7 +169,7 @@ func (s *Socket) Shutdown() error {
 				select {
 				case <-c.done:
 					internal.Debugf(s.conf, "%s(ACTIVE) closed gracefully", c.RemoteAddr())
-				case <-time.After(time.Duration(s.conf.GracefulShutdownTimeout) * time.Millisecond):
+				case <-time.After(s.conf.ShutdownTimeout):
 					log.Printf("%s timed out", c.RemoteAddr())
 				}
 			} else {
@@ -218,7 +218,7 @@ func (s *Socket) Stop() error {
 
 	select {
 	case <-s.shutdownC:
-	case <-time.After(time.Duration(s.conf.GracefulShutdownTimeout) * time.Millisecond):
+	case <-time.After(s.conf.ShutdownTimeout):
 	}
 
 	return nil

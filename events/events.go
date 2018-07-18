@@ -40,7 +40,7 @@ type EventQ struct {
 
 // NewEventQ creates a new instance of an EventQ
 func NewEventQ(conf *config.Config) *EventQ {
-	log.Printf("starting options: %s", conf)
+	log.Printf("starting options: %+v", conf)
 
 	q := &EventQ{
 		conf:         conf,

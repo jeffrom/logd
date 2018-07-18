@@ -57,7 +57,7 @@ func (cs connState) String() string {
 type Conn struct {
 	net.Conn
 
-	config *config.Config
+	conf *config.Config
 
 	id string
 
@@ -75,9 +75,9 @@ type Conn struct {
 }
 
 func newServerConn(c net.Conn, conf *config.Config) *Conn {
-	timeout := time.Duration(conf.ServerTimeout) * time.Millisecond
+	timeout := conf.Timeout
 	conn := &Conn{
-		config:       conf,
+		conf:         conf,
 		id:           newUUID(),
 		Conn:         c,
 		readTimeout:  timeout,
@@ -109,7 +109,7 @@ func (c *Conn) write(bufs ...[]byte) (int64, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	internal.Debugf(c.config, "->%s: %q", c.RemoteAddr(), internal.Prettybuf(bufs...))
+	internal.Debugf(c.conf, "->%s: %q", c.RemoteAddr(), internal.Prettybuf(bufs...))
 
 	var n int64
 	for _, buf := range bufs {
@@ -132,7 +132,7 @@ func (c *Conn) Write(p []byte) (int, error) {
 // Flush sends all pending data over the connection
 func (c *Conn) Flush() error {
 	if c.bw.Buffered() > 0 {
-		internal.Debugf(c.config, "%s: flush() (%d bytes buffered)", c.RemoteAddr(), c.bw.Buffered())
+		internal.Debugf(c.conf, "%s: flush() (%d bytes buffered)", c.RemoteAddr(), c.bw.Buffered())
 		return c.bw.Flush()
 	}
 	return nil
@@ -143,7 +143,7 @@ func (c *Conn) Read(p []byte) (int, error) {
 }
 
 func (c *Conn) readFrom(r io.Reader) (int64, error) {
-	internal.Debugf(c.config, "%s: Conn.readFrom(%+v)", c.RemoteAddr(), r)
+	internal.Debugf(c.conf, "%s: Conn.readFrom(%+v)", c.RemoteAddr(), r)
 	if err := c.setWaitForReadFromDeadline(); err != nil {
 		return 0, err
 	}
@@ -159,8 +159,8 @@ func (c *Conn) readFrom(r io.Reader) (int64, error) {
 	} else {
 		n, err = io.Copy(c.Conn, r)
 	}
-	internal.Debugf(c.config, "%s: wrote %d bytes", c.RemoteAddr(), n)
-	return n, handleConnErr(c.config, err, c)
+	internal.Debugf(c.conf, "%s: wrote %d bytes", c.RemoteAddr(), n)
+	return n, handleConnErr(c.conf, err, c)
 }
 
 func (c *Conn) setState(state connState) {
@@ -187,18 +187,18 @@ func (c *Conn) close() error {
 	// we only care about the channel if we're gracefully shutting down
 	select {
 	case c.done <- struct{}{}:
-		internal.Debugf(c.config, "sent to done channel")
+		internal.Debugf(c.conf, "sent to done channel")
 	default:
-		internal.Debugf(c.config, "failed to write to done channel")
+		internal.Debugf(c.conf, "failed to write to done channel")
 	}
 
 	return err
 }
 
 func (c *Conn) setWaitForReadFromDeadline() error {
-	timeout := time.Duration(c.config.ServerTimeout) * time.Millisecond
+	timeout := c.conf.Timeout
 	err := c.SetWriteDeadline(time.Now().Add(timeout))
-	return handleConnErr(c.config, err, c)
+	return handleConnErr(c.conf, err, c)
 }
 
 func (c *Conn) setWaitForCmdDeadline() error {
@@ -208,9 +208,9 @@ func (c *Conn) setWaitForCmdDeadline() error {
 	if c.state == connStateReading {
 		internal.LogError(c.SetDeadline(time.Time{}))
 	} else {
-		timeout := time.Duration(c.config.ServerTimeout) * time.Millisecond
+		timeout := c.conf.Timeout
 		err := c.SetReadDeadline(time.Now().Add(timeout))
-		if cerr := handleConnErr(c.config, err, c); cerr != nil {
+		if cerr := handleConnErr(c.conf, err, c); cerr != nil {
 			return cerr
 		}
 

@@ -1,125 +1,85 @@
 package main
 
 import (
+	"fmt"
 	"log"
-	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"os/signal"
-	"runtime"
-	"sort"
+	"strings"
 	"syscall"
-
-	"gopkg.in/urfave/cli.v1"
-	"gopkg.in/urfave/cli.v1/altsrc"
 
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/events"
 	"github.com/jeffrom/logd/internal"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
-func runApp(args []string) {
-	conf := &config.Config{}
-	*conf = *config.Default
+var cfgFile string
+var tmpConfig = config.New()
 
-	var check bool
+func init() {
+	cobra.OnInitialize(initConfig)
+	viper.SetEnvPrefix("logd")
+	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+	// NOTE this doesn't work unless you viper.Get flags
+	viper.AutomaticEnv()
 
-	cli.VersionFlag = cli.BoolFlag{
-		Name:  "version",
-		Usage: "Print only the version",
+	pflags := RootCmd.PersistentFlags()
+	pflags.StringVar(&cfgFile, "config", config.Default.File, "config `FILE`")
+
+	pflags.BoolVarP(&tmpConfig.Verbose, "verbose", "v", config.Default.Verbose, "print debug output")
+	viper.BindPFlag("verbose", pflags.Lookup("verbose"))
+
+	pflags.StringVar(&tmpConfig.Hostport, "host", config.Default.Hostport, "a `HOST:PORT` combination to listen on")
+	viper.BindPFlag("host", pflags.Lookup("host"))
+
+	pflags.DurationVar(&tmpConfig.Timeout, "timeout", config.Default.Timeout, "duration to wait for requests to complete")
+	viper.BindPFlag("timeout", pflags.Lookup("timeout"))
+
+	pflags.DurationVar(&tmpConfig.ShutdownTimeout, "shutdown-timeout", config.Default.ShutdownTimeout, "duration to wait for requests to complete while shutting down")
+	viper.BindPFlag("shutdown-timeout", pflags.Lookup("shutdown-timeout"))
+
+	pflags.StringVar(&tmpConfig.WorkDir, "workdir", config.Default.WorkDir, "working directory")
+	viper.BindPFlag("workdir", pflags.Lookup("workdir"))
+
+	pflags.IntVar(&tmpConfig.LogFileMode, "file-mode", config.Default.LogFileMode, "mode used for log files")
+	viper.BindPFlag("file-mode", pflags.Lookup("file-mode"))
+
+	pflags.IntVar(&tmpConfig.MaxBatchSize, "batch-size", config.Default.MaxBatchSize, "maximum size of batch in bytes")
+	viper.BindPFlag("batch-size", pflags.Lookup("batch-size"))
+
+	pflags.IntVar(&tmpConfig.PartitionSize, "partition-size", config.Default.PartitionSize, "maximum size of a partitions in bytes")
+	viper.BindPFlag("partition-size", pflags.Lookup("partition-size"))
+
+	pflags.IntVar(&tmpConfig.MaxPartitions, "partitions", config.Default.MaxPartitions, "maximum number of partitions per topic")
+	viper.BindPFlag("partitions", pflags.Lookup("partitions"))
+}
+
+func initConfig() {
+	if tmpConfig.File != "" {
+		viper.SetConfigFile(tmpConfig.File)
+	} else {
+		viper.SetConfigName("logd")
+		viper.AddConfigPath("/etc/logd")
+		viper.AddConfigPath(".")
 	}
 
-	app := cli.NewApp()
-	app.Name = "logd"
-	app.Usage = "networked logging server"
-	app.Version = "0.0.1"
-	app.EnableBashCompletion = true
-
-	app.Flags = []cli.Flag{
-		cli.StringFlag{
-			Name:   "config, c",
-			Usage:  "Load configuration from `FILE`",
-			Value:  "logd.conf.yml",
-			EnvVar: "LOGD_CONFIG",
-		},
-		altsrc.NewBoolFlag(cli.BoolFlag{
-			Name:        "verbose, v",
-			Usage:       "print debug output",
-			EnvVar:      "LOGD_VERBOSE",
-			Destination: &conf.Verbose,
-		}),
-		altsrc.NewStringFlag(cli.StringFlag{
-			Name:        "host",
-			Usage:       "A `HOST:PORT` combination to connect to",
-			EnvVar:      "LOGD_HOST",
-			Value:       "127.0.0.1:1774",
-			Destination: &conf.Hostport,
-		}),
-		altsrc.NewUintFlag(cli.UintFlag{
-			Name:        "timeout",
-			Usage:       "Time, in milliseconds, to wait for a response to be acknowledged",
-			EnvVar:      "LOGD_TIMEOUT",
-			Value:       config.Default.ServerTimeout,
-			Destination: &conf.ServerTimeout,
-		}),
-		altsrc.NewStringFlag(cli.StringFlag{
-			Name:        "log_file",
-			Usage:       "Log file name",
-			EnvVar:      "LOGD_FILE",
-			Value:       config.Default.WorkDir,
-			Destination: &conf.WorkDir,
-		}),
-		altsrc.NewIntFlag(cli.IntFlag{
-			Name:        "log_file_mode",
-			Usage:       "Integer representation of file mode",
-			EnvVar:      "LOGD_FILE_MODE",
-			Value:       config.Default.LogFileMode,
-			Destination: &conf.LogFileMode,
-		}),
-		altsrc.NewIntFlag(cli.IntFlag{
-			Name:        "max_batch_size",
-			Usage:       "Size, in bytes, of maximum chunk length",
-			EnvVar:      "LOGD_MAX_BATCH_SIZE",
-			Value:       config.Default.MaxBatchSize,
-			Destination: &conf.MaxBatchSize,
-		}),
-		altsrc.NewIntFlag(cli.IntFlag{
-			Name:        "partition_size",
-			Usage:       "Size, in bytes, of partition",
-			EnvVar:      "LOGD_PARTITION_SIZE",
-			Value:       config.Default.PartitionSize,
-			Destination: &conf.PartitionSize,
-		}),
-		altsrc.NewIntFlag(cli.IntFlag{
-			Name:        "max_partitions",
-			Usage:       "number of partitions to save on disk",
-			EnvVar:      "LOGD_MAX_PARTITIONS",
-			Value:       config.Default.MaxPartitions,
-			Destination: &conf.MaxPartitions,
-		}),
-		altsrc.NewBoolFlag(cli.BoolFlag{
-			Name:        "can_shutdown",
-			Usage:       "Server can be shut down via command",
-			EnvVar:      "LOGD_CAN_SHUTDOWN",
-			Destination: &conf.CanShutdown,
-		}),
-
-		// TODO make action for this instead of flag
-		cli.BoolFlag{
-			Name:        "check",
-			Usage:       "Check index for errors",
-			EnvVar:      "LOGD_CHECK",
-			Destination: &check,
-		},
-	}
-
-	app.Before = altsrc.InitInputSourceWithContext(app.Flags, altsrc.NewYamlSourceFromFlagFunc("config"))
-
-	app.Action = func(c *cli.Context) error {
-		if check {
-			panic("not implemented")
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			fmt.Println("failed to read config:", err)
+			os.Exit(1)
 		}
+	}
+}
 
+// RootCmd is the only entry point for the logd application
+var RootCmd = &cobra.Command{
+	Use:   "logd",
+	Short: "logd - networked log transport",
+	Long:  ``,
+	Run: func(cmd *cobra.Command, args []string) {
+		conf := tmpConfig
 		q := events.NewEventQ(conf)
 
 		stopC := make(chan os.Signal, 1)
@@ -131,21 +91,15 @@ func runApp(args []string) {
 			}
 		}()
 
-		go func() {
-			runtime.SetBlockProfileRate(10000)
-			log.Println(http.ListenAndServe("localhost:6060", nil))
-		}()
-
-		return q.Start()
-	}
-
-	sort.Sort(cli.FlagsByName(app.Flags))
-
-	if err := app.Run(args); err != nil {
-		panic(err)
-	}
+		if err := q.Start(); err != nil {
+			panic(err)
+		}
+	},
 }
 
 func main() {
-	runApp(os.Args)
+	if err := RootCmd.Execute(); err != nil {
+		fmt.Println(err)
+		os.Exit(-1)
+	}
 }

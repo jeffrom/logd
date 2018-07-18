@@ -5,6 +5,7 @@ import (
 	"log"
 	"runtime/debug"
 	"testing"
+	"time"
 
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/testhelper"
@@ -16,8 +17,8 @@ func init() {
 
 func eventQBenchConfig() *config.Config {
 	config := config.New()
-	config.ServerTimeout = 500
-	config.GracefulShutdownTimeout = 500
+	config.Timeout = 500 * time.Millisecond
+	config.ShutdownTimeout = 500 * time.Millisecond
 	config.MaxBatchSize = 1024 * 10
 	config.PartitionSize = 2048
 	config.MaxPartitions = 5

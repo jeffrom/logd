@@ -22,7 +22,7 @@ func init() {
 
 func TestBatchWrite(t *testing.T) {
 	conf := DefaultTestConfig(testing.Verbose())
-	gconf := conf.toGeneralConfig()
+	gconf := conf.ToGeneralConfig()
 	fixture := testhelper.LoadFixture("batch.small")
 	server, clientConn := testhelper.Pipe()
 	defer server.Close()
@@ -66,7 +66,7 @@ func TestBatchWrite(t *testing.T) {
 
 func TestRead(t *testing.T) {
 	conf := DefaultTestConfig(testing.Verbose())
-	gconf := conf.toGeneralConfig()
+	gconf := conf.ToGeneralConfig()
 	fixture := testhelper.LoadFixture("batch.small")
 	server, clientConn := testhelper.Pipe()
 	defer server.Close()
@@ -109,7 +109,7 @@ func TestRead(t *testing.T) {
 
 func TestTail(t *testing.T) {
 	conf := DefaultTestConfig(testing.Verbose())
-	gconf := conf.toGeneralConfig()
+	gconf := conf.ToGeneralConfig()
 	fixture := testhelper.LoadFixture("batch.small")
 	server, clientConn := testhelper.Pipe()
 	defer server.Close()
@@ -143,7 +143,7 @@ func TestTail(t *testing.T) {
 
 func TestClose(t *testing.T) {
 	conf := DefaultTestConfig(testing.Verbose())
-	gconf := conf.toGeneralConfig()
+	gconf := conf.ToGeneralConfig()
 	server, clientConn := testhelper.Pipe()
 	defer server.Close()
 	c := New(conf).SetConn(clientConn)
@@ -163,7 +163,7 @@ func TestClose(t *testing.T) {
 
 func TestReconnect(t *testing.T) {
 	conf := DefaultTestConfig(testing.Verbose())
-	gconf := conf.toGeneralConfig()
+	gconf := conf.ToGeneralConfig()
 	server, clientConn := testhelper.Pipe()
 	defer server.Close()
 	c := New(conf).SetConn(clientConn)

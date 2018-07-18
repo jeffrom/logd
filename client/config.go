@@ -84,8 +84,9 @@ func (c *Config) getWriteTimeout() time.Duration {
 	return c.Timeout
 }
 
-// just copies what is needed for shared modules (internal, protocol)
-func (c *Config) toGeneralConfig() *config.Config {
+// ToGeneralConfig copies what is needed for shared modules (internal,
+// protocol) to the server config struct.
+func (c *Config) ToGeneralConfig() *config.Config {
 	gconf := &config.Config{}
 	*gconf = *config.Default
 	gconf.Verbose = c.Verbose

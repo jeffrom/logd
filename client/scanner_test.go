@@ -18,7 +18,7 @@ func TestScanner(t *testing.T) {
 	conf := DefaultTestConfig(testing.Verbose())
 	conf.Offset = 0
 	conf.Limit = 3
-	gconf := conf.toGeneralConfig()
+	gconf := conf.ToGeneralConfig()
 	fixture := testhelper.LoadFixture("batch.small")
 	server, clientConn := testhelper.Pipe()
 	defer server.Close()
@@ -69,7 +69,7 @@ func TestScannerLimit(t *testing.T) {
 	conf := DefaultTestConfig(testing.Verbose())
 	conf.Offset = 0
 	conf.Limit = 15
-	gconf := conf.toGeneralConfig()
+	gconf := conf.ToGeneralConfig()
 	fixture := testhelper.LoadFixture("batch.small")
 	server, clientConn := testhelper.Pipe()
 	defer server.Close()
@@ -133,7 +133,7 @@ func TestScannerReadForever(t *testing.T) {
 	conf.Offset = 0
 	conf.Limit = 3
 	conf.ReadForever = true
-	gconf := conf.toGeneralConfig()
+	gconf := conf.ToGeneralConfig()
 	fixture := testhelper.LoadFixture("batch.small")
 	server, clientConn := testhelper.Pipe()
 	defer server.Close()

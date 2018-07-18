@@ -17,7 +17,7 @@ import (
 
 func TestWriter(t *testing.T) {
 	conf := DefaultTestConfig(testing.Verbose())
-	gconf := conf.toGeneralConfig()
+	gconf := conf.ToGeneralConfig()
 	fixture := testhelper.LoadFixture("batch.small")
 	server, client := testhelper.Pipe()
 	defer server.Close()
@@ -41,7 +41,7 @@ func TestWriter(t *testing.T) {
 
 func TestWriterFillBatch(t *testing.T) {
 	conf := DefaultTestConfig(testing.Verbose())
-	gconf := conf.toGeneralConfig()
+	gconf := conf.ToGeneralConfig()
 	server, client := testhelper.Pipe()
 	defer server.Close()
 	c := New(conf).SetConn(client)
@@ -76,7 +76,7 @@ func TestWriterFillBatch(t *testing.T) {
 
 func TestWriterTwoBatches(t *testing.T) {
 	conf := DefaultTestConfig(testing.Verbose())
-	gconf := conf.toGeneralConfig()
+	gconf := conf.ToGeneralConfig()
 	server, client := testhelper.Pipe()
 	defer server.Close()
 	c := New(conf).SetConn(client)

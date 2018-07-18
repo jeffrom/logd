@@ -3,6 +3,7 @@ package testhelper
 import (
 	"log"
 	"os"
+	"time"
 
 	"github.com/jeffrom/logd/config"
 )
@@ -13,21 +14,21 @@ func DefaultTestConfig(verbose bool) *config.Config {
 	}
 
 	return &config.Config{
-		Verbose:                 verbose,
-		ServerTimeout:           200,
-		GracefulShutdownTimeout: 1000,
-		LogFileMode:             0644,
-		WorkDir:                 TmpLog(),
-		MaxBatchSize:            1024 * 2,
-		PartitionSize:           1024 * 5,
-		MaxPartitions:           5,
+		Verbose:         verbose,
+		Timeout:         200 * time.Millisecond,
+		ShutdownTimeout: 1 * time.Second,
+		LogFileMode:     0644,
+		WorkDir:         TmpLog(),
+		MaxBatchSize:    1024 * 2,
+		PartitionSize:   1024 * 5,
+		MaxPartitions:   5,
 	}
 }
 
 func TestConfig(verbose bool) *config.Config {
 	conf := config.New()
-	conf.ServerTimeout = 1000
-	conf.GracefulShutdownTimeout = 1000
+	conf.Timeout = 1 * time.Second
+	conf.ShutdownTimeout = 1 * time.Second
 	conf.MaxBatchSize = 1024 * 10
 	conf.PartitionSize = 1024 * 1024 * 500
 	conf.WorkDir = TmpLog()

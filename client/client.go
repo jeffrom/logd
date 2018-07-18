@@ -51,7 +51,7 @@ type Client struct { // nolint: golint
 // New returns a new instance of Client without a net.Conn
 func New(conf *Config) *Client {
 	// timeout := time.Duration(conf.ClientTimeout) * time.Millisecond
-	gconf := conf.toGeneralConfig()
+	gconf := conf.ToGeneralConfig()
 	c := &Client{
 		conf:         conf,
 		gconf:        gconf,
@@ -102,7 +102,9 @@ func (c *Client) resetRetries() {
 func (c *Client) connect(addr string) error {
 	conn, err := c.dialer.DialTimeout("tcp", addr, c.conf.Timeout)
 	if err != nil {
-		internal.IgnoreError(c.conf.Verbose, conn.Close())
+		if conn != nil {
+			internal.IgnoreError(c.conf.Verbose, conn.Close())
+		}
 		return err
 	}
 	c.reset()
