@@ -7,10 +7,10 @@
 * [X] migrate logd/log-cli to cobra
 * [ ] failure handling for writer
   * right now it completely ignores some underlying client errors
-* [ ] Repairer to truncate partitions with corrupt data
-* [ ] remove state management stuff from scanner for now
 * [ ] scanner should read all pending response batches over the wire before
       beginning to iterate through them
+* [ ] Repairer to truncate partitions with corrupt data
+* [ ] remove state management stuff from scanner for now
 * [ ] config validation
 * [ ] send config to new connections so it can be validated
 * [ ] make consistency guarantees configurable. fast by default (at-most-once),
@@ -19,9 +19,9 @@
   * most strict can use `creat(O_SYNC)`, or maybe just flush before
     responding to each command
   * least strict just needs to fsync during shutdown
-  * have a flush interval option. also document how it may be better to just
-    change the dirty page cache kernel settings. this can be implemented by
-    just putting a flush command into the queue at an interval.
+  * have a flush interval option. this can be implemented by just putting a
+    flush command into the queue at an interval. also document how it may be
+    better to just change the dirty page cache kernel settings.
 * [ ] simple replication, scanner failover
 
 # maybe later
