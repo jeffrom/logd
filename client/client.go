@@ -29,8 +29,9 @@ func (nd *netDialer) DialTimeout(network, addr string, timeout time.Duration) (n
 // Client represents a connection to the database
 type Client struct { // nolint: golint
 	net.Conn
-	conf  *Config
-	gconf *config.Config
+	conf     *Config
+	gconf    *config.Config
+	hostport string
 
 	dialer        Dialer
 	readTimeout   time.Duration
@@ -55,6 +56,7 @@ func New(conf *Config) *Client {
 	c := &Client{
 		conf:         conf,
 		gconf:        gconf,
+		hostport:     conf.Hostport,
 		dialer:       &netDialer{},
 		readTimeout:  conf.getReadTimeout(),
 		writeTimeout: conf.getWriteTimeout(),
@@ -77,6 +79,7 @@ func Dial(addr string) (*Client, error) {
 func DialConfig(addr string, conf *Config) (*Client, error) {
 	// internal.Debugf(conf, "starting options: %s", conf)
 	c := New(conf)
+	c.hostport = addr
 	if err := c.connect(addr); err != nil {
 		return nil, err
 	}
@@ -260,7 +263,7 @@ func (c *Client) retryRequest(wt io.WriterTo, origSent, origRecv int64, err erro
 	var recv int64
 	conn := c.Conn
 	for c.conf.ConnRetries < 0 || c.retries < c.conf.ConnRetries {
-		if retryErr != nil && !isRetryable(err) {
+		if retryErr != nil && !isRetryable(retryErr) {
 			break
 		}
 		c.retries++
@@ -295,13 +298,13 @@ func (c *Client) retryRequest(wt io.WriterTo, origSent, origRecv int64, err erro
 		}
 
 		c.resetRetries()
-		break
+		return sent, recv, nil
 	}
 
 	if retryErr != nil {
 		return sent, recv, retryErr
 	}
-	return sent, recv, nil
+	return sent, recv, err
 }
 
 // flush flushes all pending data to the server

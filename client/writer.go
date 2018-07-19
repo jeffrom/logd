@@ -93,7 +93,7 @@ func (w *Writer) Topic() string {
 	return string(w.topic)
 }
 
-// TODO have a zero copy version, WriteSlice, but Write should copy, probably
+// TODO have a zero copy version, WriteSlice
 func (w *Writer) Write(p []byte) (int, error) {
 	w.mu.Lock()
 	shouldFlush := w.shouldFlush(len(p))
@@ -103,6 +103,7 @@ func (w *Writer) Write(p []byte) (int, error) {
 		w.mu.Lock()
 
 		if err != nil {
+			w.mu.Unlock()
 			return 0, err
 		}
 	}
@@ -174,7 +175,7 @@ func (w *Writer) signalReadySync(err error, sync bool) {
 		return
 	}
 	w.readySyncC <- err
-	internal.Debugf(w.gconf, "<-readySyncC")
+	internal.Debugf(w.gconf, "readySyncC <- %v", err)
 }
 
 func (w *Writer) flushPending(sync bool) error {
@@ -193,7 +194,7 @@ func (w *Writer) flushPending(sync bool) error {
 	}
 
 	off, err := w.Batch(batch)
-	internal.Debugf(w.gconf, "flush complete")
+	internal.Debugf(w.gconf, "flush complete, err: %+v", err)
 	batch.Reset()
 	if err != nil {
 		w.signalReadySync(err, sync)

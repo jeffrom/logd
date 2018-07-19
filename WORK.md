@@ -4,7 +4,9 @@
 
 * [X] Client graceful reconnect
 * [X] topics?
-* [ ] migrate logd/log-cli to cobra
+* [X] migrate logd/log-cli to cobra
+* [ ] failure handling for writer
+  * right now it completely ignores some underlying client errors
 * [ ] Repairer to truncate partitions with corrupt data
 * [ ] remove state management stuff from scanner for now
 * [ ] scanner should read all pending response batches over the wire before
@@ -21,7 +23,6 @@
     change the dirty page cache kernel settings. this can be implemented by
     just putting a flush command into the queue at an interval.
 * [ ] simple replication, scanner failover
-* [ ] failure handling for writer
 
 # maybe later
 

@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/jeffrom/logd/config"
@@ -28,7 +29,7 @@ func TestWriter(t *testing.T) {
 	defer expectServerClose(t, gconf, server)
 
 	server.Expect(func(p []byte) io.WriterTo {
-		fmt.Println(string(p))
+		// fmt.Println(string(p))
 		if !bytes.Equal(fixture, p) {
 			t.Fatalf("expected:\n\n\t%q\n\nbut got:\n\n\t%q\n", fixture, p)
 		}
@@ -37,6 +38,50 @@ func TestWriter(t *testing.T) {
 
 	writeBatch(t, w, "hi", "hallo", "sup")
 	flushBatch(t, w)
+}
+
+func TestWriterConcurrent(t *testing.T) {
+	// t.SkipNow()
+	conf := DefaultTestConfig(testing.Verbose())
+	conf.BatchSize = 1024 * 1024
+	gconf := conf.ToGeneralConfig()
+	server, client := testhelper.Pipe()
+	defer server.Close()
+	c := New(conf).SetConn(client)
+	w := WriterForClient(c)
+	w.dialer = server
+	w.SetTopic("default")
+	defer w.Close()
+	defer expectServerClose(t, gconf, server)
+
+	var offset uint64
+	par := 10
+	n := 100
+	for i := 0; i < n; i++ {
+		if i%10 == 0 {
+			t.Logf("%d times", i)
+		}
+
+		server.Expect(func(p []byte) io.WriterTo {
+			// t.Logf("%q", p)
+			off := offset
+			atomic.AddUint64(&offset, uint64(len(p)))
+			return protocol.NewClientBatchResponse(gconf, off, 1)
+		})
+
+		wg := sync.WaitGroup{}
+
+		for j := 0; j < par; j++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				writeBatch(t, w, "hi", "hallo", "sup")
+			}()
+		}
+
+		wg.Wait()
+		flushBatch(t, w)
+	}
 }
 
 func TestWriterFillBatch(t *testing.T) {
@@ -92,12 +137,12 @@ func TestWriterTwoBatches(t *testing.T) {
 	}
 	defer f.Close()
 
-	n := 0
+	var n uint64
 	for i := 0; i < 3; i++ {
 		server.Expect(func(p []byte) io.WriterTo {
 			buf.Write(p)
 			cr := protocol.NewClientBatchResponse(gconf, uint64(n), 1)
-			n += len(p)
+			atomic.AddUint64(&n, uint64(len(p)))
 			return cr
 		})
 	}
@@ -123,7 +168,7 @@ func TestWriterTwoBatches(t *testing.T) {
 
 func writeBatch(t *testing.T, w *Writer, msgs ...string) {
 	for _, msg := range msgs {
-		t.Logf("write: %q", msg)
+		// t.Logf("write: %q", msg)
 		n, err := w.Write([]byte(msg))
 		if err != nil {
 			t.Fatal(err)

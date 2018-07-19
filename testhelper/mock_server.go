@@ -1,6 +1,7 @@
 package testhelper
 
 import (
+	"bytes"
 	"io"
 	"log"
 	"net"
@@ -40,10 +41,12 @@ func NewMockServer(c net.Conn) *MockServer {
 
 func (s *MockServer) loop() {
 	for {
+		log.Print("waiting for event")
 		select {
 		case cb := <-s.in:
 			s.handleExpectation(cb)
 		case <-s.connInC:
+			log.Print("<-connInC")
 			server, client := net.Pipe()
 			s.c = server
 			log.Printf("new connection created")
@@ -60,7 +63,7 @@ func (s *MockServer) loop() {
 }
 
 func (s *MockServer) handleExpectation(cb func([]byte) io.WriterTo) {
-	internal.LogError(s.c.SetReadDeadline(time.Now().Add(50 * time.Millisecond)))
+	internal.LogError(s.c.SetReadDeadline(time.Now().Add(100 * time.Millisecond)))
 	n, err := s.c.Read(s.b)
 	log.Printf("%s: read %d bytes: %q (err: %+v)", s.c.RemoteAddr(), n, s.b[:n], err)
 	if err != nil {
@@ -78,7 +81,10 @@ func (s *MockServer) handleExpectation(cb func([]byte) io.WriterTo) {
 
 	resp := cb(s.b[:n])
 	wrote, err := resp.WriteTo(s.c)
-	log.Printf("%s: wrote %d bytes (err: %+v)", s.c.RemoteAddr(), wrote, err)
+
+	b := &bytes.Buffer{}
+	resp.WriteTo(b)
+	log.Printf("%s: wrote %d bytes: %q (err: %+v)", s.c.RemoteAddr(), wrote, b.Bytes(), err)
 	if err != nil {
 		panic(err)
 	}
@@ -107,11 +113,14 @@ func (s *MockServer) CloseN(n int) {
 
 // DialTimeout returns a new net.Pipe client connection with a timeout
 func (s *MockServer) DialTimeout(network, addr string, timeout time.Duration) (net.Conn, error) {
+	log.Print("DialTimeout: making new pipe")
 	var client net.Conn
 	s.connInC <- struct{}{}
+
 	select {
 	case conn := <-s.connRetC:
 		client = conn
+		log.Print("DialTimeout: got new pipe")
 	}
 	s.connCreatedC <- struct{}{}
 	return client, nil
