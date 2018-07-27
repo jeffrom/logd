@@ -113,7 +113,7 @@ func DefaultTestConfig(verbose bool) *Config {
 	// c.BatchSize = 1024 * 10
 	c.ReadTimeout = 100 * time.Millisecond
 	c.WriteTimeout = 100 * time.Millisecond
-	c.WaitInterval = 100 * time.Millisecond
+	c.WaitInterval = -1
 	c.ConnRetries = 3
 	c.ConnRetryInterval = 1
 	c.ConnRetryMaxInterval = 1

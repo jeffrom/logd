@@ -7,6 +7,7 @@ import (
 
 // StatePusher saves recently used offsets so they can be retrieved
 type StatePusher interface {
+	// TODO Push should also take an error argument so it can handle failures
 	Push(off uint64) error
 }
 

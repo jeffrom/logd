@@ -5,10 +5,12 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/internal"
@@ -20,18 +22,19 @@ func TestWriter(t *testing.T) {
 	conf := DefaultTestConfig(testing.Verbose())
 	gconf := conf.ToGeneralConfig()
 	fixture := testhelper.LoadFixture("batch.small")
-	server, client := testhelper.Pipe()
+	server, _ := testhelper.Pipe()
 	defer server.Close()
-	c := New(conf).SetConn(client)
-	w := WriterForClient(c)
-	w.SetTopic("default")
+	w := NewWriter(conf, "default")
+	w.Client.dialer = server
+	// TODO this prevents a race but would be better to do connections in a
+	// separate goroutine from expectations
+	w.ensureConn()
 	defer w.Close()
 	defer expectServerClose(t, gconf, server)
 
 	server.Expect(func(p []byte) io.WriterTo {
-		// fmt.Println(string(p))
 		if !bytes.Equal(fixture, p) {
-			t.Fatalf("expected:\n\n\t%q\n\nbut got:\n\n\t%q\n", fixture, p)
+			log.Panicf("expected:\n\n\t%q\n\nbut got:\n\n\t%q\n", fixture, p)
 		}
 		return protocol.NewClientBatchResponse(gconf, 10, 1)
 	})
@@ -45,12 +48,11 @@ func TestWriterConcurrent(t *testing.T) {
 	conf := DefaultTestConfig(testing.Verbose())
 	conf.BatchSize = 1024 * 1024
 	gconf := conf.ToGeneralConfig()
-	server, client := testhelper.Pipe()
+	server, _ := testhelper.Pipe()
 	defer server.Close()
-	c := New(conf).SetConn(client)
-	w := WriterForClient(c)
-	w.dialer = server
-	w.SetTopic("default")
+	w := NewWriter(conf, "default")
+	w.Client.dialer = server
+	w.ensureConn()
 	defer w.Close()
 	defer expectServerClose(t, gconf, server)
 
@@ -70,28 +72,37 @@ func TestWriterConcurrent(t *testing.T) {
 		})
 
 		wg := sync.WaitGroup{}
+		errs := make(chan error, par)
+		// w.ensureConn()
 
 		for j := 0; j < par; j++ {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				writeBatch(t, w, "hi", "hallo", "sup")
+				_, err := w.Write([]byte("hallo"))
+				errs <- err
 			}()
 		}
 
 		wg.Wait()
-		flushBatch(t, w)
+		if err := drainErrs(errs); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := w.Flush(); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
 func TestWriterFillBatch(t *testing.T) {
 	conf := DefaultTestConfig(testing.Verbose())
 	gconf := conf.ToGeneralConfig()
-	server, client := testhelper.Pipe()
+	server, _ := testhelper.Pipe()
 	defer server.Close()
-	c := New(conf).SetConn(client)
-	w := WriterForClient(c)
-	w.SetTopic("default")
+	w := NewWriter(conf, "default")
+	w.Client.dialer = server
+	w.ensureConn()
 	defer w.Close()
 	defer expectServerClose(t, gconf, server)
 	msg := []byte("pretty cool message!")
@@ -122,11 +133,11 @@ func TestWriterFillBatch(t *testing.T) {
 func TestWriterTwoBatches(t *testing.T) {
 	conf := DefaultTestConfig(testing.Verbose())
 	gconf := conf.ToGeneralConfig()
-	server, client := testhelper.Pipe()
+	server, _ := testhelper.Pipe()
 	defer server.Close()
-	c := New(conf).SetConn(client)
-	w := WriterForClient(c)
-	w.SetTopic("default")
+	w := NewWriter(conf, "default")
+	w.Client.dialer = server
+	w.ensureConn()
 	defer w.Close()
 	defer expectServerClose(t, gconf, server)
 	buf := newLockedBuffer()
@@ -166,6 +177,45 @@ func TestWriterTwoBatches(t *testing.T) {
 	testhelper.CheckGoldenFile("writer.art", buf.Bytes(), testhelper.Golden)
 }
 
+func TestWriterConnectFailure(t *testing.T) {
+	// t.Skip("temporarily skipping until reconnect logic is fixed")
+	conf := DefaultTestConfig(testing.Verbose())
+	log.Print(conf)
+	gconf := conf.ToGeneralConfig()
+	// fixture := testhelper.LoadFixture("batch.small")
+	server, client := testhelper.Pipe()
+	server.CloseConnN(2)
+	client.Close()
+	defer server.Close()
+	w := NewWriter(conf, "default")
+	w.Client.dialer = server
+	defer w.Close()
+
+	t.Logf("doing first attempt (should fail)")
+	_, err := w.Write([]byte("aw shucks sup"))
+	if err == nil {
+		t.Fatal("expected error but got nil")
+	}
+
+	t.Logf("doing second attempt (should fail)")
+	_, err = w.Write([]byte("aw shucks sup"))
+	if err == nil {
+		t.Fatal("expected error but got nil")
+	}
+
+	time.Sleep(10 * time.Millisecond)
+	server.Expect(func(p []byte) io.WriterTo {
+		return protocol.NewClientBatchResponse(gconf, 10, 1)
+	})
+
+	t.Logf("doing third attempt (should succeed)")
+	_, err = w.Write([]byte("aw shucks sup"))
+	if err != nil {
+		t.Fatal("expected nil error but got", err)
+	}
+	flushBatch(t, w)
+}
+
 func writeBatch(t *testing.T, w *Writer, msgs ...string) {
 	for _, msg := range msgs {
 		// t.Logf("write: %q", msg)
@@ -189,7 +239,7 @@ func expectServerClose(t testing.TB, conf *config.Config, server *testhelper.Moc
 	server.Expect(func(p []byte) io.WriterTo {
 		expect := []byte("CLOSE\r\n")
 		if !bytes.Equal(p, expect) {
-			t.Fatalf("expected:\n\n\t%q but got:\n\n\t%q", expect, p)
+			log.Panicf("expected:\n\n\t%q but got:\n\n\t%q", expect, p)
 		}
 		return protocol.NewClientOKResponse(conf)
 	})
@@ -222,4 +272,17 @@ func (b *lockedBuffer) Bytes() []byte {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return b.Buffer.Bytes()
+}
+
+func drainErrs(errs chan error) error {
+	for {
+		select {
+		case err := <-errs:
+			if err != nil {
+				return err
+			}
+		default:
+			return nil
+		}
+	}
 }

@@ -193,18 +193,9 @@ func doWrite(conf *client.Config, c *cobra.Command, args []string) error {
 		defer out.Close()
 	}
 
-	w, err := client.DialWriterConfig(conf.Hostport, conf)
-	if err != nil {
-		return err
-	}
-	defer w.Close()
-
 	t, err := c.PersistentFlags().GetString("topic")
 	if err != nil {
 		panic(err)
-	}
-	if err := w.SetTopic(t); err != nil {
-		return err
 	}
 
 	var m client.StatePusher
@@ -213,7 +204,9 @@ func doWrite(conf *client.Config, c *cobra.Command, args []string) error {
 	} else {
 		m = client.NewStateOutputter(out)
 	}
-	w.SetStateHandler(m)
+
+	w := client.NewWriter(conf, t).WithStateHandler(m)
+	defer w.Close()
 
 	for _, arg := range args {
 		select {

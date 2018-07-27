@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"testing"
+	"testing/iotest"
 
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/protocol"
@@ -26,6 +27,7 @@ func TestBatchWrite(t *testing.T) {
 	fixture := testhelper.LoadFixture("batch.small")
 	server, clientConn := testhelper.Pipe()
 	defer server.Close()
+	// defer expectServerClose(t, gconf, server)
 	c := New(conf).SetConn(clientConn)
 
 	var expectedID uint64 = 10
@@ -61,6 +63,46 @@ func TestBatchWrite(t *testing.T) {
 	_, err = c.Batch(batch)
 	if err != protocol.ErrInternal {
 		t.Fatalf("expected %v but got %+v", protocol.ErrInternal, err)
+	}
+}
+
+func TestBatchEmpty(t *testing.T) {
+	conf := DefaultTestConfig(testing.Verbose())
+	gconf := conf.ToGeneralConfig()
+	server, clientConn := testhelper.Pipe()
+	defer server.Close()
+	c := New(conf).SetConn(clientConn)
+
+	batch := protocol.NewBatch(gconf)
+	_, err := c.Batch(batch)
+	if err != ErrEmptyBatch {
+		t.Fatalf("expected %v but got %+v", ErrEmptyBatch, err)
+	}
+}
+
+func TestBatchErrors(t *testing.T) {
+	conf := DefaultTestConfig(testing.Verbose())
+	conf.ConnRetries = 0
+	gconf := conf.ToGeneralConfig()
+	server, clientConn := testhelper.Pipe()
+	defer server.Close()
+	c := New(conf).SetConn(clientConn)
+
+	batch := protocol.NewBatch(gconf)
+	batch.SetTopic([]byte("default"))
+	batch.Append([]byte("hi"))
+	batch.Append([]byte("hallo"))
+	batch.Append([]byte("sup"))
+
+	_, err := c.Batch(batch)
+	if err == nil {
+		t.Fatal("expected err but got", err)
+	}
+
+	c.setWriter(iotest.TruncateWriter(c.w, 3))
+	_, err = c.Batch(batch)
+	if err == nil {
+		t.Fatal("expected err but got", err)
 	}
 }
 
@@ -105,6 +147,144 @@ func TestRead(t *testing.T) {
 	if err != protocol.ErrNotFound {
 		t.Fatalf("expected %v but got %+v", protocol.ErrNotFound, err)
 	}
+}
+
+func TestReadErrors(t *testing.T) {
+	conf := DefaultTestConfig(testing.Verbose())
+	conf.ConnRetries = 0
+	// gconf := conf.ToGeneralConfig()
+	// fixture := testhelper.LoadFixture("batch.small")
+	server, clientConn := testhelper.Pipe()
+	defer server.Close()
+	c := New(conf).SetConn(clientConn)
+
+	_, scanner, err := c.ReadOffset([]byte("default"), 10, 3)
+	if err == nil {
+		t.Fatalf("expected not nil error but got %v", err)
+	}
+	if scanner != nil {
+		t.Fatal("scanner was not nil")
+	}
+
+	c.setWriter(iotest.TruncateWriter(c.w, 3))
+
+	_, scanner, err = c.ReadOffset([]byte("default"), 10, 3)
+	if err == nil {
+		t.Fatalf("expected not nil error but got %v", err)
+	}
+	if scanner != nil {
+		t.Fatal("scanner was not nil")
+	}
+}
+
+func TestReadIncorrectRespOffset(t *testing.T) {
+	conf := DefaultTestConfig(testing.Verbose())
+	conf.ConnRetries = 0
+	gconf := conf.ToGeneralConfig()
+	fixture := testhelper.LoadFixture("batch.small")
+	server, clientConn := testhelper.Pipe()
+	defer server.Close()
+	c := New(conf).SetConn(clientConn)
+
+	server.Expect(func(p []byte) io.WriterTo {
+		return readOKResponse(gconf, 0, 1, fixture)
+	})
+
+	_, scanner, err := c.ReadOffset([]byte("default"), 10, 3)
+	if err == nil {
+		t.Fatalf("expected error but got %v", err)
+	}
+	if scanner != nil {
+		t.Fatal("scanner was not nil")
+	}
+}
+
+func TestReadRetryAndFail(t *testing.T) {
+	conf := DefaultTestConfig(testing.Verbose())
+	server, clientConn := testhelper.Pipe()
+	defer server.Close()
+	c := New(conf).SetConn(clientConn)
+	c.setWriter(iotest.TruncateWriter(c.w, 3))
+
+	_, scanner, err := c.ReadOffset([]byte("default"), 0, 3)
+	if err == nil {
+		t.Fatalf("expected non-nil error but got %v", err)
+	}
+	if scanner != nil {
+		t.Fatal("scanner was not nil")
+	}
+}
+
+func TestReadDisruption(t *testing.T) {
+	conf := DefaultTestConfig(testing.Verbose())
+	gconf := conf.ToGeneralConfig()
+	fixture := testhelper.LoadFixture("batch.small")
+	server, clientConn := testhelper.Pipe()
+	defer server.Close()
+	c := New(conf).SetConn(clientConn)
+	c.setReader(iotest.HalfReader(c.r))
+
+	server.Expect(func(p []byte) io.WriterTo {
+		return readOKResponse(gconf, 10, 1, fixture)
+	})
+
+	batches, scanner, err := c.ReadOffset([]byte("default"), 10, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scanner == nil {
+		t.Fatal("scanner was nil")
+	}
+	if batches != 1 {
+		t.Fatal("expected 1 batch but got", batches)
+	}
+}
+
+func TestReadTimeout(t *testing.T) {
+	t.Skip("not implemented")
+	conf := DefaultTestConfig(testing.Verbose())
+	gconf := conf.ToGeneralConfig()
+	fixture := testhelper.LoadFixture("batch.small")
+	server, clientConn := testhelper.Pipe()
+	defer server.Close()
+	c := New(conf).SetConn(clientConn)
+	c.setReader(iotest.TimeoutReader(c.r))
+
+	server.Expect(func(p []byte) io.WriterTo {
+		return readOKResponse(gconf, 10, 1, fixture)
+	})
+
+	batches, scanner, err := c.ReadOffset([]byte("default"), 10, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scanner == nil {
+		t.Fatal("scanner was nil")
+	}
+	if batches != 1 {
+		t.Fatal("expected 1 batch but got", batches)
+	}
+
+	server.Expect(func(p []byte) io.WriterTo {
+		return readOKResponse(gconf, 10, 1, fixture)
+	})
+
+	batches, scanner, err = c.ReadOffset([]byte("default"), 10, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scanner == nil {
+		t.Fatal("scanner was nil")
+	}
+	if batches != 1 {
+		t.Fatal("expected 1 batch but got", batches)
+	}
+}
+
+type closedWriter struct{}
+
+func (w closedWriter) Write(p []byte) (int, error) {
+	return 0, io.EOF
 }
 
 func TestTail(t *testing.T) {
@@ -164,29 +344,26 @@ func TestClose(t *testing.T) {
 func TestReconnect(t *testing.T) {
 	conf := DefaultTestConfig(testing.Verbose())
 	gconf := conf.ToGeneralConfig()
+	fixture := testhelper.LoadFixture("batch.small")
 	server, clientConn := testhelper.Pipe()
 	defer server.Close()
 	c := New(conf).SetConn(clientConn)
 	c.dialer = server
 
-	var expectedID uint64
-	batch := protocol.NewBatch(gconf)
-	batch.SetTopic([]byte("default"))
-	batch.Append([]byte("hi"))
-	batch.Append([]byte("hallo"))
-	batch.Append([]byte("sup"))
-
 	server.CloseN(3)
 	server.Expect(func(p []byte) io.WriterTo {
-		return protocol.NewClientBatchResponse(gconf, expectedID, 1)
+		return readOKResponse(gconf, 10, 1, fixture)
 	})
 
-	off, err := c.Batch(batch)
+	batches, scanner, err := c.ReadOffset([]byte("default"), 10, 3)
 	if err != nil {
-		t.Fatalf("sending batch: %+v", err)
+		t.Fatal(err)
 	}
-	if off != expectedID {
-		t.Fatalf("expected resp offset %d but got %d", expectedID, off)
+	if scanner == nil {
+		t.Fatal("scanner was nil")
+	}
+	if batches != 1 {
+		t.Fatal("expected 1 batch but got", batches)
 	}
 }
 

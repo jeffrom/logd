@@ -60,6 +60,14 @@ func (b *Batch) Reset() {
 	b.msgBuf.Reset()
 }
 
+// Empty returns true if the batch contains no messages
+func (b *Batch) Empty() bool {
+	if b.Messages <= 0 {
+		return true
+	}
+	return false
+}
+
 func (b *Batch) ensureBuf() {
 	if b.body == nil {
 		b.body = make([]byte, b.conf.MaxBatchSize)

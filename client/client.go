@@ -14,6 +14,9 @@ import (
 	"github.com/jeffrom/logd/protocol"
 )
 
+// ErrEmptyBatch is returned when an empty batch write is attempted.
+var ErrEmptyBatch = errors.New("attempted to send an empty batch")
+
 // Dialer defines an interface for connecting to servers. It can be used for
 // mocking in tests.
 type Dialer interface {
@@ -39,8 +42,15 @@ type Client struct { // nolint: golint
 	retries       int
 	retryInterval time.Duration
 
+	w       io.Writer
+	r       io.Reader
+	closer  io.Closer
 	bw      *bufio.Writer
 	br      *bufio.Reader
+	sw      io.Writer
+	sr      io.Reader
+	scloser io.Closer
+
 	cr      *protocol.ClientResponse
 	readreq *protocol.Read
 	tailreq *protocol.Tail
@@ -91,6 +101,7 @@ func (c *Client) reset() {
 	c.cr.Reset()
 	c.readreq.Reset()
 	c.tailreq.Reset()
+	c.unsetConn()
 	select {
 	case <-c.done:
 	default:
@@ -103,6 +114,7 @@ func (c *Client) resetRetries() {
 }
 
 func (c *Client) connect(addr string) error {
+	internal.Debugf(c.gconf, "connecting to %s", addr)
 	conn, err := c.dialer.DialTimeout("tcp", addr, c.conf.Timeout)
 	if err != nil {
 		if conn != nil {
@@ -122,30 +134,82 @@ func (c *Client) Stop() {
 
 // SetConn sets net.Conn for a client.
 func (c *Client) SetConn(conn net.Conn) *Client {
-	if c.Conn != nil {
-		internal.LogError(c.Conn.Close())
+	if c.closer != nil {
+		internal.LogError(c.closer.Close())
 	}
 
 	c.Conn = conn
-	if c.bw == nil {
-		c.bw = bufio.NewWriterSize(conn, c.conf.BatchSize)
-	} else {
-		c.bw.Reset(conn)
-	}
-	if c.br == nil {
-		c.br = bufio.NewReaderSize(conn, c.conf.BatchSize)
-	} else {
-		c.br.Reset(conn)
-	}
+	c.setRW(conn)
+
 	return c
 }
 
-// Batch sends a batch request and returns the response.
+func (c *Client) setRW(rw io.ReadWriteCloser) {
+	if c.sw == nil {
+		c.w = rw
+		c.bw = bufio.NewWriterSize(rw, c.conf.BatchSize)
+	}
+
+	if c.sr == nil {
+		c.r = rw
+		c.br = bufio.NewReaderSize(rw, c.conf.BatchSize)
+	}
+
+	if c.scloser == nil {
+		c.closer = rw
+	}
+}
+
+func (c *Client) unsetConn() {
+	c.Conn = nil
+	c.w = nil
+	c.sr = nil
+	c.r = nil
+	c.sr = nil
+	c.closer = nil
+	c.scloser = nil
+}
+
+// setWriter sets the client writer. for testing purposes
+func (c *Client) setWriter(w io.Writer) {
+	c.sw = w
+	c.w = w
+	c.bw = bufio.NewWriterSize(w, c.conf.BatchSize)
+}
+
+// setReader sets the client reader. for testing purposes
+func (c *Client) setReader(r io.Reader) {
+	c.sr = r
+	c.r = r
+	c.br = bufio.NewReaderSize(r, c.conf.BatchSize)
+}
+
+// setCloser sets the client closer. for testing purposes
+func (c *Client) setCloser(closer io.Closer) {
+	c.scloser = closer
+	c.closer = closer
+}
+
+// unsetSticky unsets any previously set client reader, writer, and closer
+func (c *Client) unsetSticky() {
+	c.sw = nil
+	c.sr = nil
+	c.scloser = nil
+}
+
+// Batch sends a BATCH request and returns the response. Batch does not retry.
+// If you want reconnect functionality, use a Writer
 func (c *Client) Batch(batch *protocol.Batch) (uint64, error) {
-	internal.Debugf(c.gconf, "%v -> %s", batch, c.Conn.RemoteAddr())
-	if _, _, err := c.doRequest(batch); err != nil {
+	if batch.Empty() {
+		return 0, ErrEmptyBatch
+	}
+
+	// NOTE we don't retry BATCH requests.
+	internal.Debugf(c.gconf, "%v -> %s", batch, c.RemoteAddr())
+	if _, _, err := c.do(batch); err != nil {
 		return 0, err
 	}
+
 	off, _, err := c.readBatchResponse(batch)
 	return off, err
 }
@@ -153,7 +217,7 @@ func (c *Client) Batch(batch *protocol.Batch) (uint64, error) {
 // ReadOffset sends a READ request, returning a scanner that can be used to
 // iterate over the messages in the response.
 func (c *Client) ReadOffset(topic []byte, offset uint64, limit int) (int, *protocol.BatchScanner, error) {
-	internal.Debugf(c.gconf, "READ %s %d %d -> %s", topic, offset, limit, c.Conn.RemoteAddr())
+	internal.Debugf(c.gconf, "READ %s %d %d -> %s", topic, offset, limit, c.RemoteAddr())
 	req := c.readreq
 	req.Reset()
 	req.SetTopic(topic)
@@ -181,7 +245,7 @@ func (c *Client) ReadOffset(topic []byte, offset uint64, limit int) (int, *proto
 // Tail sends a TAIL request, returning the initial offset and a scanner
 // starting from the first available batch.
 func (c *Client) Tail(topic []byte, limit int) (uint64, int, *protocol.BatchScanner, error) {
-	internal.Debugf(c.gconf, "TAIL %s %d -> %s", topic, limit, c.Conn.RemoteAddr())
+	internal.Debugf(c.gconf, "TAIL %s %d -> %s", topic, limit, c.RemoteAddr())
 	req := c.tailreq
 	req.Reset()
 	req.SetTopic(topic)
@@ -204,7 +268,9 @@ func (c *Client) Tail(topic []byte, limit int) (uint64, int, *protocol.BatchScan
 // Close sends a CLOSE request and then closes the connection
 func (c *Client) Close() error {
 	defer func() {
-		internal.LogError(c.Conn.Close())
+		if c.closer != nil {
+			internal.LogError(c.closer.Close())
+		}
 	}()
 
 	closereq := protocol.NewCloseRequest(c.gconf)
@@ -228,6 +294,10 @@ func (c *Client) doRequest(wt io.WriterTo) (int64, int64, error) {
 }
 
 func (c *Client) do(wt io.WriterTo) (int64, int64, error) {
+	if err := c.ensureConn(); err != nil {
+		return 0, 0, err
+	}
+
 	internal.LogError(c.SetWriteDeadline(time.Now().Add(c.writeTimeout)))
 	sent, err := wt.WriteTo(c.bw)
 	internal.LogError(c.SetWriteDeadline(time.Time{}))
@@ -238,7 +308,7 @@ func (c *Client) do(wt io.WriterTo) (int64, int64, error) {
 	internal.LogError(c.SetWriteDeadline(time.Now().Add(c.writeTimeout)))
 	err = c.flush()
 	internal.LogError(c.SetWriteDeadline(time.Time{}))
-	internal.Debugf(c.gconf, "wrote %d bytes to %s (err: %v)", sent, c.Conn.RemoteAddr(), err)
+	internal.Debugf(c.gconf, "wrote %d bytes to %s (err: %v)", sent, c.RemoteAddr(), err)
 	if err != nil {
 		return sent, 0, err
 	}
@@ -248,6 +318,15 @@ func (c *Client) do(wt io.WriterTo) (int64, int64, error) {
 		return sent, recv, err
 	}
 	return sent, recv, nil
+}
+
+func (c *Client) ensureConn() error {
+	if c.Conn != nil {
+		return nil
+	}
+
+	err := c.connect(c.conf.Hostport)
+	return err
 }
 
 func (c *Client) retryRequest(wt io.WriterTo, origSent, origRecv int64, err error) (int64, int64, error) {
@@ -261,7 +340,6 @@ func (c *Client) retryRequest(wt io.WriterTo, origSent, origRecv int64, err erro
 	var retryErr error
 	var sent int64
 	var recv int64
-	conn := c.Conn
 	for c.conf.ConnRetries < 0 || c.retries < c.conf.ConnRetries {
 		if retryErr != nil && !isRetryable(retryErr) {
 			break
@@ -284,8 +362,8 @@ func (c *Client) retryRequest(wt io.WriterTo, origSent, origRecv int64, err erro
 		}
 		log.Printf("retrying after %s (attempt %d)", c.retryInterval, c.retries)
 
-		if conn != nil {
-			internal.IgnoreError(c.conf.Verbose, conn.Close())
+		if c.closer != nil {
+			internal.IgnoreError(c.conf.Verbose, c.closer.Close())
 		}
 		retryErr = c.connect(c.conf.Hostport)
 		if retryErr != nil {
@@ -310,7 +388,7 @@ func (c *Client) retryRequest(wt io.WriterTo, origSent, origRecv int64, err erro
 // flush flushes all pending data to the server
 func (c *Client) flush() error {
 	if c.bw.Buffered() > 0 {
-		internal.Debugf(c.gconf, "client.Flush() (%d bytes)", c.bw.Buffered())
+		internal.Debugf(c.gconf, "client.Flush() initiated (%d bytes)", c.bw.Buffered())
 		internal.LogError(c.SetWriteDeadline(time.Now().Add(c.writeTimeout)))
 		err := c.bw.Flush()
 		internal.Debugf(c.gconf, "client.Flush() complete (err: %v)", err)
@@ -325,7 +403,7 @@ func (c *Client) readClientResponse() (int64, error) {
 	internal.LogError(c.SetReadDeadline(time.Now().Add(c.readTimeout)))
 	n, err := c.cr.ReadFrom(c.br)
 	internal.LogError(c.SetReadDeadline(time.Time{}))
-	internal.Debugf(c.gconf, "read %d bytes from %s: %+v (err: %v)", n, c.Conn.RemoteAddr(), c.cr, err)
+	internal.Debugf(c.gconf, "read %d bytes from %s: %+v (err: %v)", n, c.RemoteAddr(), c.cr, err)
 	return n, c.handleErr(err)
 }
 
@@ -345,7 +423,7 @@ func (c *Client) handleErr(err error) error {
 		return err
 	}
 	if err == io.EOF {
-		internal.DebugfDepth(c.gconf, 1, "%s closed the connection", c.Conn.RemoteAddr())
+		internal.DebugfDepth(c.gconf, 1, "%s closed the connection", c.RemoteAddr())
 	} else {
 		internal.DebugfDepth(c.gconf, 1, "%+v", err)
 	}

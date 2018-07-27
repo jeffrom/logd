@@ -23,6 +23,9 @@
     flush command into the queue at an interval. also document how it may be
     better to just change the dirty page cache kernel settings.
 * [ ] simple replication, scanner failover
+* [ ] split each topic into its own event queue which will be a big win as each
+  topic would have concurrency against the rest
+  - pushrequest would send to the correct `in` channel
 
 # maybe later
 
