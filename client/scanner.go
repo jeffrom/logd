@@ -19,7 +19,6 @@ type Scanner struct {
 	*Client
 	conf              *Config
 	topic             []byte
-	state             StatePuller
 	s                 *protocol.BatchScanner
 	batch             *protocol.Batch
 	msg               *protocol.Message
@@ -201,10 +200,8 @@ func (s *Scanner) setNextBatch() error {
 	s.batchesRead++
 	s.batchBuf.Reset()
 	s.batchBufBr = bufio.NewReader(s.batchBuf)
-	if _, err := s.batchBuf.Write(s.batch.MessageBytes()); err != nil {
-		return err
-	}
-	return nil
+	_, err := s.batchBuf.Write(s.batch.MessageBytes())
+	return err
 }
 
 func (s *Scanner) pollBatch() error {

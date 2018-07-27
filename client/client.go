@@ -314,10 +314,7 @@ func (c *Client) do(wt io.WriterTo) (int64, int64, error) {
 	}
 
 	recv, err := c.readClientResponse()
-	if err != nil {
-		return sent, recv, err
-	}
-	return sent, recv, nil
+	return sent, recv, err
 }
 
 func (c *Client) ensureConn() error {

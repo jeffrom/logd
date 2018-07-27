@@ -96,10 +96,6 @@ type Writer struct {
 	stopC        chan struct{}
 }
 
-type clientWrapper struct {
-	*Client
-}
-
 // NewWriter returns a new instance of Writer for a topic
 func NewWriter(conf *Config, topic string) *Writer {
 	gconf := conf.ToGeneralConfig()
@@ -127,6 +123,7 @@ func (w *Writer) WithStateHandler(m StatePusher) *Writer {
 	return w
 }
 
+// Reset sets the writer to its initial values
 func (w *Writer) Reset(topic string) {
 	w.topic = []byte(topic)
 	w.batch.Reset()
@@ -166,10 +163,8 @@ func (w *Writer) Close() error {
 func (w *Writer) doCommand(cmd *writerCmd) error {
 	w.inC <- cmd
 
-	select {
-	case err := <-w.resC:
-		return err
-	}
+	err := <-w.resC
+	return err
 }
 
 func (w *Writer) stopTimer() {
@@ -291,8 +286,8 @@ func (w *Writer) handleFlush() error {
 	w.state = stateConnected
 
 	if w.stateManager != nil {
-		if err := w.stateManager.Push(off, nil, nil); err != nil {
-			return err
+		if perr := w.stateManager.Push(off, nil, nil); perr != nil {
+			return perr
 		}
 	}
 	return err
