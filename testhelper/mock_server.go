@@ -59,6 +59,7 @@ func (s *MockServer) loop() {
 				s.handleExpectation(s.closedExpectation)
 			}
 		case <-s.done:
+			close(s.done)
 			log.Printf("stopping mock server")
 			return
 			// case <-time.After(200 * time.Millisecond):

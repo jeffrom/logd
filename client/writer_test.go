@@ -180,6 +180,7 @@ func TestWriterTwoBatches(t *testing.T) {
 func TestWriterConnectFailure(t *testing.T) {
 	// t.Skip("temporarily skipping until reconnect logic is fixed")
 	conf := DefaultTestConfig(testing.Verbose())
+	conf.ConnRetries = 0
 	log.Print(conf)
 	gconf := conf.ToGeneralConfig()
 	// fixture := testhelper.LoadFixture("batch.small")
@@ -197,23 +198,76 @@ func TestWriterConnectFailure(t *testing.T) {
 		t.Fatal("expected error but got nil")
 	}
 
-	t.Logf("doing second attempt (should fail)")
-	_, err = w.Write([]byte("aw shucks sup"))
-	if err == nil {
-		t.Fatal("expected error but got nil")
-	}
-
 	time.Sleep(10 * time.Millisecond)
 	server.Expect(func(p []byte) io.WriterTo {
 		return protocol.NewClientBatchResponse(gconf, 10, 1)
 	})
 
-	t.Logf("doing third attempt (should succeed)")
+	t.Logf("doing second attempt (should succeed)")
 	_, err = w.Write([]byte("aw shucks sup"))
 	if err != nil {
 		t.Fatal("expected nil error but got", err)
 	}
 	flushBatch(t, w)
+}
+
+func TestWriterStatePusher(t *testing.T) {
+	conf := DefaultTestConfig(testing.Verbose())
+	gconf := conf.ToGeneralConfig()
+	fixture := testhelper.LoadFixture("batch.small")
+	server, _ := testhelper.Pipe()
+	sp := NewMockStatePusher()
+	w := NewWriter(conf, "default").WithStateHandler(sp)
+	w.Client.dialer = server
+	// TODO this prevents a race but would be better to do connections in a
+	// separate goroutine from expectations
+	w.ensureConn()
+	defer w.Close()
+
+	server.Expect(func(p []byte) io.WriterTo {
+		return protocol.NewClientBatchResponse(gconf, 10, 1)
+	})
+
+	writeBatch(t, w, "idk", "ikr", "yessssss")
+	flushBatch(t, w)
+
+	off, err, batch, ok := sp.Next()
+	if !ok {
+		t.Fatal("expected state to be pushed")
+	}
+	if off != 10 {
+		t.Fatalf("expected pushed offset to be %d but was %d", 10, off)
+	}
+	if err != nil {
+		t.Fatalf("expected no pushed error but got: %+v", err)
+	}
+	if batch != nil {
+		t.Fatalf("expected nil batch but got %+v", batch)
+	}
+
+	server.Close()
+	writeBatch(t, w, "hi", "hallo", "sup")
+	if err := w.Flush(); err == nil {
+		t.Fatal("expected error but got none")
+	}
+
+	_, err, batch, ok = sp.Next()
+	if !ok {
+		t.Fatal("expected state to be pushed")
+	}
+
+	if err == nil {
+		t.Fatal("expected pushed error but got none")
+	}
+	if batch == nil {
+		t.Fatal("expected pushed batch but got none")
+	}
+	// fmt.Println(batch)
+	b := &bytes.Buffer{}
+	batch.WriteTo(b)
+	if !bytes.Equal(b.Bytes(), fixture) {
+		t.Fatalf("expected:\n\n\t%q\n\nbut got:\n\n\t%q", fixture, b.Bytes())
+	}
 }
 
 func writeBatch(t *testing.T, w *Writer, msgs ...string) {

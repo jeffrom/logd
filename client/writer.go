@@ -276,15 +276,24 @@ func (w *Writer) handleFlush() error {
 	w.state = stateFlushing
 	off, err := w.Batch(batch)
 	internal.Debugf(w.gconf, "flush complete, err: %+v", err)
-	// TODO throw out failed batch?
-	batch.Reset()
 	if serr := w.setErr(err); serr != nil {
+		if w.stateManager != nil {
+			perr := w.stateManager.Push(off, serr, batch.Copy())
+			batch.Reset()
+			if perr != nil {
+				return perr
+			}
+		}
+		batch.Reset()
 		return err
 	}
+	batch.Reset()
 	w.state = stateConnected
 
 	if w.stateManager != nil {
-		internal.LogError(w.stateManager.Push(off))
+		if err := w.stateManager.Push(off, nil, nil); err != nil {
+			return err
+		}
 	}
 	return err
 }

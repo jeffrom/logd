@@ -458,3 +458,16 @@ func (b *Batch) calculateFirstOffset() uint64 {
 
 	return n
 }
+
+// Copy returns a newly allocated copy
+func (b *Batch) Copy() *Batch {
+	batch := NewBatch(b.conf)
+	batch.Size = b.Size
+	batch.Checksum = b.Checksum
+	batch.Messages = b.Messages
+	batch.SetTopic(b.TopicSlice())
+	batch.body = make([]byte, len(b.body))
+	copy(batch.body, b.body)
+	batch.wasRead = true
+	return batch
+}
