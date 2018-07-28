@@ -273,45 +273,47 @@ func (s *Socket) handleConnection(conn *Conn) {
 			log.Printf("%s error: %+v", conn.RemoteAddr(), err)
 			return
 		}
+
 		// wait for a new request. continue along if there isn't one. All
 		// requests will be handled in this block, and after all commands have
 		// been migrated, this will be the whole loop
 		internal.Debugf(s.conf, "%s: waiting for request", conn.RemoteAddr())
-		if req, err := s.waitForRequest(conn); req != nil && err == nil {
-			internal.Debugf(s.conf, "%s: waited for request", conn.RemoteAddr())
-			if _, rerr := req.ReadFrom(conn.br); rerr != nil {
-				// conn.Flush()
-				log.Printf("%s read error: %+v", conn.RemoteAddr(), rerr)
-				return
-			}
-			internal.Debugf(s.conf, "%s: read request %v", conn.RemoteAddr(), req)
-			resp, rerr := s.q.PushRequest(ctx, req)
-			if rerr != nil {
-				internal.LogError(conn.Flush())
-				log.Printf("%s error: %+v", conn.RemoteAddr(), rerr)
-				return
-			}
-			internal.Debugf(s.conf, "%s: got response: %+v", conn.RemoteAddr(), resp)
-
-			n, rerr := s.sendResponse(conn, resp)
-			if rerr != nil {
-				internal.LogError(conn.Flush())
-				log.Printf("%s response error: %+v", conn.RemoteAddr(), rerr)
-				return
-			}
-			internal.Debugf(s.conf, "%s: sent response (%d bytes)", conn.RemoteAddr(), n)
-
-			internal.LogError(conn.Flush())
-
-			if req.Name == protocol.CmdClose {
-				internal.Debugf(s.conf, "%s: closing", conn.RemoteAddr())
-				return
-			}
-			continue
-		} else if err != nil {
+		req, err := s.waitForRequest(conn)
+		if err != nil || req == nil {
 			if err != io.EOF {
 				log.Printf("%s wait error: %+v", conn.RemoteAddr(), err)
 			}
+			return
+		}
+
+		internal.Debugf(s.conf, "%s: waited for request", conn.RemoteAddr())
+		if _, rerr := req.ReadFrom(conn.br); rerr != nil {
+			// conn.Flush()
+			log.Printf("%s read error: %+v", conn.RemoteAddr(), rerr)
+			return
+		}
+
+		internal.Debugf(s.conf, "%s: read request %v", conn.RemoteAddr(), req)
+		resp, rerr := s.q.PushRequest(ctx, req)
+		if rerr != nil {
+			internal.LogError(conn.Flush())
+			log.Printf("%s error: %+v", conn.RemoteAddr(), rerr)
+			return
+		}
+		internal.Debugf(s.conf, "%s: got response: %+v", conn.RemoteAddr(), resp)
+
+		n, rerr := s.sendResponse(conn, resp)
+		if rerr != nil {
+			internal.LogError(conn.Flush())
+			log.Printf("%s response error: %+v", conn.RemoteAddr(), rerr)
+			return
+		}
+		internal.Debugf(s.conf, "%s: sent response (%d bytes)", conn.RemoteAddr(), n)
+
+		internal.LogError(conn.Flush())
+
+		if req.Name == protocol.CmdClose {
+			internal.Debugf(s.conf, "%s: closing", conn.RemoteAddr())
 			return
 		}
 	}
