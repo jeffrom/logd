@@ -6,9 +6,9 @@
 - [x] topics?
 - [x] migrate logd/log-cli to cobra
 - [x] failure handling for writer
-- [ ] scanner should read all pending response batches over the wire before
+- [x] scanner should read all pending response batches over the wire before
       beginning to iterate through them
-- [ ] Repairer to truncate partitions with corrupt data
+- [x] Repairer to truncate partitions with corrupt data
 - [ ] remove state management stuff from scanner for now
 - [ ] config validation
 - [ ] send config to new connections so it can be validated
