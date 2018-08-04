@@ -13,6 +13,7 @@ type LogRepairer interface {
 	Data(part uint64) (io.ReadCloser, error)
 }
 
+// Repairer implements LogRepairer using the filesystem
 type Repairer struct {
 	conf  *config.Config
 	topic string
