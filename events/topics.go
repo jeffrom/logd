@@ -1,11 +1,14 @@
 package events
 
 import (
+	"bufio"
+	"io"
 	"log"
 
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/internal"
 	"github.com/jeffrom/logd/logger"
+	"github.com/jeffrom/logd/protocol"
 )
 
 // topics manages the topics for an event queue.
@@ -53,6 +56,7 @@ func (t *topics) Setup() error {
 		}
 	}
 	// fmt.Println(t.m)
+
 	return err
 }
 
@@ -96,6 +100,7 @@ type topic struct {
 	parts *partitions
 	logp  logger.PartitionManager
 	logw  logger.LogWriter
+	logrp logger.LogRepairer
 }
 
 func newTopic(conf *config.Config, name string) *topic {
@@ -106,6 +111,7 @@ func newTopic(conf *config.Config, name string) *topic {
 		parts: newPartitions(conf, logp),
 		logp:  logp,
 		logw:  logger.NewWriter(conf, name),
+		logrp: logger.NewRepairer(conf, name),
 	}
 }
 
@@ -169,9 +175,54 @@ func (t *topic) setupPartitions() error {
 	}
 
 	head := t.parts.head
+	if err := t.check(); err != nil {
+		return err
+	}
 	if serr := t.logw.SetPartition(head.startOffset); serr != nil {
 		return serr
 	}
 	log.Printf("Topic %s starting at %d (partition %d, delta %d)", t.name, t.parts.headOffset(), head.startOffset, head.size)
+	return nil
+}
+
+func (t *topic) check() error {
+	if t.parts.head.size == 0 {
+		return nil
+	}
+	partOff := t.parts.head.startOffset
+	internal.Debugf(t.conf, "checking integrity of partition %s/%d", t.name, partOff)
+	r, err := t.logrp.Data(partOff)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	br := bufio.NewReader(r)
+	batch := protocol.NewBatch(t.conf)
+	var read int64
+	var n int64
+	for err == nil && read < int64(t.parts.head.size) {
+		n, err = batch.ReadFrom(br)
+		if err != nil {
+			break
+		}
+
+		err = batch.Validate()
+		if err != nil {
+			break
+		}
+		read += n
+	}
+
+	if err == nil || err == io.EOF {
+		return nil
+	}
+
+	log.Printf("corrupted partition. truncating head partition %d at offset %d. new head offset: %d. old offset: %d. truncated %d bytes", partOff, read, partOff+uint64(read), partOff+uint64(t.parts.head.size), int64(t.parts.head.size)-read)
+	if terr := t.logrp.Truncate(partOff, read); terr != nil {
+		return terr
+	}
+
+	t.parts.head.size = int(read)
 	return nil
 }

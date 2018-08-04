@@ -378,13 +378,20 @@ func (b *Batch) readEnvelope(r *bufio.Reader) (int64, error) {
 	var total int64
 	word, err := r.ReadSlice(' ')
 	total += int64(len(word))
-	if err != nil {
-		return total, err
-	}
 
-	// fmt.Printf("readEnvelope: %q\n", word)
+	// fmt.Printf("%q %+v\n", word, err)
+	if len(word) == 0 {
+		if err == io.EOF {
+			return total, err
+		}
+		return total, errInvalidProtocolLine
+	}
 	if !bytes.Equal(word, bbatchStart) {
 		return total, errors.Wrap(errInvalidProtocolLine, "batch envelope didn't start with BATCH")
+	}
+
+	if err != nil {
+		return total, err
 	}
 
 	word, err = r.ReadSlice(' ')

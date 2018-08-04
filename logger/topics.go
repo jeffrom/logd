@@ -82,7 +82,6 @@ func (t *Topics) reopenWorkDir() error {
 
 // Setup implements internal.LifecycleManager
 func (t *Topics) Setup() error {
-	// TODO conf for this?
 	if err := os.MkdirAll(t.conf.WorkDir, 0700); err != nil {
 		return err
 	}
