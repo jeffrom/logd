@@ -9,7 +9,7 @@
 - [x] scanner should read all pending response batches over the wire before
       beginning to iterate through them
 - [x] Repairer to truncate partitions with corrupt data
-- [ ] remove state management stuff from scanner for now
+- [x] remove state management stuff from scanner for now
 - [ ] config validation
 - [ ] send config to new connections so it can be validated
   - probably better to have client ask for it
