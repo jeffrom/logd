@@ -2,6 +2,7 @@ package client
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"io"
 	"log"
@@ -51,6 +52,12 @@ type Client struct { // nolint: golint
 	sr      io.Reader
 	scloser io.Closer
 
+	// temporarily cache batches when scanning
+	batch    *protocol.Batch
+	batchbr  *bufio.Reader
+	batchbuf *bytes.Buffer
+
+	// can cache these here since client should not be used concurrently
 	cr      *protocol.ClientResponse
 	readreq *protocol.Read
 	tailreq *protocol.Tail
@@ -75,6 +82,9 @@ func New(conf *Config) *Client {
 		readreq:      protocol.NewRead(gconf),
 		tailreq:      protocol.NewTail(gconf),
 		done:         make(chan struct{}),
+		batch:        protocol.NewBatch(gconf),
+		batchbuf:     &bytes.Buffer{},
+		batchbr:      bufio.NewReaderSize(nil, conf.BatchSize),
 	}
 
 	return c
@@ -102,6 +112,8 @@ func (c *Client) reset() {
 	c.readreq.Reset()
 	c.tailreq.Reset()
 	c.unsetConn()
+	c.batch.Reset()
+	c.batchbuf.Reset()
 	select {
 	case <-c.done:
 	default:
@@ -204,7 +216,9 @@ func (c *Client) Batch(batch *protocol.Batch) (uint64, error) {
 		return 0, ErrEmptyBatch
 	}
 
-	// NOTE we don't retry BATCH requests.
+	// TODO we don't retry BATCH requests. We probably should, but there's an
+	// async retry loop the writer uses. Should probably be possible to
+	// configure sync (client-level) retries with writer's async retries).
 	internal.Debugf(c.gconf, "%v -> %s", batch, c.RemoteAddr())
 	if _, _, err := c.do(batch); err != nil {
 		return 0, err
@@ -212,6 +226,25 @@ func (c *Client) Batch(batch *protocol.Batch) (uint64, error) {
 
 	off, _, err := c.readBatchResponse(batch)
 	return off, err
+}
+
+func (c *Client) readBatches(nbatches int, r *bufio.Reader) (int64, error) {
+	var total int64
+	var n int64
+	var err error
+	for i := 0; i < nbatches; i++ {
+		c.batch.Reset()
+		n, err = c.batch.ReadFrom(r)
+		total += n
+		if err != nil {
+			return total, err
+		}
+
+		if _, err := c.batch.WriteTo(c.batchbuf); err != nil {
+			return total, err
+		}
+	}
+	return total, err
 }
 
 // ReadOffset sends a READ request, returning a scanner that can be used to
@@ -237,7 +270,11 @@ func (c *Client) ReadOffset(topic []byte, offset uint64, limit int) (int, *proto
 		return 0, nil, protocol.ErrInternal
 	}
 
-	c.bs.Reset(c.br)
+	if _, err := c.readBatches(nbatches, c.br); err != nil {
+		return nbatches, nil, err
+	}
+	c.batchbr.Reset(c.batchbuf)
+	c.bs.Reset(c.batchbr)
 	internal.LogError(c.SetReadDeadline(time.Now().Add(c.readTimeout)))
 	return nbatches, c.bs, nil
 }

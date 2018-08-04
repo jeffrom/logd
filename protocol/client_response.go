@@ -56,9 +56,11 @@ type ClientResponse struct {
 
 // NewClientResponse creates a new instance of *ClientResponse
 func NewClientResponse(conf *config.Config) *ClientResponse {
-	return &ClientResponse{
+	cr := &ClientResponse{
 		conf: conf,
 	}
+
+	return cr
 }
 
 // NewClientBatchResponse returns a successful batch *ClientResponse
