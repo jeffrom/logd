@@ -45,9 +45,9 @@ func (m *Message) Reset() {
 	m.completedRead = false
 }
 
-// func (m *Message) String() string {
-// 	return fmt.Sprintf("%+v", *m)
-// }
+func (m *Message) String() string {
+	return string(m.BodyBytes())
+}
 
 // BodyBytes returns the bytes of the message body
 func (m *Message) BodyBytes() []byte {
