@@ -41,7 +41,7 @@ ls.tmp:
 deps:
 	@echo "Installing dep tool and dependencies..."
 	dep version || go get -u github.com/golang/dep/cmd/dep
-	dep ensure
+	dep ensure -v
 	go get github.com/wadey/gocovmerge
 	go get golang.org/x/tools/cmd/benchcmp
 	mkdir -p report
@@ -115,9 +115,13 @@ benchcmp:
 bench.ci:
 	./script/compare_benchmarks.sh
 
+.PHONY: bench.race
+bench.race:
+	go test ./... -run ^$$ -bench . -benchmem -benchtime 2s -race
+
 .PHONY: ci
-# ci: clean deps lint.install test.coverprofile test.race test.integration.compile test.integration test.report lint test.report.summary
-ci: clean deps lint.install test.coverprofile test.race test.integration.compile test.integration test.report test.report.summary
+# ci: clean deps build lint.install test.coverprofile test.race test.integration.compile test.integration test.report lint test.report.summary
+ci: clean deps build test.coverprofile test.race bench.race test.report test.report.summary
 
 .PHONY: test.integration.compile
 test.integration.compile:
