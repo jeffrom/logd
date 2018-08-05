@@ -10,6 +10,7 @@
       beginning to iterate through them
 - [x] Repairer to truncate partitions with corrupt data
 - [x] remove state management stuff from scanner for now
+- [ ] idle timeout
 - [ ] config validation
 - [ ] send config to new connections so it can be validated
   - probably better to have client ask for it
