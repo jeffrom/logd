@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/jeffrom/logd.svg?branch=master)](https://travis-ci.org/jeffrom/logd)
+
 # logd
 
 high-performance log transport
