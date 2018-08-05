@@ -12,10 +12,10 @@ type Server interface {
 	GoServe()
 	Stop() error
 	ListenAddr() net.Addr
-	SetQPusher(q QPusher)
+	SetQPusher(q RequestHandler)
 }
 
-// QPusher lets a server push requests to the event q
-type QPusher interface {
+// RequestHandler lets a server push requests to the event q
+type RequestHandler interface {
 	PushRequest(context.Context, *protocol.Request) (*protocol.Response, error)
 }

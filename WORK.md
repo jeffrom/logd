@@ -14,6 +14,8 @@
 - [ ] config validation
 - [ ] send config to new connections so it can be validated
   - probably better to have client ask for it
+- [ ] how should client scanner message tracking work?
+  - needs to be able to start at any message in the batch
 - [ ] make consistency guarantees configurable. fast by default (at-most-once),
       but also force disk flush before returning success (at-least-once) if
       that's desired.

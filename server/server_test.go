@@ -1,11 +1,16 @@
 package server
 
 import (
+	"bufio"
+	"bytes"
 	"flag"
 	"testing"
 
+	"github.com/jeffrom/logd/client"
 	"github.com/jeffrom/logd/config"
+	"github.com/jeffrom/logd/protocol"
 	"github.com/jeffrom/logd/testhelper"
+	"github.com/jeffrom/logd/transport"
 )
 
 func init() {
@@ -17,16 +22,32 @@ func init() {
 
 func NewTestServer(conf *config.Config) *Socket {
 	srv := NewSocket("127.0.0.1:0", conf)
-	srv.GoServe()
-
 	return srv
 }
 
-func CloseTestServer(t testing.TB, srv *Socket) {
-	srv.Stop()
-	srv.connMu.Lock()
-	defer srv.connMu.Unlock()
-	if len(srv.conns) > 0 {
+func expectClose(rh *transport.MockRequestHandler) {
+	rh.Expect(func(req *protocol.Request) *protocol.Response {
+		conf := testhelper.DefaultTestConfig(testing.Verbose())
+		resp := protocol.NewResponse(conf)
+		cr := protocol.NewClientOKResponse(conf)
+		req.WriteResponse(resp, cr)
+		return resp
+	})
+}
+
+func CloseTestServer(t testing.TB, srv *Socket, rh *transport.MockRequestHandler) {
+	if rh != nil {
+		if err := rh.Stop(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := srv.Stop(); err != nil {
+		t.Fatal(err)
+	}
+
+	conns := srv.Conns()
+	if len(conns) > 0 {
 		for conn := range srv.conns {
 			t.Logf("Leftover connection: %s", conn.RemoteAddr())
 		}
@@ -34,8 +55,113 @@ func CloseTestServer(t testing.TB, srv *Socket) {
 	}
 }
 
-// func TestBatch(t *testing.T) {
-// 	conf := testhelper.DefaultTestConfig(testing.Verbose())
-// 	srv := NewTestServer(conf)
-// 	defer CloseTestServer(t, srv)
-// }
+func TestLifecycle(t *testing.T) {
+	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	srv := NewTestServer(conf)
+
+	srv.GoServe()
+	if err := srv.Stop(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestClose(t *testing.T) {
+	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	srv := NewTestServer(conf)
+	rh := transport.NewMockRequestHandler()
+	srv.SetQPusher(rh)
+	srv.GoServe()
+
+	c, err := client.Dial(srv.ListenAddr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectClose(rh)
+	if err := c.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	CloseTestServer(t, srv, rh)
+}
+
+func TestBatch(t *testing.T) {
+	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	srv := NewTestServer(conf)
+	rh := transport.NewMockRequestHandler()
+	srv.SetQPusher(rh)
+	srv.GoServe()
+	defer CloseTestServer(t, srv, rh)
+
+	c, err := client.Dial(srv.ListenAddr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer expectServerClientClose(t, rh, c)
+
+	fixture := testhelper.LoadFixture("batch.small")
+	batch := protocol.NewBatch(conf)
+	br := bufio.NewReader(bytes.NewBuffer(fixture))
+	if _, err := batch.ReadFrom(br); err != nil {
+		t.Fatal(err)
+	}
+	t.Log(batch)
+
+	rh.Expect(func(req *protocol.Request) *protocol.Response {
+		resp := protocol.NewResponse(conf)
+		cr := protocol.NewClientBatchResponse(conf, 0, 1)
+		req.WriteResponse(resp, cr)
+		return resp
+	})
+
+	if _, err := c.Batch(batch); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestFailedRequest(t *testing.T) {
+	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	srv := NewTestServer(conf)
+	rh := transport.NewMockRequestHandler()
+	srv.SetQPusher(rh)
+	srv.GoServe()
+	defer CloseTestServer(t, srv, rh)
+
+	c, err := client.Dial(srv.ListenAddr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer expectServerClientClose(t, rh, c)
+
+	fixture := testhelper.LoadFixture("batch.small")
+	batch := protocol.NewBatch(conf)
+	br := bufio.NewReader(bytes.NewBuffer(fixture))
+	if _, err := batch.ReadFrom(br); err != nil {
+		t.Fatal(err)
+	}
+	t.Log(batch)
+
+	rh.Expect(func(req *protocol.Request) *protocol.Response {
+		resp := protocol.NewResponse(conf)
+		return resp
+	})
+
+	if _, err := c.Batch(batch); err == nil {
+		t.Fatal("expected error but got none")
+	}
+
+	rh.Expect(func(req *protocol.Request) *protocol.Response {
+		return nil
+	})
+
+	if _, err := c.Batch(batch); err == nil {
+		t.Fatal("expected error but got none")
+	}
+}
+
+func expectServerClientClose(t testing.TB, rh *transport.MockRequestHandler, c *client.Client) {
+	expectClose(rh)
+	if err := c.Close(); err != nil {
+		t.Fatal(err)
+	}
+}

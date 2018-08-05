@@ -56,6 +56,10 @@ deps.dep:
 build:
 	go install -x -v ./...
 
+.PHONY: doc.serve
+doc.serve:
+	godoc -http=:6060 -goroot /usr/share/go
+
 .PHONY: build.container
 build.container:
 	./script/build_container.sh
@@ -74,7 +78,8 @@ test.cover:
 
 .PHONY: test.coverprofile
 test.coverprofile:
-	$(foreach pkg,$(SHORT_PKGS),go test -coverprofile=integration_test/out/unit.$(pkg).cov.out -covermode=count ./$(pkg);)
+	# $(foreach pkg,$(SHORT_PKGS),go test -coverprofile=integration_test/out/unit.$(pkg).cov.out -covermode=count -coverpkg ./... ./$(pkg);)
+	go test -coverprofile=./integration_test/out/all.cov.out -coverpkg ./... -covermode=count ./...
 
 .PHONY: test.golden
 test.golden:
@@ -121,7 +126,8 @@ bench.race:
 
 .PHONY: ci
 # ci: clean deps build lint.install test.coverprofile test.race test.integration.compile test.integration test.report lint test.report.summary
-ci: clean deps build test.coverprofile test.race bench.race test.report test.report.summary
+# ci: clean deps build test.coverprofile test.race bench.race test.report test.report.summary
+ci: clean deps build test.coverprofile test.race bench.race test.report.summary
 
 .PHONY: test.integration.compile
 test.integration.compile:
@@ -140,4 +146,9 @@ test.report:
 
 .PHONY: test.report.summary
 test.report.summary:
-	go tool cover -func=integration_test/out/all.cov.out
+	# $(foreach pkg,$(SHORT_PKGS),echo -n "$(pkg): "; go tool cover -func=integration_test/out/unit.$(pkg).cov.out | tail -n 1 | sed -e 's/\((statements)\|total:\)//g' | tr -s "[:space:]";)
+	echo -n "total: "; go tool cover -func=integration_test/out/all.cov.out | tail -n 1 | sed -e 's/\((statements)\|total:\)//g' | tr -s "[:space:]"
+
+.PHONY: test.report.html
+test.report.html:
+	go tool cover -html=integration_test/out/all.cov.out
