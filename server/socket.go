@@ -296,7 +296,7 @@ func (s *Socket) handleConnection(conn *Conn) {
 		internal.Debugf(s.conf, "%s: read request %v", conn.RemoteAddr(), req)
 		resp, rerr := s.q.PushRequest(ctx, req)
 		if rerr != nil {
-			internal.LogError(conn.Flush())
+			// internal.LogError(conn.Flush())
 			log.Printf("%s error: %+v", conn.RemoteAddr(), rerr)
 			resp = protocol.NewResponse(s.conf)
 		}
@@ -310,9 +310,7 @@ func (s *Socket) handleConnection(conn *Conn) {
 		}
 		internal.Debugf(s.conf, "%s: sent response (%d bytes)", conn.RemoteAddr(), n)
 
-		internal.LogError(conn.Flush())
-
-		if req.Name == protocol.CmdClose {
+		if ferr := conn.Flush(); ferr != nil || req.Name == protocol.CmdClose {
 			internal.Debugf(s.conf, "%s: closing", conn.RemoteAddr())
 			return
 		}
