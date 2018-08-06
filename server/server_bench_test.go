@@ -19,7 +19,6 @@ func init() {
 
 func BenchmarkClientBatch(b *testing.B) {
 	b.SetParallelism(2)
-	// b.SkipNow()
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
 	srv := NewTestServer(conf)
 	rh := transport.NewMockRequestHandler(conf)
