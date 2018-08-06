@@ -28,8 +28,6 @@ type Socket struct {
 	connMu sync.Mutex
 	connIn chan *Conn
 
-	disallowedCommands map[protocol.CmdType]bool
-
 	readyC       chan struct{}
 	stopC        chan struct{}
 	shutdownC    chan struct{}
@@ -237,10 +235,6 @@ func (s *Socket) removeConn(conn *Conn) {
 	s.connMu.Lock()
 	delete(s.conns, conn)
 	s.connMu.Unlock()
-}
-
-func (s *Socket) setDisallowedCommands(cmds map[protocol.CmdType]bool) {
-	s.disallowedCommands = cmds
 }
 
 func (s *Socket) handleConnection(conn *Conn) {
