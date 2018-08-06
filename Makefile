@@ -152,3 +152,7 @@ test.report.summary:
 .PHONY: test.report.html
 test.report.html:
 	go tool cover -html=integration_test/out/all.cov.out
+
+.PHONY: report.depgraph
+report.depgraph:
+	go list ./... | grep -v cmd | xargs godepgraph -s -p "github.com/pkg/errors" | dot -Tpng -o godepgraph.png
