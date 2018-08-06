@@ -55,5 +55,4 @@ func BenchmarkClientBatch(b *testing.B) {
 			}
 		}
 	})
-
 }
