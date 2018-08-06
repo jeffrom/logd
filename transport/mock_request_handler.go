@@ -16,6 +16,7 @@ type handlerFunc func(*protocol.Request) *protocol.Response
 
 // MockRequestHandler implements a mock that implements RequestHandler interface
 type MockRequestHandler struct {
+	conf       *config.Config
 	in         chan *protocol.Request
 	pending    chan handlerFunc
 	response   handlerFunc
@@ -27,8 +28,9 @@ type MockRequestHandler struct {
 }
 
 // NewMockRequestHandler returns a new instance of *MockRequestHandler
-func NewMockRequestHandler() *MockRequestHandler {
+func NewMockRequestHandler(conf *config.Config) *MockRequestHandler {
 	rh := &MockRequestHandler{
+		conf:    conf,
 		in:      make(chan *protocol.Request, 1000),
 		stopC:   make(chan struct{}),
 		pending: make(chan handlerFunc, 1000),

@@ -3,6 +3,8 @@ package server
 import (
 	"bufio"
 	"bytes"
+	"io/ioutil"
+	"log"
 	"testing"
 
 	"github.com/jeffrom/logd/client"
@@ -11,15 +13,19 @@ import (
 	"github.com/jeffrom/logd/transport"
 )
 
+func init() {
+	log.SetOutput(ioutil.Discard)
+}
+
 func BenchmarkClientBatch(b *testing.B) {
 	b.SetParallelism(2)
 	// b.SkipNow()
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
 	srv := NewTestServer(conf)
-	rh := transport.NewMockRequestHandler()
+	rh := transport.NewMockRequestHandler(conf)
 	srv.SetQPusher(rh)
 	srv.GoServe()
-	// defer CloseTestServer(b, srv, rh)
+	defer CloseTestServer(b, srv, rh)
 
 	rh.Respond(func(req *protocol.Request) *protocol.Response {
 		resp := protocol.NewResponse(conf)

@@ -10,7 +10,7 @@ import (
 
 func TestMockRequestHandler(t *testing.T) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
-	rh := NewMockRequestHandler()
+	rh := NewMockRequestHandler(conf)
 	resp := protocol.NewResponse(conf)
 	rh.Respond(func(req *protocol.Request) *protocol.Response {
 		return resp

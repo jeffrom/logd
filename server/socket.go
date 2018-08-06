@@ -217,6 +217,7 @@ func (s *Socket) Stop() error {
 	select {
 	case <-s.shutdownC:
 	case <-time.After(s.conf.ShutdownTimeout):
+		log.Printf("hard shutdown after %s", s.conf.ShutdownTimeout)
 	}
 
 	return nil
