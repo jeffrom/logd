@@ -249,6 +249,10 @@ func (b *Batch) buildBodyBytes() error {
 	b.Size = uint64(l)
 	b.ensureBuf()
 	// fmt.Printf("buildBodyBytes: %q\n", b.msgBuf.Bytes())
+	// fmt.Println(len(b.body), b.msgBuf.Len())
+	if b.msgBuf.Len() > len(b.body) {
+		return errTooLarge
+	}
 	copy(b.body[:b.Size], b.msgBuf.Bytes())
 
 	return nil

@@ -68,7 +68,7 @@ func TestLifecycle(t *testing.T) {
 func TestClose(t *testing.T) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
 	srv := NewTestServer(conf)
-	rh := transport.NewMockRequestHandler()
+	rh := transport.NewMockRequestHandler(conf)
 	srv.SetQPusher(rh)
 	srv.GoServe()
 
@@ -88,7 +88,7 @@ func TestClose(t *testing.T) {
 func TestBatch(t *testing.T) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
 	srv := NewTestServer(conf)
-	rh := transport.NewMockRequestHandler()
+	rh := transport.NewMockRequestHandler(conf)
 	srv.SetQPusher(rh)
 	srv.GoServe()
 	defer CloseTestServer(t, srv, rh)
@@ -122,7 +122,7 @@ func TestBatch(t *testing.T) {
 func TestFailedRequest(t *testing.T) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
 	srv := NewTestServer(conf)
-	rh := transport.NewMockRequestHandler()
+	rh := transport.NewMockRequestHandler(conf)
 	srv.SetQPusher(rh)
 	srv.GoServe()
 	defer CloseTestServer(t, srv, rh)

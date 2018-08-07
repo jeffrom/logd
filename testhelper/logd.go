@@ -86,3 +86,7 @@ func Repeat(s string, n int) string {
 	}
 	return b.String()
 }
+
+func IsCI() bool {
+	return os.Getenv("CI") == "true"
+}

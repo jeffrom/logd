@@ -16,7 +16,7 @@ func newTestMessage(conf *config.Config, body string) *Message {
 }
 
 func TestWriteMessage(t *testing.T) {
-	conf := testhelper.TestConfig(testing.Verbose())
+	conf := testhelper.DefaultTestConfig(testing.Verbose())
 	s := "cool message"
 	msg := newTestMessage(conf, s)
 
@@ -32,7 +32,7 @@ func TestWriteMessage(t *testing.T) {
 }
 
 func TestReadMessage(t *testing.T) {
-	conf := testhelper.TestConfig(testing.Verbose())
+	conf := testhelper.DefaultTestConfig(testing.Verbose())
 	msg := NewMessage(conf)
 	fixture := testhelper.LoadFixture("msg.small")
 	buf := bytes.NewBuffer(fixture)

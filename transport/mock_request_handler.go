@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -11,22 +12,28 @@ import (
 	"github.com/jeffrom/logd/protocol"
 )
 
+type handlerFunc func(*protocol.Request) *protocol.Response
+
 // MockRequestHandler implements a mock that implements RequestHandler interface
 type MockRequestHandler struct {
-	in       chan *protocol.Request
-	pending  chan func(*protocol.Request) *protocol.Response
-	npending int32
-	stopC    chan struct{}
-	done     chan error
-	failC    chan error
+	conf       *config.Config
+	in         chan *protocol.Request
+	pending    chan handlerFunc
+	response   handlerFunc
+	responsemu sync.Mutex
+	npending   int32
+	stopC      chan struct{}
+	done       chan error
+	failC      chan error
 }
 
 // NewMockRequestHandler returns a new instance of *MockRequestHandler
-func NewMockRequestHandler() *MockRequestHandler {
+func NewMockRequestHandler(conf *config.Config) *MockRequestHandler {
 	rh := &MockRequestHandler{
+		conf:    conf,
 		in:      make(chan *protocol.Request, 1000),
 		stopC:   make(chan struct{}),
-		pending: make(chan func(*protocol.Request) *protocol.Response, 1000),
+		pending: make(chan handlerFunc, 1000),
 		done:    make(chan error),
 		failC:   make(chan error, 1),
 	}
@@ -40,14 +47,26 @@ func (rh *MockRequestHandler) loop() {
 	for {
 		select {
 		case <-rh.stopC:
+			// log.Println("<-stopC")
 			go rh.shutdown()
 			return
 		case req := <-rh.in:
+			// log.Println("<-in", req)
+			rh.responsemu.Lock()
+			if rh.response != nil {
+				req.Respond(rh.response(req))
+				rh.responsemu.Unlock()
+				continue
+			}
+			rh.responsemu.Unlock()
+
 			select {
 			case cb := <-rh.pending:
+				// log.Println("<-pending")
 				req.Respond(cb(req))
 				atomic.AddInt32(&rh.npending, -1)
 			case <-time.After(100 * time.Millisecond):
+				// log.Println("<-timeout")
 				rh.failC <- errors.New("no response set after 100ms")
 				return
 			}
@@ -65,13 +84,17 @@ func (rh *MockRequestHandler) shutdown() {
 }
 
 func (rh *MockRequestHandler) Stop() error {
-	rh.stopC <- struct{}{}
+	select {
+	case rh.stopC <- struct{}{}:
+	case <-time.After(100 * time.Millisecond):
+		return errors.New("stop timed out")
+	}
 
 	select {
 	case err := <-rh.done:
 		return err
 	case <-time.After(100 * time.Millisecond):
-		return errors.New("timed out")
+		return errors.New("stop timed out")
 	}
 	return rh.getErr()
 }
@@ -92,9 +115,15 @@ func (rh *MockRequestHandler) setErr(err error) {
 	rh.failC <- err
 }
 
-func (rh *MockRequestHandler) Expect(cb func(req *protocol.Request) *protocol.Response) {
+func (rh *MockRequestHandler) Expect(cb handlerFunc) {
 	rh.pending <- cb
 	atomic.AddInt32(&rh.npending, 1)
+}
+
+func (rh *MockRequestHandler) Respond(cb handlerFunc) {
+	rh.responsemu.Lock()
+	rh.response = cb
+	rh.responsemu.Unlock()
 }
 
 // PushRequest implements RequestHandler interface
