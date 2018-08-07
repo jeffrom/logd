@@ -19,6 +19,7 @@ func init() {
 
 func BenchmarkClientBatch(b *testing.B) {
 	b.SetParallelism(2)
+
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
 	srv := NewTestServer(conf)
 	rh := transport.NewMockRequestHandler(conf)
@@ -47,6 +48,7 @@ func BenchmarkClientBatch(b *testing.B) {
 		if err != nil {
 			panic(err)
 		}
+		defer c.Close()
 
 		for b.Next() {
 			if _, err := c.Batch(batch); err != nil {
