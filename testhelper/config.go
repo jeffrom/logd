@@ -27,6 +27,7 @@ func DefaultTestConfig(verbose bool) *config.Config {
 
 	if !testing.Short() && IsCI() {
 		c.Timeout = 2 * time.Second
+		c.ShutdownTimeout = 5 * time.Second
 	}
 
 	return c
