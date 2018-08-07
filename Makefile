@@ -146,7 +146,6 @@ test.report:
 
 .PHONY: test.report.summary
 test.report.summary:
-	# $(foreach pkg,$(SHORT_PKGS),echo -n "$(pkg): "; go tool cover -func=integration_test/out/unit.$(pkg).cov.out | tail -n 1 | sed -e 's/\((statements)\|total:\)//g' | tr -s "[:space:]";)
 	echo -n "total: "; go tool cover -func=integration_test/out/all.cov.out | tail -n 1 | sed -e 's/\((statements)\|total:\)//g' | tr -s "[:space:]"
 
 .PHONY: test.report.html

@@ -9,7 +9,7 @@ import (
 )
 
 func TestReadRequest(t *testing.T) {
-	conf := testhelper.TestConfig(testing.Verbose())
+	conf := testhelper.DefaultTestConfig(testing.Verbose())
 	req := NewRequest(conf)
 	fixture := testhelper.LoadFixture("batch.small")
 

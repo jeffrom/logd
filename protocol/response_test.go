@@ -8,7 +8,7 @@ import (
 )
 
 func TestWriteClientResponse(t *testing.T) {
-	conf := testhelper.TestConfig(testing.Verbose())
+	conf := testhelper.DefaultTestConfig(testing.Verbose())
 	resp := NewClientResponse(conf)
 	resp.SetOffset(10)
 	resp.SetBatches(20)

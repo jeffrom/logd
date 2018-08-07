@@ -34,7 +34,7 @@ func startQConfig(t testing.TB, conf *config.Config) *EventQ {
 }
 
 func startQ(t *testing.T) *EventQ {
-	return startQConfig(t, testhelper.TestConfig(testing.Verbose()))
+	return startQConfig(t, testhelper.DefaultTestConfig(testing.Verbose()))
 }
 
 func stopQ(t testing.TB, q *EventQ) {

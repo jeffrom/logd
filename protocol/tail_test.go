@@ -8,7 +8,7 @@ import (
 )
 
 func TestWriteTail(t *testing.T) {
-	conf := testhelper.TestConfig(testing.Verbose())
+	conf := testhelper.DefaultTestConfig(testing.Verbose())
 	tail := NewTail(conf)
 	tail.Messages = 100
 	tail.SetTopic([]byte("default"))

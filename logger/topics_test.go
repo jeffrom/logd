@@ -8,7 +8,7 @@ import (
 )
 
 func TestTopics(t *testing.T) {
-	topics := NewTopics(testhelper.TestConfig(testing.Verbose()))
+	topics := NewTopics(testhelper.DefaultTestConfig(testing.Verbose()))
 	t.Logf("starting config: %+v", topics.conf)
 	if err := topics.Setup(); err != nil {
 		t.Fatal(err)
