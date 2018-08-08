@@ -3,7 +3,10 @@ package protocol
 import (
 	"bufio"
 	"bytes"
+	"fmt"
+	"io"
 	"io/ioutil"
+	"strings"
 	"testing"
 
 	"github.com/jeffrom/logd/config"
@@ -174,6 +177,142 @@ func TestScanBatches(t *testing.T) {
 	}
 }
 
+func TestBatchWriteErrors(t *testing.T) {
+	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	batch := NewBatch(conf)
+	fixture := testhelper.LoadFixture("batch.small")
+
+	b := &bytes.Buffer{}
+	b.Write(fixture)
+	br := bufio.NewReader(b)
+	if _, err := batch.ReadFrom(br); err != nil {
+		t.Fatalf("unexpected error reading batch: %v", err)
+	}
+
+	w := testhelper.NewFailingWriter()
+
+	var errs []error
+	for i := 0; i < 50; i++ {
+		_, err := batch.WriteTo(w)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	if len(errs) == 0 {
+		t.Fatal("expected errors but got none")
+	}
+
+	// if at least one valid batch was written, that's something i guess. this
+	// isn't a great check :P
+	if !strings.Contains(w.String(), string(fixture)) {
+		t.Fatal(w.String(), "\ndidn't contain a single valid batch")
+	}
+}
+
+func TestBatchReadErrors(t *testing.T) {
+	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	batch := NewBatch(conf)
+	fixture := testhelper.LoadFixture("batch.small")
+	r := testhelper.NewFailingReader(fixture)
+
+	var errs []error
+	br := bufio.NewReaderSize(r, 4)
+	for i := 0; i < 100; i++ {
+		batch.Reset()
+		_, err := batch.ReadFrom(br)
+		fmt.Println(i, err)
+		if err != nil {
+			if err != io.EOF {
+				errs = append(errs, err)
+			}
+			br.Reset(r)
+		} else if i > 90 {
+			break
+		}
+	}
+
+	if len(errs) == 0 {
+		t.Fatal("expected errors but got none")
+	}
+
+	if batch.Size != 37 {
+		t.Fatal("expected batch size 37 but got:", batch.Size)
+	}
+	if batch.Messages != 3 {
+		t.Fatal("expected 3 messages but got:", batch.Messages)
+	}
+}
+
+var invalidBatches = map[string][]byte{
+	// "valid":  []byte("BATCH 30 default 1362320750 3\r\nMSG 1\r\nA\r\nMSG 1\r\nB\r\nMSG 1\r\nC\r\n"),
+	"bad crc":               []byte("BATCH 30 default 1362320751 3\r\nMSG 1\r\nA\r\nMSG 1\r\nB\r\nMSG 1\r\nC\r\n"),
+	"bad crc2":              []byte("BATCH 30 default 1362320750 3\r\nMSG 1\r\na\r\nMSG 1\r\nB\r\nMSG 1\r\nC\r\n"),
+	"small body length":     []byte("BATCH 30 default 1362320750 3\r\nMSG 1\r\n\r\nMSG 1\r\nB\r\nMSG 1\r\nC\r\n"),
+	"no final newline":      []byte("BATCH 30 default 1362320750 3\r\nMSG 1\r\n\r\nMSG 1\r\nB\r\nMSG 1\r\nC"),
+	"no final newline2":     []byte("BATCH 30 default 1362320750 3\r\nMSG 1\r\n\r\nMSG 1\r\nB\r\nMSG 1\r\nC\r"),
+	"no final newline3":     []byte("BATCH 30 default 1362320750 3\r\nMSG 1\r\n\r\nMSG 1\r\nB\r\nMSG 1\r\nC\n"),
+	"wrong size":            []byte("BATCH 29 default 1362320750 3\r\nMSG 1\r\nA\r\nMSG 1\r\nB\r\nMSG 1\r\nC\r\n"),
+	"invalid size":          []byte("BATCH a default 1362320750 3\r\nMSG 1\r\nA\r\nMSG 1\r\nB\r\nMSG 1\r\nC\r\n"),
+	"invalid size2":         []byte("BATCH cool default 1362320750 3\r\nMSG 1\r\nA\r\nMSG 1\r\nB\r\nMSG 1\r\nC\r\n"),
+	"wrong command":         []byte("BOTCH 30 default 1362320750 3\r\nMSG 1\r\nA\r\nMSG 1\r\nB\r\nMSG 1\r\nC\r\n"),
+	"wrong msg size":        []byte("BATCH 30 default 1362320750 3\r\nMSG 1\r\nA\r\nMSG 2\r\nB\r\nMSG 1\r\nC\r\n"),
+	"invalid num messages":  []byte("BATCH 30 default 1362320750 a\r\nMSG 1\r\nA\r\nMSG 1\r\nB\r\nMSG 1\r\nC\r\n"),
+	"invalid num messages2": []byte("BATCH 30 default 1362320750 cool\r\nMSG 1\r\nA\r\nMSG 1\r\nB\r\nMSG 1\r\nC\r\n"),
+	"invalid crc":           []byte("BATCH 30 default dang 3\r\nMSG 1\r\nA\r\nMSG 1\r\nB\r\nMSG 1\r\nC\r\n"),
+}
+
+func TestBatchInvalid(t *testing.T) {
+	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	batch := NewBatch(conf)
+
+	for name, b := range invalidBatches {
+		t.Run(name, func(t *testing.T) {
+			batch.Reset()
+			_, err := batch.ReadFrom(bufio.NewReader(bytes.NewBuffer(b)))
+			verr := batch.Validate()
+			if err == nil && verr == nil {
+				t.Fatalf("%s case: batch should not have been valid\n%q\n", name, b)
+			}
+
+			batch.Reset()
+			req := NewRequest(conf)
+			_, err = req.ReadFrom(bufio.NewReader(bytes.NewBuffer(b)))
+			_, rerr := batch.FromRequest(req)
+			if err == nil && rerr == nil {
+				t.Fatalf("%s case: batch should not have been a valid request\n%q\n", name, b)
+			}
+		})
+	}
+}
+
+func TestBatchWriteTooLarge(t *testing.T) {
+	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf.MaxBatchSize = 10
+	batch := NewBatch(conf)
+	batch.Append([]byte("AAAAAAAAAAAA"))
+	b := &bytes.Buffer{}
+
+	if _, err := batch.WriteTo(b); err == nil {
+		t.Fatal("expected err but got none")
+	}
+}
+
+func TestBatchReadTooLarge(t *testing.T) {
+	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	batch := NewBatch(conf)
+	fixture := testhelper.LoadFixture("batch.small")
+
+	if _, err := batch.ReadFrom(bufio.NewReader(bytes.NewBuffer(fixture))); err != nil {
+		t.Fatal(err)
+	}
+
+	conf.MaxBatchSize = 10
+	if err := batch.Validate(); err == nil {
+		t.Fatal("expected error but got none")
+	}
+}
+
 func testRead(t *testing.T, conf *config.Config, fixtureName string) {
 	testReadBatch(t, conf, fixtureName, NewBatch(conf))
 }
@@ -188,6 +327,10 @@ func testReadBatch(t *testing.T, conf *config.Config, fixtureName string, batch 
 		t.Fatalf("unexpected error reading batch: %v", err)
 	}
 
+	if err := batch.Validate(); err != nil {
+		t.Fatalf("validation error: %+v", err)
+	}
+
 	b = &bytes.Buffer{}
 	if _, err := batch.WriteTo(b); err != nil {
 		t.Fatalf("unexpected error writing batch: %v", err)
@@ -195,5 +338,4 @@ func testReadBatch(t *testing.T, conf *config.Config, fixtureName string, batch 
 
 	actual := b.Bytes()
 	testhelper.CheckGoldenFile(fixtureName, actual, testhelper.Golden)
-
 }

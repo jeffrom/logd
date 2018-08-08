@@ -1,6 +1,7 @@
 package testhelper
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"testing"
@@ -8,6 +9,12 @@ import (
 
 	"github.com/jeffrom/logd/config"
 )
+
+func init() {
+	if IsCI() {
+		fmt.Println("We're in CI!")
+	}
+}
 
 func DefaultTestConfig(verbose bool) *config.Config {
 	if verbose {
@@ -26,8 +33,8 @@ func DefaultTestConfig(verbose bool) *config.Config {
 	}
 
 	if !testing.Short() && IsCI() {
-		c.Timeout = 2 * time.Second
-		c.ShutdownTimeout = 5 * time.Second
+		c.Timeout = 10 * time.Second
+		c.ShutdownTimeout = 15 * time.Second
 	}
 
 	return c
