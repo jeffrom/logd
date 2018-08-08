@@ -77,9 +77,9 @@ test.cover:
 	go test -cover -coverpkg ./... ./...
 
 .PHONY: test.coverprofile
+# $(foreach pkg,$(SHORT_PKGS),go test -coverprofile=integration_test/out/unit.$(pkg).cov.out -covermode=count -coverpkg ./... ./$(pkg);)
 test.coverprofile:
-	# $(foreach pkg,$(SHORT_PKGS),go test -coverprofile=integration_test/out/unit.$(pkg).cov.out -covermode=count -coverpkg ./... ./$(pkg);)
-	go test -coverprofile=./integration_test/out/all.cov.out -coverpkg ./... -covermode=count ./...
+	go test -coverprofile=./integration_test/out/all.cov.out -covermode=count ./...
 
 .PHONY: test.golden
 test.golden:
@@ -150,7 +150,7 @@ test.report.summary:
 
 .PHONY: test.report.html
 test.report.html:
-	go tool cover -html=integration_test/out/all.cov.out
+	go tool cover -html=integration_test/out/all.cov.out -o integration_test/out/all.cov.html
 
 .PHONY: report.depgraph
 report.depgraph:
