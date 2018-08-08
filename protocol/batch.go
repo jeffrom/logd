@@ -119,6 +119,9 @@ func (b *Batch) FromRequest(req *Request) (*Batch, error) {
 	}
 	b.Messages = int(n)
 
+	if len(req.body) < req.bodysize {
+		return nil, errors.New("request body too small")
+	}
 	b.body = req.body[:req.bodysize]
 
 	b.firstOff = uint64(len(req.envelope) + termLen)
@@ -175,35 +178,9 @@ func (b *Batch) AppendMessage(m *Message) error {
 	return nil
 }
 
-// SetMessages sets all messages in a batch
-func (b *Batch) SetMessages(msgs []*Message) {
-	b.msgs = msgs
-	b.Messages = len(msgs)
-}
-
 // MessageBytes returns a byte slice of the batch of messages.
 func (b *Batch) MessageBytes() []byte {
 	return b.body[:b.Size]
-}
-
-// Annotate adds firstOffset and offsetDelta information to each message in the
-// batch
-func (b *Batch) Annotate() error {
-	b.firstOff = b.calculateFirstOffset()
-
-	var n uint64
-	for i := 0; i < b.Messages; i++ {
-		m := b.msgs[i]
-		m.firstOffset = b.firstOff
-		m.offsetDelta = b.firstOff + n
-		msgSize, err := b.messageFullSize(m)
-		if err != nil {
-			return err
-		}
-		n += uint64(msgSize)
-	}
-
-	return nil
 }
 
 // SetChecksum sets the batch's crc32
@@ -256,17 +233,6 @@ func (b *Batch) buildBodyBytes() error {
 	copy(b.body[:b.Size], b.msgBuf.Bytes())
 
 	return nil
-}
-
-func (b *Batch) messageFullSize(m *Message) (int, error) {
-	if m.fullSize > 0 {
-		return m.fullSize, nil
-	}
-
-	b.msgBuf.Reset()
-	n, err := m.WriteTo(b.msgBuf)
-	m.fullSize = int(n)
-	return m.fullSize, err
 }
 
 // WriteTo implements io.WriterTo.

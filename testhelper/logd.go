@@ -2,6 +2,7 @@ package testhelper
 
 import (
 	"bytes"
+	"errors"
 	"io/ioutil"
 	"log"
 	"os"
@@ -89,4 +90,63 @@ func Repeat(s string, n int) string {
 
 func IsCI() bool {
 	return os.Getenv("CI") == "true"
+}
+
+// FailingWriter fails the first call to Write, then the second, then third,
+// etc.
+type FailingWriter struct {
+	*bytes.Buffer
+	n    int
+	last int
+}
+
+func NewFailingWriter() *FailingWriter {
+	return &FailingWriter{
+		Buffer: &bytes.Buffer{},
+	}
+}
+
+func (w *FailingWriter) Write(p []byte) (int, error) {
+	if w.n >= w.last {
+		w.n = 0
+		w.last++
+		return 0, errors.New("cool error")
+	}
+
+	w.n++
+	return w.Buffer.Write(p)
+}
+
+type FailingReader struct {
+	*bytes.Buffer
+	data []byte
+	n    int
+	last int
+}
+
+func NewFailingReader(data []byte) *FailingReader {
+	r := &FailingReader{
+		Buffer: &bytes.Buffer{},
+		data:   data,
+	}
+
+	r.Buffer.Write(r.data)
+	return r
+}
+
+func (r *FailingReader) Read(p []byte) (int, error) {
+	if r.n >= r.last {
+		r.n = 0
+		r.last++
+		r.Buffer.Reset()
+		r.Buffer.Write(r.data)
+		return 0, errors.New("cool error")
+	}
+	r.n++
+
+	sl := p
+	if len(p) > 2 {
+		sl = p[:len(p)/2]
+	}
+	return r.Buffer.Read(sl)
 }

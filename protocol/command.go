@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"strconv"
 )
+
+const maxArgs = 4
 
 var errUnknownCmdType = errors.New("unknown command type")
 
@@ -101,11 +102,4 @@ var argLens = map[CmdType]int{
 	CmdStats: 0,
 	CmdClose: 0,
 	// CmdShutdown: 0,
-}
-
-const maxArgs = 4
-
-// ParseNumber parses a uint64 from bytes
-func ParseNumber(b []byte) (uint64, error) {
-	return strconv.ParseUint(string(b), 10, 64)
 }

@@ -72,8 +72,8 @@ test.race:
 	go test -race $(PKGS)
 
 .PHONY: test.cover
+# $(foreach pkg,$(WITHOUT_APPTEST),go test -outputdir=../report -cover ./$(pkg);)
 test.cover:
-	$(foreach pkg,$(WITHOUT_APPTEST),go test -outputdir=../report -cover ./$(pkg);)
 	go test -cover -coverpkg ./... ./...
 
 .PHONY: test.coverprofile
