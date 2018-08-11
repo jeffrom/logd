@@ -111,41 +111,41 @@ func (m *Message) readFromBuf(r *bufio.Reader) (int64, error) {
 	return total, nil
 }
 
-// FromBytes populates a Message from a byte slice, returning bytes read and
-// an error, if any
-func (m *Message) FromBytes(b []byte) (int, error) {
-	var total int
-	// fmt.Printf("FromBytes(%q)\n", b)
+// // FromBytes populates a Message from a byte slice, returning bytes read and
+// // an error, if any
+// func (m *Message) FromBytes(b []byte) (int, error) {
+// 	var total int
+// 	// fmt.Printf("FromBytes(%q)\n", b)
 
-	n, word, err := parseWordN(b)
-	total += n
-	if err != nil {
-		return total, err
-	}
+// 	n, word, err := parseWordN(b)
+// 	total += n
+// 	if err != nil {
+// 		return total, err
+// 	}
 
-	if !bytes.Equal(word, bmsg) {
-		return total, errInvalidProtocolLine
-	}
+// 	if !bytes.Equal(word, bmsg) {
+// 		return total, errInvalidProtocolLine
+// 	}
 
-	n, word, err = parseWordN(b[total:])
-	total += n
-	if err != nil {
-		return total, err
-	}
-	x, err := asciiToUint(word)
-	if err != nil {
-		return total, err
-	}
-	m.Size = int(x)
+// 	n, word, err = parseWordN(b[total:])
+// 	total += n
+// 	if err != nil {
+// 		return total, err
+// 	}
+// 	x, err := asciiToUint(word)
+// 	if err != nil {
+// 		return total, err
+// 	}
+// 	m.Size = int(x)
 
-	// fmt.Printf("rest of slice: %q\n", b[total:])
-	m.Body = b[total : total+m.Size]
-	total += m.Size
-	total += termLen
+// 	// fmt.Printf("rest of slice: %q\n", b[total:])
+// 	m.Body = b[total : total+m.Size]
+// 	total += m.Size
+// 	total += termLen
 
-	// fmt.Println("parsed", m)
-	return total, err
-}
+// 	// fmt.Println("parsed", m)
+// 	return total, err
+// }
 
 // WriteTo implements io.WriterTo
 func (m *Message) WriteTo(w io.Writer) (int64, error) {

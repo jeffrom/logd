@@ -246,6 +246,7 @@ func TestBatchReadErrors(t *testing.T) {
 
 var invalidBatches = map[string][]byte{
 	// "valid":  []byte("BATCH 30 default 1362320750 3\r\nMSG 1\r\nA\r\nMSG 1\r\nB\r\nMSG 1\r\nC\r\n"),
+	// "space before newline":  []byte("BATCH 30 default 1362320750 3 \r\nMSG 1\r\nA\r\nMSG 1\r\nB\r\nMSG 1\r\nC\r\n"),
 	"bad crc":               []byte("BATCH 30 default 1362320751 3\r\nMSG 1\r\nA\r\nMSG 1\r\nB\r\nMSG 1\r\nC\r\n"),
 	"bad crc2":              []byte("BATCH 30 default 1362320750 3\r\nMSG 1\r\na\r\nMSG 1\r\nB\r\nMSG 1\r\nC\r\n"),
 	"small body length":     []byte("BATCH 30 default 1362320750 3\r\nMSG 1\r\n\r\nMSG 1\r\nB\r\nMSG 1\r\nC\r\n"),
