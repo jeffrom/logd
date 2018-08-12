@@ -36,6 +36,7 @@ type EventQ struct {
 	batchScanner *protocol.BatchScanner
 	servers      []transport.Server
 	Stats        *internal.Stats
+	tmpBatch     *protocol.Batch
 }
 
 // NewEventQ creates a new instance of an EventQ
@@ -52,6 +53,7 @@ func NewEventQ(conf *config.Config) *EventQ {
 		partArgBuf:   newPartitionArgList(conf), // partition arguments buffer
 		batchScanner: protocol.NewBatchScanner(conf, nil),
 		servers:      []transport.Server{},
+		tmpBatch:     protocol.NewBatch(conf),
 	}
 
 	if conf.Hostport != "" {
@@ -173,7 +175,8 @@ func (q *EventQ) Stop() error {
 
 func (q *EventQ) handleBatch(req *protocol.Request) (*protocol.Response, error) {
 	resp := protocol.NewResponse(q.conf)
-	batch, err := protocol.NewBatch(q.conf).FromRequest(req)
+	q.tmpBatch.Reset()
+	batch, err := q.tmpBatch.FromRequest(req)
 	if err != nil {
 		return errResponse(q.conf, req, resp, err)
 	}
