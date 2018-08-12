@@ -1,38 +1,24 @@
-package server
+package events
 
 import (
 	"bufio"
 	"bytes"
-	"io/ioutil"
-	"log"
 	"testing"
 
 	"github.com/jeffrom/logd/client"
 	"github.com/jeffrom/logd/protocol"
 	"github.com/jeffrom/logd/testhelper"
-	"github.com/jeffrom/logd/transport"
 )
 
-func init() {
-	log.SetOutput(ioutil.Discard)
-}
-
-func BenchmarkClientBatch(b *testing.B) {
+func BenchmarkBatchFull(b *testing.B) {
 	b.SetParallelism(4)
-
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
-	srv := NewTestServer(conf)
-	rh := transport.NewMockRequestHandler(conf)
-	srv.SetQPusher(rh)
-	srv.GoServe()
-	defer CloseTestServer(b, srv, rh)
-
-	rh.Respond(func(req *protocol.Request) *protocol.Response {
-		resp := protocol.NewResponse(conf)
-		cr := protocol.NewClientBatchResponse(conf, 0, 1)
-		req.WriteResponse(resp, cr)
-		return resp
-	})
+	conf.Hostport = ":0"
+	q := NewEventQ(conf)
+	if err := q.GoStart(); err != nil {
+		b.Fatal(err)
+	}
+	addr := q.servers[0].ListenAddr().String()
 
 	b.ResetTimer()
 	b.RunParallel(func(b *testing.PB) {
@@ -44,7 +30,7 @@ func BenchmarkClientBatch(b *testing.B) {
 			panic(err)
 		}
 
-		c, err := client.Dial(srv.ListenAddr().String())
+		c, err := client.Dial(addr)
 		if err != nil {
 			panic(err)
 		}
@@ -56,4 +42,5 @@ func BenchmarkClientBatch(b *testing.B) {
 			}
 		}
 	})
+
 }
