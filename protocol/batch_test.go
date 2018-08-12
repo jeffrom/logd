@@ -261,6 +261,7 @@ var invalidBatches = map[string][]byte{
 	"invalid num messages":  []byte("BATCH 30 default 1362320750 a\r\nMSG 1\r\nA\r\nMSG 1\r\nB\r\nMSG 1\r\nC\r\n"),
 	"invalid num messages2": []byte("BATCH 30 default 1362320750 cool\r\nMSG 1\r\nA\r\nMSG 1\r\nB\r\nMSG 1\r\nC\r\n"),
 	"invalid crc":           []byte("BATCH 30 default dang 3\r\nMSG 1\r\nA\r\nMSG 1\r\nB\r\nMSG 1\r\nC\r\n"),
+	"missing data":          []byte("BATCH 30 default 1362320750 3\r\n"),
 }
 
 func TestBatchInvalid(t *testing.T) {

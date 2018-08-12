@@ -7,7 +7,6 @@ import (
 
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/internal"
-	"github.com/pkg/errors"
 )
 
 // Request represents a single request / response.
@@ -66,6 +65,9 @@ func (req *Request) FullSize() int {
 func (req *Request) parseType() ([]byte, error) {
 	rest, word, err := parseWord(req.envelope)
 	req.Name = cmdNamefromBytes(word)
+	if req.Name == 0 {
+		return rest, errUnknownCmdType
+	}
 	return rest, err
 }
 
@@ -148,14 +150,7 @@ func (req *Request) readFromBuf(r *bufio.Reader) (int64, error) {
 		return total, err
 	}
 
-	if req.Name == 0 { // unknown command
-		return total, ErrInvalid
-	}
-
-	expectedArgs, ok := argLens[req.Name]
-	if !ok {
-		return total, errors.Errorf("type %v has no specified length", req.Name)
-	}
+	expectedArgs := argLens[req.Name]
 
 	for i := 0; i < expectedArgs; i++ {
 		line, err = req.parseArg(line)

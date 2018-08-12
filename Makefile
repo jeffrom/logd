@@ -79,7 +79,8 @@ test.cover:
 .PHONY: test.coverprofile
 # $(foreach pkg,$(SHORT_PKGS),go test -coverprofile=integration_test/out/unit.$(pkg).cov.out -covermode=count -coverpkg ./... ./$(pkg);)
 test.coverprofile:
-	go test -coverprofile=./integration_test/out/all.cov.out -covermode=count ./...
+	go get github.com/AlekSi/gocoverutil
+	gocoverutil -coverprofile=cov.out test -covermode=count ./...
 
 .PHONY: test.golden
 test.golden:
@@ -150,7 +151,7 @@ test.report.summary:
 
 .PHONY: test.report.html
 test.report.html:
-	go tool cover -html=integration_test/out/all.cov.out -o integration_test/out/all.cov.html
+	go tool cover -html=cov.out -o cov.html
 
 .PHONY: report.depgraph
 report.depgraph:
