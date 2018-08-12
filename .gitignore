@@ -12,6 +12,9 @@ __*.index
 *.out
 *.pprof
 
+# coverage artifacts
+cov.html
+
 # test binaries
 log*.test
 

@@ -34,7 +34,6 @@ import (
 	stderrors "errors"
 	"fmt"
 	"hash/crc32"
-	"io"
 
 	"github.com/pkg/errors"
 )
@@ -66,52 +65,11 @@ var bmok = []byte("MOK")
 var bmokStart = []byte("MOK ")
 var bclose = []byte("CLOSE")
 
-// ReadLine reads a line from a bufio.Reader
-// NOTE the line data will be overwritten the next time the bufio.Reader is
-// used.
-func ReadLine(br *bufio.Reader) (int, []byte, error) {
-	line, err := br.ReadSlice('\n')
-	n := len(line) + 1
-	if err == bufio.ErrBufferFull {
-		return n, nil, Error("long response line")
-	}
-	if err == io.EOF {
-		return n, nil, err
-	}
-	if err != nil {
-		return n, nil, errors.Wrap(err, "reading line failed")
-	}
-
-	if len(line) < termLen {
-		return n, nil, Error("line missing terminator")
-	}
-
-	if line[len(line)-1] != '\n' || line[len(line)-2] != '\r' {
-		return n, nil, Error("bad response line terminator")
-	}
-
-	line = line[:len(line)-2]
-	return n, line, nil
-}
-
 // Error is a client error type
 type Error string
 
 func (pe Error) Error() string {
 	return fmt.Sprintf("%s (possible server error)", string(pe))
-}
-
-func trimNewline(line []byte) []byte {
-	if line == nil || len(line) < 1 {
-		return line
-	}
-	if line[len(line)-1] == '\n' {
-		line = line[len(line):]
-	}
-	if line[len(line)-1] == '\r' {
-		line = line[len(line):]
-	}
-	return line
 }
 
 func parseWord(line []byte) ([]byte, []byte, error) {
@@ -126,86 +84,10 @@ func parseWord(line []byte) ([]byte, []byte, error) {
 	return line[n+1:], word, nil
 }
 
-// same as parseWord, but returns the number of bytes read instead of the rest
-// of the slice
-func parseWordN(line []byte) (int, []byte, error) {
-	n := bytes.IndexAny(line, " \n")
-	if n < 0 {
-		return 0, nil, errors.New("invalid bytes")
-	}
-	word := line[:n]
-	if word[n-1] == '\r' {
-		word = line[:n-1]
-	}
-	return n + 1, word, nil
-}
-
-func readWordFromBuf(r *bufio.Reader) (int64, []byte, []byte, error) {
-	word, err := r.ReadSlice(' ')
-	total := int64(len(word))
-	return total, word[:len(word)-1], word, err
-}
-
 func readLineFromBuf(r *bufio.Reader) (int64, []byte, []byte, error) {
 	word, err := r.ReadSlice('\n')
 	total := int64(len(word))
 	return total, word[:len(word)-2], word, err
-}
-
-func isDigits(b []byte) bool {
-	if b == nil || len(b) == 0 {
-		return false
-	}
-	for i := 0; i < len(b); i++ {
-		if b[i] < 48 || b[i] > 57 {
-			return false
-		}
-	}
-	return true
-}
-
-func parseInt(line []byte) ([]byte, int64, error) {
-	if line == nil || len(line) == 0 {
-		return nil, 0, errors.New("invalid bytes")
-	}
-	n := bytes.IndexAny(line, " \n")
-	if n <= 0 {
-		if !isDigits(line) {
-			return line, 0, errors.New("invalid bytes")
-		}
-		n = len(line) - 1
-	}
-	numb := line[:n]
-	if len(line) == 1 {
-		numb = line
-	}
-	if len(numb) > 1 && numb[n-1] == '\r' {
-		numb = line[:n]
-	}
-	num, err := asciiToInt(numb)
-	return line[n+1:], num, err
-}
-
-func parseUint(line []byte) ([]byte, uint64, error) {
-	if line == nil || len(line) == 0 {
-		return nil, 0, errors.New("invalid bytes")
-	}
-	n := bytes.IndexAny(line, " \n")
-	if n < 0 {
-		if !isDigits(line) {
-			return line, 0, errors.New("invalid bytes")
-		}
-		n = len(line) - 1
-	}
-	numb := line[:n]
-	if len(line) == 1 {
-		numb = line
-	}
-	if len(numb) > 1 && numb[n-1] == '\r' {
-		numb = line[:n]
-	}
-	num, err := asciiToUint(numb)
-	return line[n+1:], num, err
 }
 
 func asciiToUint(tok []byte) (uint64, error) {
@@ -230,22 +112,6 @@ func asciiToInt(tok []byte) (int64, error) {
 		n = (n * 10) + int64(ch-'0')
 	}
 	return n, nil
-}
-
-// XXX this is broken
-func intToASCII(n int64, b *[32]byte) int {
-	i := 31
-	if n < 0 {
-		b[i] = '-'
-		i--
-	}
-	for n > 9 {
-		digit := n % 10
-		n /= 10
-		b[i] = '0' + byte(digit)
-		i--
-	}
-	return i
 }
 
 func uintToASCII(n uint64, b *[32]byte) int {
