@@ -24,6 +24,7 @@ func DefaultTestConfig(verbose bool) *config.Config {
 	c := &config.Config{
 		Verbose:         verbose,
 		Timeout:         200 * time.Millisecond,
+		IdleTimeout:     200 * time.Millisecond,
 		ShutdownTimeout: 1 * time.Second,
 		LogFileMode:     0644,
 		WorkDir:         TmpLog(),
@@ -34,6 +35,7 @@ func DefaultTestConfig(verbose bool) *config.Config {
 
 	if !testing.Short() && IsCI() {
 		c.Timeout = 10 * time.Second
+		c.IdleTimeout = 10 * time.Second
 		c.ShutdownTimeout = 15 * time.Second
 	}
 

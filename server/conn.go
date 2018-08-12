@@ -32,9 +32,6 @@ const (
 
 	// connection had an error.
 	connStateFailed
-
-	// connection is handling a subscription.
-	connStateReading
 )
 
 func (cs connState) String() string {
@@ -47,8 +44,6 @@ func (cs connState) String() string {
 		return "CLOSED"
 	case connStateFailed:
 		return "FAILED"
-	case connStateReading:
-		return "READING"
 	}
 	return fmt.Sprintf("UNKNOWN(%+v)", uint8(cs))
 }
@@ -177,7 +172,7 @@ func (c *Conn) getState() connState {
 
 func (c *Conn) isActive() bool {
 	state := c.getState()
-	return state == connStateActive || state == connStateReading
+	return state == connStateActive
 }
 
 func (c *Conn) close() error {
@@ -205,17 +200,13 @@ func (c *Conn) setWaitForCmdDeadline() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if c.state == connStateReading {
-		internal.LogError(c.SetDeadline(time.Time{}))
-	} else {
-		timeout := c.conf.Timeout
-		err := c.SetReadDeadline(time.Now().Add(timeout))
-		if cerr := handleConnErr(c.conf, err, c); cerr != nil {
-			return cerr
-		}
-
-		c.state = connStateActive
+	timeout := c.conf.IdleTimeout
+	err := c.SetReadDeadline(time.Now().Add(timeout))
+	if cerr := handleConnErr(c.conf, err, c); cerr != nil {
+		return cerr
 	}
+
+	c.state = connStateActive
 
 	return nil
 }

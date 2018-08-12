@@ -37,6 +37,9 @@ func init() {
 	pflags.DurationVar(&tmpConfig.Timeout, "timeout", config.Default.Timeout, "duration to wait for requests to complete")
 	viper.BindPFlag("timeout", pflags.Lookup("timeout"))
 
+	pflags.DurationVar(&tmpConfig.IdleTimeout, "idle-timeout", config.Default.IdleTimeout, "duration to wait for idle connections to be closed")
+	viper.BindPFlag("idle-timeout", pflags.Lookup("idle-timeout"))
+
 	pflags.DurationVar(&tmpConfig.ShutdownTimeout, "shutdown-timeout", config.Default.ShutdownTimeout, "duration to wait for requests to complete while shutting down")
 	viper.BindPFlag("shutdown-timeout", pflags.Lookup("shutdown-timeout"))
 
