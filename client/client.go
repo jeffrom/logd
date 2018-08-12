@@ -342,9 +342,7 @@ func (c *Client) do(wt io.WriterTo) (int64, int64, error) {
 		return sent, 0, err
 	}
 
-	internal.LogError(c.SetWriteDeadline(time.Now().Add(c.writeTimeout)))
 	err = c.flush()
-	internal.LogError(c.SetWriteDeadline(time.Time{}))
 	internal.Debugf(c.gconf, "wrote %d bytes to %s (err: %v)", sent, c.RemoteAddr(), err)
 	if err != nil {
 		return sent, 0, err
