@@ -6,11 +6,14 @@ import (
 
 // Config holds configuration variables
 type Config struct {
-	File            string        `json:"config-file"`
-	Verbose         bool          `json:"verbose"`
-	CanShutdown     bool          `json:"can-shutdown"`
-	Hostport        string        `json:"host"`
+	File        string `json:"config-file"`
+	Verbose     bool   `json:"verbose"`
+	CanShutdown bool   `json:"can-shutdown"`
+	Hostport    string `json:"host"`
+	// Timeout determines how long to wait during requests before closing the
+	// connection if the transmission hasn't completed.
 	Timeout         time.Duration `json:"timeout"`
+	IdleTimeout     time.Duration `json:"idle-timeout"`
 	ShutdownTimeout time.Duration `json:"shutdown-timeout"`
 	WorkDir         string        `json:"work-dir"`
 	LogFileMode     int           `json:"log-file-mode"`
@@ -35,8 +38,9 @@ func New() *Config {
 // Default is the default application config
 var Default = &Config{
 	Hostport:        "localhost:1774",
-	Timeout:         1 * time.Second,
-	ShutdownTimeout: 1 * time.Second,
+	Timeout:         2 * time.Second,
+	IdleTimeout:     30 * time.Second,
+	ShutdownTimeout: 15 * time.Second,
 	WorkDir:         "logs/",
 	LogFileMode:     0600,
 	MaxBatchSize:    1024 * 64,
