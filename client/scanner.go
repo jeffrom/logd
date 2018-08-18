@@ -89,6 +89,7 @@ func (s *Scanner) Reset() {
 	s.nbatches = 0
 	s.state.offset = 0
 	s.state.delta = 0
+	s.s = nil
 
 	select {
 	case <-s.done:
@@ -122,31 +123,8 @@ func (s *Scanner) Scan() bool {
 		if err := s.doInitialRead(); err != nil {
 			return s.scanErr(err)
 		}
-	} else if s.messagesRead >= s.batch.Messages {
-		if !s.conf.ReadForever && s.totalMessagesRead >= s.conf.Limit {
-			return s.scanErr(nil)
-		}
-
-		if s.batchesRead >= s.nbatches {
-			if err := s.requestMoreBatches(false); err == protocol.ErrNotFound {
-				if perr := s.pollBatch(); perr != nil {
-					return s.scanErr(perr)
-				}
-			} else if err != nil {
-				return s.scanErr(err)
-			}
-		}
-
-		if !s.s.Scan() {
-			err := s.s.Error()
-			if err != nil && err != io.EOF {
-				return s.scanErr(err)
-			}
-		}
-
-		if err := s.setNextBatch(); err != nil {
-			return s.scanErr(err)
-		}
+	} else if err := s.scanNextBatch(); err != nil {
+		return s.scanErr(err)
 	}
 
 	// read the next message in the batch
@@ -187,6 +165,49 @@ func (s *Scanner) doInitialRead() error {
 	}
 	return err
 }
+
+func (s *Scanner) scanNextBatch() error {
+	if s.messagesRead >= s.batch.Messages || s.batchRead >= int(s.batch.Size) {
+		if !s.conf.ReadForever && s.totalMessagesRead >= s.conf.Limit {
+			return nil
+		}
+
+		if s.batchesRead >= s.nbatches {
+			if err := s.requestMoreBatches(false); err == protocol.ErrNotFound {
+				if perr := s.pollBatch(); perr != nil {
+					return perr
+				}
+			} else if err != nil {
+				return err
+			}
+		}
+
+		if !s.s.Scan() {
+			err := s.s.Error()
+			if err != nil && err != io.EOF {
+				return err
+			}
+		}
+
+		if err := s.setNextBatch(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// func (s *Scanner) finishedBatch() bool {
+// 	if s.messagesRead >= s.batch.Messages {
+// 		return true
+// 	}
+// 	if s.statem != nil {
+// 		size, _ := s.batch.FullSize()
+// 		_, read, err := s.statem.Get()
+
+// 	}
+// 	return false
+// }
 
 // Stop causes the scanner to stop making requests and returns ErrStopped
 func (s *Scanner) Stop() {

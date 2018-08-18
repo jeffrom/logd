@@ -31,6 +31,7 @@ type Batch struct {
 	msgBuf   *bytes.Buffer
 	firstOff uint64
 	wasRead  bool
+	nread    int
 }
 
 // NewBatch returns a new instance of a batch
@@ -316,10 +317,10 @@ func (b *Batch) WriteTo(w io.Writer) (int64, error) {
 func (b *Batch) ReadFrom(r io.Reader) (int64, error) {
 	n, err := b.readFromBuf(r.(*bufio.Reader))
 	if err != nil {
-		return n, err
+		return b.finishRead(n, err)
 	}
 	b.wasRead = true
-	return n, err
+	return b.finishRead(n, err)
 }
 
 // FirstOffset returns the offset delta of the first message
@@ -341,6 +342,11 @@ func (b *Batch) readFromBuf(r *bufio.Reader) (int64, error) {
 	n, err := b.readData(r)
 	total += n
 	return total, err
+}
+
+func (b *Batch) finishRead(size int64, err error) (int64, error) {
+	b.nread = int(size)
+	return size, err
 }
 
 // readEnvelope reads the batch protocol envelope
@@ -447,4 +453,13 @@ func (b *Batch) Copy() *Batch {
 	copy(batch.body, b.body)
 	batch.wasRead = true
 	return batch
+}
+
+// FullSize returns the full size of the batch if it was previously read. The
+// second return value indicates whether the batch was read or not.
+func (b *Batch) FullSize() (int, bool) {
+	if b.wasRead {
+		return b.nread, true
+	}
+	return 0, false
 }
