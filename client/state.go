@@ -94,8 +94,8 @@ func (m *MockStatePusher) Next() (uint64, error, *protocol.Batch, bool) {
 
 // StatePuller keeps track of the last scanned message
 type StatePuller interface {
-	Get() (uint64, error)
-	Complete(off uint64) error
+	Get() (uint64, uint64, error)
+	Complete(off, delta uint64) error
 }
 
 // FileStatePuller tracks offset state in a file
@@ -106,19 +106,43 @@ type FileStatePuller struct {
 }
 
 // NewFileStatePuller returns a new instance of *FileStatePuller
-func NewFileStatePuller(name string, conf *Config) *FileStatePuller {
+func NewFileStatePuller(conf *Config, name string) *FileStatePuller {
 	return &FileStatePuller{
 		name: name,
 		conf: conf,
 	}
 }
 
-// Get implements FileStatePuller
-func (m *FileStatePuller) Get() (uint64, error) {
-	return 0, nil
+// Get implements StatePuller interface
+func (m *FileStatePuller) Get() (uint64, uint64, error) {
+	return 0, 0, nil
 }
 
-// Complete implements FileStatePuller
-func (m *FileStatePuller) Complete(off uint64) error {
+// Complete implements StatePuller interface
+func (m *FileStatePuller) Complete(off, delta uint64) error {
+	return nil
+}
+
+type MemoryStatePuller struct {
+	conf  *Config
+	off   uint64
+	delta uint64
+}
+
+func NewMemoryStatePuller(conf *Config) *MemoryStatePuller {
+	return &MemoryStatePuller{
+		conf: conf,
+	}
+}
+
+// Get implements StatePuller interface
+func (m *MemoryStatePuller) Get() (uint64, uint64, error) {
+	return m.off, m.delta, nil
+}
+
+// Complete implements StatePuller interface
+func (m *MemoryStatePuller) Complete(off, delta uint64) error {
+	m.off = off
+	m.delta = delta
 	return nil
 }
