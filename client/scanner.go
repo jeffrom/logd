@@ -143,8 +143,25 @@ func (s *Scanner) doInitialRead() error {
 	var bs *protocol.BatchScanner
 	var err error
 	var nbatches int
-	if s.conf.UseTail {
-		s.curr, nbatches, bs, err = s.Client.Tail(s.topic, s.conf.Limit)
+	if s.conf.UseTail { // offset was not explicitly set
+		if s.statem != nil {
+			off, delta, err := s.statem.Get()
+			if err != nil {
+				return err
+			}
+			s.curr = off
+			nbatches, bs, err = s.Client.ReadOffset(s.topic, s.curr, s.conf.Limit)
+			if err != nil {
+				return err
+			}
+			for uint64(bs.Scanned()) < delta {
+				if !bs.Scan() {
+					return bs.Error()
+				}
+			}
+		} else {
+			s.curr, nbatches, bs, err = s.Client.Tail(s.topic, s.conf.Limit)
+		}
 	} else {
 		// TODO test that s.conf.Offset is respected
 		s.curr = s.conf.Offset
@@ -196,18 +213,6 @@ func (s *Scanner) scanNextBatch() error {
 
 	return nil
 }
-
-// func (s *Scanner) finishedBatch() bool {
-// 	if s.messagesRead >= s.batch.Messages {
-// 		return true
-// 	}
-// 	if s.statem != nil {
-// 		size, _ := s.batch.FullSize()
-// 		_, read, err := s.statem.Get()
-
-// 	}
-// 	return false
-// }
 
 // Stop causes the scanner to stop making requests and returns ErrStopped
 func (s *Scanner) Stop() {
