@@ -127,7 +127,6 @@ func TestScannerLimit(t *testing.T) {
 }
 
 func TestScannerReadForever(t *testing.T) {
-	// t.SkipNow()
 	nbatches := 5
 	conf := DefaultTestConfig(testing.Verbose())
 	conf.Offset = 0
@@ -204,4 +203,8 @@ func TestScannerReadForever(t *testing.T) {
 	if err := s.Error(); err != protocol.ErrNotFound {
 		t.Fatalf("expected error %v but got %+v", protocol.ErrNotFound, err)
 	}
+}
+
+func TestScannerState(t *testing.T) {
+
 }

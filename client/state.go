@@ -1,6 +1,7 @@
 package client
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -92,20 +93,24 @@ func (m *MockStatePusher) Next() (uint64, error, *protocol.Batch, bool) {
 	return off, err, batch, true
 }
 
+// errNoState should be returned by StatePullers when the state hasn't
+// stored any offset information yet.
+var errNoState = errors.New("state uninitialized")
+
 // StatePuller keeps track of the last scanned message
 type StatePuller interface {
 	Get() (uint64, uint64, error)
 	Complete(off, delta uint64) error
 }
 
-// FileStatePuller tracks offset state in a file
+// FileStatePuller tracks offset state in a file.
 type FileStatePuller struct {
 	conf *Config
 	name string
 	f    *os.File
 }
 
-// NewFileStatePuller returns a new instance of *FileStatePuller
+// NewFileStatePuller returns a new instance of *FileStatePuller.
 func NewFileStatePuller(conf *Config, name string) *FileStatePuller {
 	return &FileStatePuller{
 		name: name,
@@ -113,20 +118,28 @@ func NewFileStatePuller(conf *Config, name string) *FileStatePuller {
 	}
 }
 
-// Get implements StatePuller interface
+func (m *FileStatePuller) isReady() bool {
+	if m.f == nil {
+		return false
+	}
+	return true
+}
+
+// Get implements StatePuller interface.
 func (m *FileStatePuller) Get() (uint64, uint64, error) {
 	return 0, 0, nil
 }
 
-// Complete implements StatePuller interface
+// Complete implements StatePuller interface.
 func (m *FileStatePuller) Complete(off, delta uint64) error {
 	return nil
 }
 
 type MemoryStatePuller struct {
-	conf  *Config
-	off   uint64
-	delta uint64
+	conf        *Config
+	off         uint64
+	delta       uint64
+	initialized bool
 }
 
 func NewMemoryStatePuller(conf *Config) *MemoryStatePuller {
@@ -137,11 +150,15 @@ func NewMemoryStatePuller(conf *Config) *MemoryStatePuller {
 
 // Get implements StatePuller interface
 func (m *MemoryStatePuller) Get() (uint64, uint64, error) {
+	if !m.initialized {
+		return 0, 0, errNoState
+	}
 	return m.off, m.delta, nil
 }
 
 // Complete implements StatePuller interface
 func (m *MemoryStatePuller) Complete(off, delta uint64) error {
+	m.initialized = true
 	m.off = off
 	m.delta = delta
 	return nil

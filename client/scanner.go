@@ -128,23 +128,39 @@ func (s *Scanner) Scan() bool {
 	}
 
 	// read the next message in the batch
+	if err := s.readMessage(); err != nil {
+		return s.scanErr(err)
+	}
+	return true
+}
+
+func (s *Scanner) readMessage() error {
 	s.msg.Reset()
 	n, err := s.msg.ReadFrom(s.batchBufBr)
 	s.batchRead += int(n)
 	if err != nil {
-		return s.scanErr(err)
+		return err
 	}
 	s.messagesRead++
 	s.totalMessagesRead++
-	return true
+	return err
 }
 
 func (s *Scanner) doInitialRead() error {
 	var bs *protocol.BatchScanner
 	var err error
 	var nbatches int
+	var hasState bool
+
+	if s.statem != nil {
+		_, _, err := s.statem.Get()
+		if err == nil {
+			hasState = true
+		}
+	}
+
 	if s.conf.UseTail { // offset was not explicitly set
-		if s.statem != nil {
+		if hasState {
 			off, delta, err := s.statem.Get()
 			if err != nil {
 				return err
@@ -154,22 +170,22 @@ func (s *Scanner) doInitialRead() error {
 			if err != nil {
 				return err
 			}
-			for uint64(bs.Scanned()) < delta {
-				if !bs.Scan() {
-					return bs.Error()
+			for uint64(s.batchRead) < delta {
+				if err := s.readMessage(); err != nil {
+					return err
 				}
 			}
 		} else {
 			s.curr, nbatches, bs, err = s.Client.Tail(s.topic, s.conf.Limit)
 		}
 	} else {
-		// TODO test that s.conf.Offset is respected
 		s.curr = s.conf.Offset
 		nbatches, bs, err = s.Client.ReadOffset(s.topic, s.curr, s.conf.Limit)
 	}
 	if err != nil {
 		return err
 	}
+
 	s.s = bs
 	s.nbatches = nbatches
 	internal.Debugf(s.gconf, "started reading from %d", s.curr)
