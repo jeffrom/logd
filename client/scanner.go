@@ -29,16 +29,10 @@ type Scanner struct {
 	nbatches          int
 	messagesRead      int
 	totalMessagesRead int
-	state             *scannerState
 	statem            StatePuller
 	curr              uint64
 	err               error
 	done              chan struct{}
-}
-
-type scannerState struct {
-	offset uint64
-	delta  uint64
 }
 
 // NewScanner returns a new instance of *Scanner
@@ -47,7 +41,6 @@ func NewScanner(conf *Config) *Scanner {
 		conf:     conf,
 		batchBuf: &bytes.Buffer{},
 		msg:      protocol.NewMessage(conf.ToGeneralConfig()),
-		state:    &scannerState{},
 		done:     make(chan struct{}),
 	}
 }
@@ -79,16 +72,16 @@ func DialScanner(addr string) (*Scanner, error) {
 // Reset sets the scanner to it's initial values so it can be reused.
 func (s *Scanner) Reset() {
 	s.msg.Reset()
-	s.curr = s.conf.Offset
+	s.curr = 0
 	s.messagesRead = 0
 	s.totalMessagesRead = 0
+	s.batch.Reset()
 	s.batchBuf.Reset()
 	s.batchBufBr = bufio.NewReader(s.batchBuf)
+	s.msg.Reset()
 	s.batchRead = 0
 	s.batchesRead = 0
 	s.nbatches = 0
-	s.state.offset = 0
-	s.state.delta = 0
 	s.s = nil
 
 	select {
@@ -134,13 +127,28 @@ func (s *Scanner) Scan() bool {
 	return true
 }
 
+// Complete marks the current message processing completed. It will panic if no
+// StatePuller exists on the scanner. It will pass the error back from the
+// StatePuller.
+func (s *Scanner) Complete() error {
+	off := s.curr
+	delta := s.batchRead
+	if s.batch != nil && uint64(s.batchRead) >= s.batch.Size {
+		fullsize, _ := s.batch.FullSize()
+		off = s.curr + uint64(fullsize)
+		delta = 0
+	}
+	internal.Debugf(s.gconf, "completing to offset %d, delta %d", off, delta)
+	return s.statem.Complete(off, uint64(delta))
+}
+
 func (s *Scanner) readMessage() error {
 	s.msg.Reset()
 	n, err := s.msg.ReadFrom(s.batchBufBr)
-	s.batchRead += int(n)
 	if err != nil {
 		return err
 	}
+	s.batchRead += int(n)
 	s.messagesRead++
 	s.totalMessagesRead++
 	return err
@@ -151,6 +159,7 @@ func (s *Scanner) doInitialRead() error {
 	var err error
 	var nbatches int
 	var hasState bool
+	var delta uint64
 
 	if s.statem != nil {
 		_, _, err := s.statem.Get()
@@ -161,19 +170,16 @@ func (s *Scanner) doInitialRead() error {
 
 	if s.conf.UseTail { // offset was not explicitly set
 		if hasState {
-			off, delta, err := s.statem.Get()
+			off, delt, err := s.statem.Get()
+			delta = delt
 			if err != nil {
 				return err
 			}
 			s.curr = off
+			internal.Debugf(s.gconf, "starting from previous state: offset %d, delta %d", off, delta)
 			nbatches, bs, err = s.Client.ReadOffset(s.topic, s.curr, s.conf.Limit)
 			if err != nil {
 				return err
-			}
-			for uint64(s.batchRead) < delta {
-				if err := s.readMessage(); err != nil {
-					return err
-				}
 			}
 		} else {
 			s.curr, nbatches, bs, err = s.Client.Tail(s.topic, s.conf.Limit)
@@ -195,6 +201,12 @@ func (s *Scanner) doInitialRead() error {
 
 	if err := s.setNextBatch(); err != nil {
 		return err
+	}
+
+	for uint64(s.batchRead) < delta {
+		if err := s.readMessage(); err != nil {
+			return err
+		}
 	}
 	return err
 }

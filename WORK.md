@@ -29,6 +29,7 @@
 - [ ] split each topic into its own event queue which will be a big win as each
       topic would have concurrency against the rest
   - pushrequest would send to the correct `in` channel
+- [ ] audit / fix int types, such as batch size (should be int, not uint64)
 
 # maybe later
 
