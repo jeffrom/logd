@@ -16,35 +16,44 @@ func BenchmarkBatchFull(b *testing.B) {
 	b.SetParallelism(4)
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
 	conf.Hostport = ":0"
-	benchmarkBatchFull(b, conf, []string{"default"})
+	benchmarkBatchFull(b, conf, "batch.small", []string{"default"})
+}
+
+func BenchmarkBatchFullLarge(b *testing.B) {
+	b.SetParallelism(4)
+	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf.Hostport = ":0"
+	conf.MaxBatchSize = 1024 * 64
+	conf.PartitionSize = 1024 * 1024
+	benchmarkBatchFull(b, conf, "batch.large", []string{"default"})
 }
 
 // func BenchmarkBatchFullNewTopic(b *testing.B) {
 // 	b.SetParallelism(4)
 // 	conf := testhelper.DefaultTestConfig(testing.Verbose())
 // 	conf.Hostport = ":0"
-// 	benchmarkBatchFull(b, conf, []string{"topic1"})
+// 	benchmarkBatchFull(b, conf, "batch.small", []string{"topic1"})
 // }
 
 // func BenchmarkBatchFullTopics2(b *testing.B) {
 // 	b.SetParallelism(2)
 // 	conf := testhelper.DefaultTestConfig(testing.Verbose())
 // 	conf.Hostport = ":0"
-// 	benchmarkBatchFull(b, conf, []string{"default", "topic1"})
+// 	benchmarkBatchFull(b, conf, "batch.small", []string{"default", "topic1"})
 // }
 
 // func BenchmarkBatchFullTopics4(b *testing.B) {
 // 	b.SetParallelism(2)
 // 	conf := testhelper.DefaultTestConfig(testing.Verbose())
 // 	conf.Hostport = ":0"
-// 	benchmarkBatchFull(b, conf, []string{"default", "topic1", "topic2", "topic3"})
+// 	benchmarkBatchFull(b, conf, "batch.small", []string{"default", "topic1", "topic2", "topic3"})
 // }
 
 func BenchmarkBatchFullTopics8(b *testing.B) {
 	b.SetParallelism(2)
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
 	conf.Hostport = ":0"
-	benchmarkBatchFull(b, conf, []string{
+	benchmarkBatchFull(b, conf, "batch.small", []string{
 		"default", "topic1", "topic2", "topic3",
 		"topic4", "topic5", "topic6", "topic7",
 	})
@@ -73,13 +82,13 @@ func (r *repeater) next() int {
 	return i
 }
 
-func benchmarkBatchFull(b *testing.B, conf *config.Config, topics []string) {
+func benchmarkBatchFull(b *testing.B, conf *config.Config, fixturename string, topics []string) {
 	h := NewHandlers(conf)
 	if err := h.GoStart(); err != nil {
 		b.Fatal(err)
 	}
 	addr := h.servers[0].ListenAddr().String()
-	fixture := testhelper.LoadFixture("batch.small")
+	fixture := testhelper.LoadFixture(fixturename)
 
 	fixtures := make([][]byte, len(topics))
 	for i, topic := range topics {

@@ -51,7 +51,7 @@ var DefaultConfig = &Config{
 	ConnRetryMaxInterval: 30 * time.Second,
 	ConnRetryMultiplier:  2.0,
 
-	BatchSize: 1024 * 20,
+	BatchSize: 1024 * 64,
 	InputPath: "-",
 
 	Limit: 15,
@@ -110,7 +110,7 @@ func DefaultTestConfig(verbose bool) *Config {
 	c := &Config{}
 	*c = *DefaultConfig
 	c.Verbose = verbose
-	// c.BatchSize = 1024 * 10
+	c.BatchSize = 1024 * 20
 	c.ReadTimeout = 100 * time.Millisecond
 	c.WriteTimeout = 100 * time.Millisecond
 	c.WaitInterval = -1
