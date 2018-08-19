@@ -16,6 +16,8 @@
 - [ ] config validation
 - [ ] send config to new connections so it can be validated
   - probably better to have client ask for it
+- [ ] `testhelper/mock_server.go` has some race condition problems. probably
+      has to do with the closing connection stuff
 
 # maybe later
 
