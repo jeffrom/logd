@@ -252,6 +252,40 @@ func TestScannerState(t *testing.T) {
 	}
 }
 
+func TestScannerUseTail(t *testing.T) {
+	conf := DefaultTestConfig(testing.Verbose())
+	conf.Offset = 0
+	conf.Limit = 3
+	conf.UseTail = true
+	gconf := conf.ToGeneralConfig()
+	fixture := testhelper.LoadFixture("batch.small")
+	server, clientConn := testhelper.Pipe()
+	defer server.Close()
+	c := New(conf).SetConn(clientConn)
+	s := ScannerForClient(c)
+	defer s.Close()
+	defer expectServerClose(t, gconf, server)
+	s.SetTopic("default")
+
+	server.Expect(func(p []byte) io.WriterTo {
+		req := protocol.NewRequest(gconf)
+		if _, err := req.ReadFrom(bufio.NewReader(bytes.NewReader(p))); err != nil {
+			panic(err)
+		}
+		_, err := protocol.NewTail(gconf).FromRequest(req)
+		if err != nil {
+			panic(err)
+		}
+
+		resp := readOKResponse(gconf, 123, 1, fixture)
+		return resp
+	})
+
+	if !s.Scan() {
+		t.Fatal(s.Error())
+	}
+}
+
 func mustScan(t *testing.T, s *Scanner, expected string) {
 	if !s.Scan() {
 		t.Fatal("failed to scan:", s.Error())

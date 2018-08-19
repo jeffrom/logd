@@ -11,9 +11,6 @@
 - [x] Repairer to truncate partitions with corrupt data
 - [x] remove state management stuff from scanner for now
 - [x] idle timeout
-- [ ] config validation
-- [ ] send config to new connections so it can be validated
-  - probably better to have client ask for it
 - [x] how should client scanner message tracking work?
   - needs to be able to start at any message in the batch
 - [ ] make consistency guarantees configurable. fast by default (at-most-once),
@@ -25,11 +22,14 @@
   - have a flush interval option. this can be implemented by just putting a
     flush command into the queue at an interval. also document how it may be
     better to just change the dirty page cache kernel settings.
-- [ ] simple replication, scanner failover
+- [ ] audit / fix int types, such as batch size (should be int, not uint64)
 - [ ] split each topic into its own event queue which will be a big win as each
       topic would have concurrency against the rest
   - pushrequest would send to the correct `in` channel
-- [ ] audit / fix int types, such as batch size (should be int, not uint64)
+- [ ] simple replication, scanner failover
+- [ ] config validation
+- [ ] send config to new connections so it can be validated
+  - probably better to have client ask for it
 
 # maybe later
 
