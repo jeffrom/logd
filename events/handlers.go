@@ -118,9 +118,13 @@ func (h *Handlers) PushRequest(ctx context.Context, req *protocol.Request) (*pro
 }
 
 func (h *Handlers) pushBlockingRequest(ctx context.Context, req *protocol.Request) (*protocol.Response, error) {
+	name := req.Topic()
+	if name == "" {
+		return h.asyncQ.PushRequest(ctx, req)
+	}
+
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	name := req.Topic()
 	if q, ok := h.h[name]; ok {
 		return q.PushRequest(ctx, req)
 	}
