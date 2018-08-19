@@ -83,18 +83,18 @@ var RootCmd = &cobra.Command{
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
 		conf := tmpConfig
-		q := events.NewEventQ(conf)
+		h := events.NewHandlers(conf)
 
 		stopC := make(chan os.Signal, 1)
 		signal.Notify(stopC, os.Interrupt, syscall.SIGTERM)
 		go func() {
 			for range stopC {
 				log.Print("Caught signal. Exiting...")
-				internal.LogError(q.Stop())
+				internal.LogError(h.Stop())
 			}
 		}()
 
-		if err := q.Start(); err != nil {
+		if err := h.Start(); err != nil {
 			panic(err)
 		}
 	},

@@ -12,8 +12,6 @@ import (
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/internal"
 	"github.com/jeffrom/logd/protocol"
-	"github.com/jeffrom/logd/server"
-	"github.com/jeffrom/logd/transport"
 )
 
 // this file contains the core logic of the program. Commands come from the
@@ -25,67 +23,47 @@ var errInvalidFormat = stderrors.New("Invalid command format")
 
 const defaultTopic = "default"
 
-// EventQ manages the receiving, processing, and responding to events.
-type EventQ struct {
+// eventQ manages the receiving, processing, and responding to events.
+type eventQ struct {
 	conf         *config.Config
 	in           chan *protocol.Request
 	stopC        chan error
 	shutdownC    chan error
-	topics       *topics
+	topic        *topic
 	partArgBuf   *partitionArgList
 	batchScanner *protocol.BatchScanner
-	servers      []transport.Server
 	Stats        *internal.Stats
 	tmpBatch     *protocol.Batch
 }
 
-// NewEventQ creates a new instance of an EventQ
-func NewEventQ(conf *config.Config) *EventQ {
-	log.Printf("starting options: %+v", conf)
-
-	q := &EventQ{
+// newEventQ creates a new instance of an EventQ
+func newEventQ(conf *config.Config) *eventQ {
+	q := &eventQ{
 		conf:         conf,
 		Stats:        internal.NewStats(),
 		in:           make(chan *protocol.Request, 1000),
 		stopC:        make(chan error),
 		shutdownC:    make(chan error, 1),
-		topics:       newTopics(conf),
 		partArgBuf:   newPartitionArgList(conf), // partition arguments buffer
 		batchScanner: protocol.NewBatchScanner(conf, nil),
-		servers:      []transport.Server{},
 		tmpBatch:     protocol.NewBatch(conf),
-	}
-
-	if conf.Hostport != "" {
-		q.Register(server.NewSocket(conf.Hostport, conf))
 	}
 
 	return q
 }
 
-// Register adds a server to the event queue. The queue should be stopped when
-// Register is called.
-func (q *EventQ) Register(server transport.Server) {
-	server.SetQPusher(q)
-	q.servers = append(q.servers, server)
+func (q *eventQ) setTopic(t *topic) {
+	q.topic = t
 }
 
 // GoStart begins handling messages
-func (q *EventQ) GoStart() error {
-	if err := q.topics.Setup(); err != nil {
-		return err
-	}
-
+func (q *eventQ) GoStart() error {
 	go q.loop()
-
-	for _, server := range q.servers {
-		server.GoServe()
-	}
 	return nil
 }
 
 // Start begins handling messages, blocking until the application is closed
-func (q *EventQ) Start() error {
+func (q *eventQ) Start() error {
 	if err := q.GoStart(); err != nil {
 		return err
 	}
@@ -99,7 +77,7 @@ func (q *EventQ) Start() error {
 	return nil
 }
 
-func (q *EventQ) drainShutdownC() {
+func (q *eventQ) drainShutdownC() {
 	for {
 		select {
 		case <-q.shutdownC:
@@ -109,7 +87,7 @@ func (q *EventQ) drainShutdownC() {
 	}
 }
 
-func (q *EventQ) loop() { // nolint: gocyclo
+func (q *eventQ) loop() { // nolint: gocyclo
 	q.drainShutdownC()
 	defer func() {
 		q.shutdownC <- nil
@@ -153,27 +131,20 @@ func (q *EventQ) loop() { // nolint: gocyclo
 }
 
 // Stop halts the event queue
-func (q *EventQ) Stop() error {
+func (q *eventQ) Stop() error {
 	var err error
-	for _, server := range q.servers {
-		if serr := server.Stop(); serr != nil {
-			if err == nil {
-				err = serr
-			}
-			log.Printf("shutdown error: %+v", serr)
-		}
-	}
 
 	select {
 	case q.stopC <- err:
 	case <-time.After(500 * time.Millisecond):
 		log.Printf("event queue failed to stop properly")
+		return errors.New("shutdown failed")
 	}
 
 	return nil
 }
 
-func (q *EventQ) handleBatch(req *protocol.Request) (*protocol.Response, error) {
+func (q *eventQ) handleBatch(req *protocol.Request) (*protocol.Response, error) {
 	resp := protocol.NewResponse(q.conf)
 	q.tmpBatch.Reset()
 	batch, err := q.tmpBatch.FromRequest(req)
@@ -181,9 +152,9 @@ func (q *EventQ) handleBatch(req *protocol.Request) (*protocol.Response, error) 
 		return errResponse(q.conf, req, resp, err)
 	}
 
-	topic, err := q.topics.get(batch.Topic())
-	if err != nil {
-		return errResponse(q.conf, req, resp, err)
+	topic := q.topic
+	if topic == nil {
+		return errResponse(q.conf, req, resp, protocol.ErrNotFound)
 	}
 
 	// set next write partition if needed
@@ -215,16 +186,16 @@ func (q *EventQ) handleBatch(req *protocol.Request) (*protocol.Response, error) 
 	return resp, nil
 }
 
-func (q *EventQ) handleRead(req *protocol.Request) (*protocol.Response, error) {
+func (q *eventQ) handleRead(req *protocol.Request) (*protocol.Response, error) {
 	resp := protocol.NewResponse(q.conf)
 	readreq, err := protocol.NewRead(q.conf).FromRequest(req)
 	if err != nil {
 		return errResponse(q.conf, req, resp, err)
 	}
 
-	topic, err := q.topics.get(readreq.Topic())
-	if err != nil {
-		return errResponse(q.conf, req, resp, err)
+	topic := q.topic
+	if topic == nil {
+		return errResponse(q.conf, req, resp, protocol.ErrNotFound)
 	}
 
 	partArgs, err := q.gatherReadArgs(topic, readreq.Offset, readreq.Messages)
@@ -263,16 +234,16 @@ func (q *EventQ) handleRead(req *protocol.Request) (*protocol.Response, error) {
 	return resp, nil
 }
 
-func (q *EventQ) handleTail(req *protocol.Request) (*protocol.Response, error) {
+func (q *eventQ) handleTail(req *protocol.Request) (*protocol.Response, error) {
 	resp := protocol.NewResponse(q.conf)
 	tailreq, err := protocol.NewTail(q.conf).FromRequest(req)
 	if err != nil {
 		return errResponse(q.conf, req, resp, err)
 	}
 
-	topic, err := q.topics.get(tailreq.Topic())
-	if err != nil {
-		return errResponse(q.conf, req, resp, err)
+	topic := q.topic
+	if topic == nil {
+		return errResponse(q.conf, req, resp, protocol.ErrNotFound)
 	}
 
 	firstPart := topic.parts.parts[0]
@@ -308,7 +279,7 @@ func (q *EventQ) handleTail(req *protocol.Request) (*protocol.Response, error) {
 	return resp, nil
 }
 
-func (q *EventQ) handleStats(req *protocol.Request) (*protocol.Response, error) {
+func (q *eventQ) handleStats(req *protocol.Request) (*protocol.Response, error) {
 	resp := protocol.NewResponse(q.conf)
 	cr := protocol.NewClientMultiResponse(q.conf, q.Stats.Bytes())
 	_, err := req.WriteResponse(resp, cr)
@@ -318,7 +289,7 @@ func (q *EventQ) handleStats(req *protocol.Request) (*protocol.Response, error) 
 	return resp, nil
 }
 
-func (q *EventQ) handleClose(req *protocol.Request) (*protocol.Response, error) {
+func (q *eventQ) handleClose(req *protocol.Request) (*protocol.Response, error) {
 	resp := protocol.NewResponse(q.conf)
 	cr := protocol.NewClientOKResponse(q.conf)
 	_, err := req.WriteResponse(resp, cr)
@@ -328,7 +299,7 @@ func (q *EventQ) handleClose(req *protocol.Request) (*protocol.Response, error) 
 	return resp, nil
 }
 
-func (q *EventQ) gatherReadArgs(topic *topic, offset uint64, messages int) (*partitionArgList, error) {
+func (q *eventQ) gatherReadArgs(topic *topic, offset uint64, messages int) (*partitionArgList, error) {
 	soff, delta, err := topic.parts.lookup(offset)
 	// fmt.Printf("%v\ngatherReadArgs: offset: %d, partition: %d, delta: %d, err: %v\n", topic.parts, offset, soff, delta, err)
 	if err != nil {
@@ -385,20 +356,16 @@ Loop:
 }
 
 // handleShutdown handles a shutdown request
-func (q *EventQ) handleShutdown() error {
+func (q *eventQ) handleShutdown() error {
 	// check if shutdown command is allowed and wait to finish any outstanding
 	// work here
 	// TODO try all shutdowns or give up after the first error?
-
-	if err := q.topics.Shutdown(); err != nil {
-		return err
-	}
 	return nil
 }
 
 // PushRequest adds a request event to the queue, and waits for a response.
 // Called by server conn goroutines.
-func (q *EventQ) PushRequest(ctx context.Context, req *protocol.Request) (*protocol.Response, error) {
+func (q *eventQ) PushRequest(ctx context.Context, req *protocol.Request) (*protocol.Response, error) {
 	select {
 	case q.in <- req:
 	case <-ctx.Done():

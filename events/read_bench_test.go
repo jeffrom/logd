@@ -14,32 +14,32 @@ import (
 
 func BenchmarkReadHead(b *testing.B) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
-	q := NewEventQ(conf)
-	doStartQ(b, q)
-	defer doShutdownQ(b, q)
+	q := NewHandlers(conf)
+	doStartHandler(b, q)
+	defer doShutdownHandler(b, q)
 	offs := writeBatches(b, conf, q)
 	benchmarkRead(b, conf, q, offs[len(offs)-1:])
 }
 
 func BenchmarkReadTail(b *testing.B) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
-	q := NewEventQ(conf)
-	doStartQ(b, q)
-	defer doShutdownQ(b, q)
+	q := NewHandlers(conf)
+	doStartHandler(b, q)
+	defer doShutdownHandler(b, q)
 	offs := writeBatches(b, conf, q)
 	benchmarkRead(b, conf, q, offs[:1])
 }
 
 func BenchmarkReadAll(b *testing.B) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
-	q := NewEventQ(conf)
-	doStartQ(b, q)
-	defer doShutdownQ(b, q)
+	q := NewHandlers(conf)
+	doStartHandler(b, q)
+	defer doShutdownHandler(b, q)
 	offs := writeBatches(b, conf, q)
 	benchmarkRead(b, conf, q, offs)
 }
 
-func benchmarkRead(b *testing.B, conf *config.Config, q *EventQ, offs []uint64) {
+func benchmarkRead(b *testing.B, conf *config.Config, q *Handlers, offs []uint64) {
 	var bufs [][]byte
 	for _, off := range offs {
 		buf := []byte(fmt.Sprintf("READ default %d %d\r\n", off, 3))
@@ -74,7 +74,7 @@ func benchmarkRead(b *testing.B, conf *config.Config, q *EventQ, offs []uint64) 
 	}
 }
 
-func writeBatches(b testing.TB, conf *config.Config, q *EventQ) []uint64 {
+func writeBatches(b testing.TB, conf *config.Config, q *Handlers) []uint64 {
 	ctx := context.Background()
 	fixture := testhelper.LoadFixture("batch.small")
 	req := protocol.NewRequest(conf)

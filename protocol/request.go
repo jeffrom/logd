@@ -62,6 +62,17 @@ func (req *Request) FullSize() int {
 	return int(req.read)
 }
 
+// Topic returns the topic for the request, if any
+func (req *Request) Topic() string {
+	switch req.Name {
+	case CmdBatch:
+		return string(req.args[1])
+	case CmdRead, CmdTail:
+		return string(req.args[0])
+	}
+	return ""
+}
+
 func (req *Request) parseType() ([]byte, error) {
 	rest, word, err := parseWord(req.envelope)
 	req.Name = cmdNamefromBytes(word)

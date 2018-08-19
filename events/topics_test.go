@@ -12,9 +12,9 @@ import (
 
 func TestTopics(t *testing.T) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
-	q := NewEventQ(conf)
-	doStartQ(t, q)
-	defer doShutdownQ(t, q)
+	q := NewHandlers(conf)
+	doStartHandler(t, q)
+	defer doShutdownHandler(t, q)
 
 	names := []string{"cool", "sup", "oknice"}
 	msgs := [][]byte{[]byte("aaa"), []byte("bbb"), []byte("ccc")}

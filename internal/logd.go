@@ -78,6 +78,14 @@ func LogError(err error) {
 	}
 }
 
+// LogAndReturnError logs the error if one occurred, then returns the error
+func LogAndReturnError(err error) error {
+	if err != nil {
+		stdlog(os.Stderr, 2, "error logged and ignored: %+v", err)
+	}
+	return err
+}
+
 // IgnoreError logs the error if one occurred
 func IgnoreError(verbose bool, err error) {
 	if verbose && err != nil {

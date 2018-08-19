@@ -67,7 +67,7 @@ func TestStartup(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			writePartitionFiles(tc.conf, tc.topics)
-			q := NewEventQ(tc.conf)
+			q := newEventQ(tc.conf)
 			t.Logf("starting event queue with config: %+v", tc.conf)
 
 			err := q.GoStart()

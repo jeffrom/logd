@@ -24,11 +24,8 @@ func BenchmarkBatchFile(b *testing.B) {
 }
 
 func benchmarkBatch(b *testing.B, conf *config.Config, logw logger.LogWriter) {
-	q := NewEventQ(conf)
-	// if logw != nil {
-	// 	q.logw = logw
-	// }
-	if err := q.GoStart(); err != nil {
+	h := NewHandlers(conf)
+	if err := h.GoStart(); err != nil {
 		b.Fatalf("unexpected startup error: %+v", err)
 	}
 
@@ -43,9 +40,18 @@ func benchmarkBatch(b *testing.B, conf *config.Config, logw logger.LogWriter) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := q.PushRequest(ctx, req)
+		_, err := h.PushRequest(ctx, req)
 		if err != nil {
 			b.Fatalf("unexpected error writing batches: %+v", err)
 		}
+
+		// r, err := resp.ScanReader()
+		// if err != nil {
+		// 	b.Fatal(err)
+		// }
+		// cr := protocol.NewClientResponse(conf)
+		// if _, rerr := cr.ReadFrom(bufio.NewReader(r)); rerr != nil {
+		// 	b.Fatalf("unexpected error reading response: %+v", rerr)
+		// }
 	}
 }

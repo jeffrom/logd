@@ -48,11 +48,11 @@ func (t *topics) Setup() error {
 	}
 
 	for _, topic := range topics {
-		// fmt.Println("list", topic)
-		if _, ok := t.m[topic]; !ok {
-			if _, aerr := t.add(topic); aerr != nil {
-				return aerr
-			}
+		if topic == "default" {
+			continue
+		}
+		if _, aerr := t.add(topic); aerr != nil {
+			return aerr
 		}
 	}
 	// fmt.Println(t.m)
@@ -71,6 +71,7 @@ func (t *topics) Shutdown() error {
 			log.Printf("shutdown: %+v", err)
 		}
 	}
+	t.reset()
 	return firstErr
 }
 

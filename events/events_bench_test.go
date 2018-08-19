@@ -15,7 +15,7 @@ func init() {
 	log.SetOutput(ioutil.Discard)
 }
 
-func eventQBenchConfig() *config.Config {
+func eventHandlerBenchConfig() *config.Config {
 	config := config.New()
 	config.Timeout = 500 * time.Millisecond
 	config.ShutdownTimeout = 500 * time.Millisecond
@@ -28,28 +28,27 @@ func eventQBenchConfig() *config.Config {
 	return config
 }
 
-func startQForBench(b *testing.B) (*EventQ, func()) {
-	config := eventQBenchConfig()
+func startHandlerForBench(b *testing.B) (*Handlers, func()) {
+	config := eventHandlerBenchConfig()
 	config.LogFileMode = 0644
 	config.WorkDir = testhelper.TmpLog()
 
-	q := NewEventQ(config)
-	if err := q.GoStart(); err != nil {
+	h := NewHandlers(config)
+	if err := h.GoStart(); err != nil {
 		b.Logf("%s", debug.Stack())
 		b.Fatalf("error starting queue: %v", err)
 	}
-	return q, nil
+	return h, nil
 }
 
-func BenchmarkEventQLifecycle(b *testing.B) {
-	config := eventQBenchConfig()
+func BenchmarkLifecycle(b *testing.B) {
+	config := eventHandlerBenchConfig()
 	config.LogFileMode = 0644
 	config.WorkDir = testhelper.TmpLog()
 
 	for i := 0; i < b.N; i++ {
-		q := NewEventQ(config)
-		q.GoStart()
-		q.handleShutdown()
-		q.Stop()
+		h := NewHandlers(config)
+		h.GoStart()
+		h.Stop()
 	}
 }

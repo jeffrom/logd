@@ -211,7 +211,8 @@ func (p *Partitions) tmpPath(off uint64) string {
 func (p *Partitions) Shutdown() error {
 	if p.tempDir != "" {
 		// TODO log any remaining uncirculated files
-		return os.Remove(p.tempDir)
+		internal.Debugf(p.conf, "removing directory: %s", p.tempDir)
+		return os.RemoveAll(p.tempDir)
 	}
 	return nil
 }

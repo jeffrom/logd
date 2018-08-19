@@ -8,9 +8,9 @@ import (
 
 func TestShutdown(t *testing.T) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
-	q := NewEventQ(conf)
+	q := NewHandlers(conf)
 	for i := 0; i < 100; i++ {
-		doStartQ(t, q)
-		doShutdownQ(t, q)
+		doStartHandler(t, q)
+		doShutdownHandler(t, q)
 	}
 }

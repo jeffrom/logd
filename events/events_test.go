@@ -23,33 +23,33 @@ func init() {
 	flag.Parse()
 }
 
-func startQConfig(t testing.TB, conf *config.Config) *EventQ {
-	q := NewEventQ(conf)
+func startHandlerConfig(t testing.TB, conf *config.Config) *Handlers {
+	h := NewHandlers(conf)
 	t.Logf("starting event queue with config: %+v", conf)
-	if err := q.GoStart(); err != nil {
+	if err := h.GoStart(); err != nil {
 		t.Logf("%s", debug.Stack())
 		t.Fatalf("error starting queue: %+v", err)
 	}
-	return q
+	return h
 }
 
-func startQ(t *testing.T) *EventQ {
-	return startQConfig(t, testhelper.DefaultTestConfig(testing.Verbose()))
+func startHandler(t *testing.T) *Handlers {
+	return startHandlerConfig(t, testhelper.DefaultTestConfig(testing.Verbose()))
 }
 
-func stopQ(t testing.TB, q *EventQ) {
-	if err := q.Stop(); err != nil {
+func stopHandler(t testing.TB, h *Handlers) {
+	if err := h.Stop(); err != nil {
 		t.Logf("%s", debug.Stack())
 		t.Fatalf("error stopping queue: %+v", err)
 	}
 }
 
-func TestEventQStartStop(t *testing.T) {
-	q := startQ(t)
-	stopQ(t, q)
+func TestHandlerStartStop(t *testing.T) {
+	h := startHandler(t)
+	stopHandler(t, h)
 }
 
-func TestQFileLogger(t *testing.T) {
+func TestHandlerFileLogger(t *testing.T) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
 	conf.MaxBatchSize /= 20
 	conf.PartitionSize /= 20
@@ -58,15 +58,15 @@ func TestQFileLogger(t *testing.T) {
 	runs := conf.MaxBatchSize
 	for i := 0; i < runs; i++ {
 		conf.PartitionSize--
-		testQFileLogger(t, conf)
+		testHandlerFileLogger(t, conf)
 	}
 }
 
-func testQFileLogger(t *testing.T, conf *config.Config) {
+func testHandlerFileLogger(t *testing.T, conf *config.Config) {
 	t.Logf("testing with config: %+v", conf)
-	q := NewEventQ(conf)
-	doStartQ(t, q)
-	defer doShutdownQ(t, q)
+	h := NewHandlers(conf)
+	doStartHandler(t, h)
+	defer doShutdownHandler(t, h)
 
 	fixture := testhelper.LoadFixture("batch.small")
 	writesPerPartition := conf.PartitionSize / len(fixture)
@@ -79,18 +79,18 @@ func testQFileLogger(t *testing.T, conf *config.Config) {
 			offs = offs[writesPerPartition:]
 		}
 
-		cr := pushBatch(t, q, fixture)
+		cr := pushBatch(t, h, fixture)
 
-		checkBatch(t, q, fixture, cr.Offset(), 1)
-		checkReadMultipleBatches(t, q, fixture, offs)
+		checkBatch(t, h, fixture, cr.Offset(), 1)
+		checkReadMultipleBatches(t, h, fixture, offs)
 
-		testhelper.CheckError(q.Stop())
-		testhelper.CheckError(q.GoStart())
+		testhelper.CheckError(h.Stop())
+		testhelper.CheckError(h.GoStart())
 
-		cr = pushBatch(t, q, fixture)
+		cr = pushBatch(t, h, fixture)
 
-		checkBatch(t, q, fixture, cr.Offset(), 1)
-		checkReadMultipleBatches(t, q, fixture, offs)
+		checkBatch(t, h, fixture, cr.Offset(), 1)
+		checkReadMultipleBatches(t, h, fixture, offs)
 
 		offs = append(offs, cr.Offset())
 	}
@@ -100,8 +100,8 @@ func addReadRespEnvelope(off uint64, batches int, b []byte) []byte {
 	return append([]byte(fmt.Sprintf("OK %d %d\r\n", off, batches)), b...)
 }
 
-func checkBatch(t *testing.T, q *EventQ, fixture []byte, off uint64, batches int) {
-	respb := pushRead(t, q, off, 3)
+func checkBatch(t *testing.T, h *Handlers, fixture []byte, off uint64, batches int) {
+	respb := pushRead(t, h, off, 3)
 	expect := addReadRespEnvelope(off, batches, fixture)
 	if !bytes.Equal(respb, expect) {
 		log.Panicf("expected (%d):\n\t%q\nbut got\n\t%q", off, expect, respb)
@@ -109,7 +109,7 @@ func checkBatch(t *testing.T, q *EventQ, fixture []byte, off uint64, batches int
 	}
 }
 
-func checkReadMultipleBatches(t *testing.T, q *EventQ, fixture []byte, offs []uint64) {
+func checkReadMultipleBatches(t *testing.T, h *Handlers, fixture []byte, offs []uint64) {
 	if len(offs) <= 1 {
 		return
 	}
@@ -121,10 +121,10 @@ func checkReadMultipleBatches(t *testing.T, q *EventQ, fixture []byte, offs []ui
 
 		remainingMessages := (left * 3)
 		for j := 0; j < 3; j++ {
-			respb := pushRead(t, q, off, remainingMessages-j)
+			respb := pushRead(t, h, off, remainingMessages-j)
 			envelope := []byte(fmt.Sprintf("OK %d %d\r\n", off, (remainingMessages-j)/3))
 			if len(respb)-len(envelope) != len(fixture)*left {
-				t.Logf("failed attempt at READ('default', %d, %d), expected %d remaining batches. Log location: %s", off, remainingMessages, left, q.conf.WorkDir)
+				t.Logf("failed attempt at READ('default', %d, %d), expected %d remaining batches. Log location: %s", off, remainingMessages, left, h.conf.WorkDir)
 				log.Panicf("expected (%d):\n\t(%dx)%q\nbut got\n\t%q", off, left, fixture, respb)
 			}
 		}
@@ -133,17 +133,17 @@ func checkReadMultipleBatches(t *testing.T, q *EventQ, fixture []byte, offs []ui
 
 func TestPartitionRemoval(t *testing.T) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
-	q := NewEventQ(conf)
-	doStartQ(t, q)
-	defer doShutdownQ(t, q)
+	h := NewHandlers(conf)
+	doStartHandler(t, h)
+	defer doShutdownHandler(t, h)
 
-	topic, err := q.topics.get("default")
+	topic, err := h.topics.get("default")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	for i := 0; i < conf.MaxPartitions*3; i++ {
-		fillPartition(t, q)
+		fillPartition(t, h)
 		parts, err := topic.parts.logp.List()
 		if err != nil {
 			t.Fatalf("unexpected failure listing partitions: %+v", err)
@@ -160,34 +160,34 @@ func TestPartitionRemoval(t *testing.T) {
 
 func TestReadNotFound(t *testing.T) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
-	q := NewEventQ(conf)
-	doStartQ(t, q)
-	defer doShutdownQ(t, q)
+	h := NewHandlers(conf)
+	doStartHandler(t, h)
+	defer doShutdownHandler(t, h)
 
 	for i := 0; i < conf.MaxPartitions*3; i++ {
-		offs := fillPartition(t, q)
+		offs := fillPartition(t, h)
 		for _, off := range offs {
 			if off > 0 {
-				checkNotFound(t, conf, pushRead(t, q, off-1, 3))
+				checkNotFound(t, conf, pushRead(t, h, off-1, 3))
 			}
 			if off > 10 {
-				checkNotFound(t, conf, pushRead(t, q, off-9, 3))
+				checkNotFound(t, conf, pushRead(t, h, off-9, 3))
 			}
-			checkNotFound(t, conf, pushRead(t, q, off+1, 3))
-			checkNotFound(t, conf, pushRead(t, q, off+10, 3))
-			checkNotFound(t, conf, pushRead(t, q, off+100, 3))
+			checkNotFound(t, conf, pushRead(t, h, off+1, 3))
+			checkNotFound(t, conf, pushRead(t, h, off+10, 3))
+			checkNotFound(t, conf, pushRead(t, h, off+100, 3))
 		}
 	}
 }
 
 func TestUnknownCommand(t *testing.T) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
-	q := NewEventQ(conf)
-	doStartQ(t, q)
-	defer doShutdownQ(t, q)
+	h := NewHandlers(conf)
+	doStartHandler(t, h)
+	defer doShutdownHandler(t, h)
 
 	req := protocol.NewRequest(conf)
-	resp, err := q.PushRequest(context.Background(), req)
+	resp, err := h.PushRequest(context.Background(), req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,60 +275,60 @@ func checkReadResp(t testing.TB, conf *config.Config, resp *protocol.Response) [
 	return b.Bytes()
 }
 
-func doStartQ(b testing.TB, q *EventQ) {
-	dir, _ := filepath.Split(q.conf.WorkDir)
+func doStartHandler(b testing.TB, h *Handlers) {
+	dir, _ := filepath.Split(h.conf.WorkDir)
 	log.Printf("starting log dir: %s", dir)
-	if err := q.GoStart(); err != nil {
+	if err := h.GoStart(); err != nil {
 		b.Fatalf("unexpected error starting event queue: %+v", err)
 	}
 }
 
-func doShutdownQ(t testing.TB, q *EventQ) {
+func doShutdownHandler(t testing.TB, h *Handlers) {
 	if t.Failed() {
-		t.Logf("failed: not removing files in %s", q.conf.WorkDir)
+		t.Logf("failed: not removing files in %s", h.conf.WorkDir)
 		return
 	}
-	if err := q.Stop(); err != nil {
+	if err := h.Stop(); err != nil {
 		t.Fatalf("unexpected error shutting down: %+v", err)
 	}
 }
 
-// writes a partition worth of batch requests into the q
-func fillPartition(t testing.TB, q *EventQ) []uint64 {
+// writes a partition worth of batch requests into the h
+func fillPartition(t testing.TB, h *Handlers) []uint64 {
 	var offs []uint64
 	fixture := testhelper.LoadFixture("batch.small")
 	n := 0
-	for n+len(fixture) < q.conf.PartitionSize {
-		cr := pushBatch(t, q, fixture)
+	for n+len(fixture) < h.conf.PartitionSize {
+		cr := pushBatch(t, h, fixture)
 		offs = append(offs, cr.Offset())
 		n += len(fixture)
 	}
 	return offs
 }
 
-func pushBatch(t testing.TB, q *EventQ, fixture []byte) *protocol.ClientResponse {
+func pushBatch(t testing.TB, h *Handlers, fixture []byte) *protocol.ClientResponse {
 	ctx := context.Background()
-	req := newRequest(t, q.conf, fixture)
-	resp, err := q.PushRequest(ctx, req)
+	req := newRequest(t, h.conf, fixture)
+	resp, err := h.PushRequest(ctx, req)
 	if err != nil {
 		t.Fatalf("%+v", err)
 	}
-	return checkBatchResp(t, q.conf, resp)
+	return checkBatchResp(t, h.conf, resp)
 }
 
-func pushReadTopic(t testing.TB, q *EventQ, topic string, off uint64, limit int) []byte {
+func pushReadTopic(t testing.TB, h *Handlers, topic string, off uint64, limit int) []byte {
 	ctx := context.Background()
 	fixture := []byte(fmt.Sprintf("READ %s %d %d\r\n", topic, off, limit))
-	req := newRequest(t, q.conf, fixture)
-	resp, err := q.PushRequest(ctx, req)
+	req := newRequest(t, h.conf, fixture)
+	resp, err := h.PushRequest(ctx, req)
 	if err != nil {
 		t.Fatalf("%+v", err)
 	}
-	return checkReadResp(t, q.conf, resp)
+	return checkReadResp(t, h.conf, resp)
 }
 
-func pushRead(t testing.TB, q *EventQ, off uint64, limit int) []byte {
-	return pushReadTopic(t, q, "default", off, limit)
+func pushRead(t testing.TB, h *Handlers, off uint64, limit int) []byte {
+	return pushReadTopic(t, h, "default", off, limit)
 }
 
 func partitionIterations(conf *config.Config, fixtureLen int) (int, int) {

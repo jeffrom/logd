@@ -18,14 +18,14 @@ func TestMockServer(t *testing.T) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
 	q, _, shutdown := newMockServerQ(t, conf)
 
-	doStartQ(t, q)
+	doStartHandler(t, q)
 	shutdown()
 }
 
 func TestMockServerClose(t *testing.T) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
 	q, s, shutdown := newMockServerQ(t, conf)
-	doStartQ(t, q)
+	doStartHandler(t, q)
 	defer shutdown()
 	cconf := client.DefaultTestConfig(testing.Verbose())
 	_, clientShutdown := newMockServerClient(t, cconf, s)
@@ -35,7 +35,7 @@ func TestMockServerClose(t *testing.T) {
 func TestMockServerBatchAndRead(t *testing.T) {
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
 	q, s, shutdown := newMockServerQ(t, conf)
-	doStartQ(t, q)
+	doStartHandler(t, q)
 	defer shutdown()
 	cconf := client.DefaultTestConfig(testing.Verbose())
 	client, clientShutdown := newMockServerClient(t, cconf, s)
@@ -80,12 +80,12 @@ func TestMockServerBatchAndRead(t *testing.T) {
 	// 	}
 }
 
-func newMockServerQ(t testing.TB, conf *config.Config) (*EventQ, *server.MockSocket, func()) {
-	q := NewEventQ(conf)
+func newMockServerQ(t testing.TB, conf *config.Config) (*Handlers, *server.MockSocket, func()) {
+	h := NewHandlers(conf)
 	s := server.NewMockSocket(conf)
-	q.Register(s)
-	return q, s, func() {
-		if err := q.Stop(); err != nil {
+	h.Register(s)
+	return h, s, func() {
+		if err := h.Stop(); err != nil {
 			t.Fatal(err)
 		}
 	}

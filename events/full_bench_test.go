@@ -14,7 +14,7 @@ func BenchmarkBatchFull(b *testing.B) {
 	b.SetParallelism(4)
 	conf := testhelper.DefaultTestConfig(testing.Verbose())
 	conf.Hostport = ":0"
-	q := NewEventQ(conf)
+	q := NewHandlers(conf)
 	if err := q.GoStart(); err != nil {
 		b.Fatal(err)
 	}
