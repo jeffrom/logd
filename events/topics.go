@@ -77,7 +77,7 @@ func (t *topics) Shutdown() error {
 func (t *topics) add(name string) (*topic, error) {
 	topic, ok := t.m[name]
 	if !ok {
-		log.Printf("creating topic: %s", name)
+		log.Printf("initializing topic: %s", name)
 		if err := t.manager.Create(name); err != nil {
 			return nil, err
 		}

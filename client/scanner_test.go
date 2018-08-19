@@ -1,12 +1,14 @@
 package client
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
 	"log"
 	"testing"
 
+	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/protocol"
 	"github.com/jeffrom/logd/testhelper"
 )
@@ -127,7 +129,6 @@ func TestScannerLimit(t *testing.T) {
 }
 
 func TestScannerReadForever(t *testing.T) {
-	// t.SkipNow()
 	nbatches := 5
 	conf := DefaultTestConfig(testing.Verbose())
 	conf.Offset = 0
@@ -203,5 +204,121 @@ func TestScannerReadForever(t *testing.T) {
 
 	if err := s.Error(); err != protocol.ErrNotFound {
 		t.Fatalf("expected error %v but got %+v", protocol.ErrNotFound, err)
+	}
+}
+
+func TestScannerState(t *testing.T) {
+	conf := DefaultTestConfig(testing.Verbose())
+	conf.Offset = 0
+	conf.Limit = 3
+	conf.UseTail = true
+	gconf := conf.ToGeneralConfig()
+	fixture := testhelper.LoadFixture("batch.small")
+	server, clientConn := testhelper.Pipe()
+	defer server.Close()
+	c := New(conf).SetConn(clientConn)
+	sm := NewMemoryStatePuller(conf)
+	s := ScannerForClient(c).WithStatePuller(sm)
+	defer s.Close()
+	defer expectServerClose(t, gconf, server)
+	s.SetTopic("default")
+
+	// ensure state is initialized
+	if err := s.Complete(); err != nil {
+		t.Fatal(err)
+	}
+
+	var offset uint64
+
+	for i := 0; i < 10; i++ {
+		server.Expect(okCallback(gconf, fixture, offset))
+		mustScan(t, s, "hi")
+		mustComplete(t, s)
+		mustScan(t, s, "hallo")
+		mustScan(t, s, "sup")
+		s.Reset()
+
+		server.Expect(okCallback(gconf, fixture, offset))
+		mustScan(t, s, "hallo")
+		mustComplete(t, s)
+		mustScan(t, s, "sup")
+		s.Reset()
+
+		server.Expect(okCallback(gconf, fixture, offset))
+		mustScan(t, s, "sup")
+		mustComplete(t, s)
+		s.Reset()
+		offset += uint64(len(fixture))
+	}
+}
+
+func TestScannerUseTail(t *testing.T) {
+	conf := DefaultTestConfig(testing.Verbose())
+	conf.Offset = 0
+	conf.Limit = 3
+	conf.UseTail = true
+	gconf := conf.ToGeneralConfig()
+	fixture := testhelper.LoadFixture("batch.small")
+	server, clientConn := testhelper.Pipe()
+	defer server.Close()
+	c := New(conf).SetConn(clientConn)
+	s := ScannerForClient(c)
+	defer s.Close()
+	defer expectServerClose(t, gconf, server)
+	s.SetTopic("default")
+
+	server.Expect(func(p []byte) io.WriterTo {
+		req := protocol.NewRequest(gconf)
+		if _, err := req.ReadFrom(bufio.NewReader(bytes.NewReader(p))); err != nil {
+			panic(err)
+		}
+		_, err := protocol.NewTail(gconf).FromRequest(req)
+		if err != nil {
+			panic(err)
+		}
+
+		resp := readOKResponse(gconf, 123, 1, fixture)
+		return resp
+	})
+
+	if !s.Scan() {
+		t.Fatal(s.Error())
+	}
+}
+
+func mustScan(t *testing.T, s *Scanner, expected string) {
+	if !s.Scan() {
+		t.Fatal("failed to scan:", s.Error())
+	}
+	// t.Logf("read: %q (expected: %q)", s.Message().BodyBytes(), expected)
+
+	if !bytes.Equal([]byte(expected), s.Message().BodyBytes()) {
+		t.Fatalf("expected:\n\n\t%q\n\nbut got:\n\n\t%q", expected, s.Message().BodyBytes())
+	}
+}
+
+func mustComplete(t *testing.T, s *Scanner) {
+	if err := s.Complete(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func okCallback(conf *config.Config, fixture []byte, off uint64) func([]byte) io.WriterTo {
+	return func(p []byte) io.WriterTo {
+		req := protocol.NewRequest(conf)
+		if _, err := req.ReadFrom(bufio.NewReader(bytes.NewReader(p))); err != nil {
+			panic(err)
+		}
+		readreq, err := protocol.NewRead(conf).FromRequest(req)
+		if err != nil {
+			panic(err)
+		}
+
+		if readreq.Offset != off {
+			log.Panicf("expected offset %d but got %d", off, readreq.Offset)
+		}
+
+		resp := readOKResponse(conf, readreq.Offset, 1, fixture)
+		return resp
 	}
 }

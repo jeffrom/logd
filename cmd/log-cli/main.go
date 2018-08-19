@@ -264,9 +264,6 @@ func doWrite(conf *client.Config, c *cobra.Command, args []string) error {
 
 func doRead(conf *client.Config, c *cobra.Command) error {
 	conf.UseTail = !c.PersistentFlags().Lookup("offset").Changed
-	// if conf.ReadForever {
-	// 	conf.Limit = 1000
-	// }
 	done := make(chan struct{})
 	handleKills(done)
 

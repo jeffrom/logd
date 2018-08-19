@@ -29,6 +29,7 @@ type Scanner struct {
 	nbatches          int
 	messagesRead      int
 	totalMessagesRead int
+	statem            StatePuller
 	curr              uint64
 	err               error
 	done              chan struct{}
@@ -71,19 +72,28 @@ func DialScanner(addr string) (*Scanner, error) {
 // Reset sets the scanner to it's initial values so it can be reused.
 func (s *Scanner) Reset() {
 	s.msg.Reset()
-	s.curr = s.conf.Offset
+	s.curr = 0
 	s.messagesRead = 0
 	s.totalMessagesRead = 0
+	s.batch.Reset()
 	s.batchBuf.Reset()
 	s.batchBufBr = bufio.NewReader(s.batchBuf)
+	s.msg.Reset()
 	s.batchRead = 0
 	s.batchesRead = 0
 	s.nbatches = 0
+	s.s = nil
 
 	select {
 	case <-s.done:
 	default:
 	}
+}
+
+// WithSetStatePuller sets the StatePuller on the Scanner
+func (s *Scanner) WithStatePuller(statem StatePuller) *Scanner {
+	s.statem = statem
+	return s
 }
 
 // SetTopic sets the topic for the scanner.
@@ -103,68 +113,133 @@ func (s *Scanner) Scan() bool {
 	}
 
 	if s.s == nil { // initial state
-		var bs *protocol.BatchScanner
-		var err error
-		var nbatches int
-		if s.conf.UseTail {
-			s.curr, nbatches, bs, err = s.Client.Tail(s.topic, s.conf.Limit)
-		} else {
-			// TODO test that s.conf.Offset is respected
-			s.curr = s.conf.Offset
+		if err := s.doInitialRead(); err != nil {
+			return s.scanErr(err)
+		}
+	} else if err := s.scanNextBatch(); err != nil {
+		return s.scanErr(err)
+	}
+
+	// read the next message in the batch
+	if err := s.readMessage(); err != nil {
+		return s.scanErr(err)
+	}
+	return true
+}
+
+// Complete marks the current message processing completed. It will panic if no
+// StatePuller exists on the scanner. It will pass the error back from the
+// StatePuller.
+func (s *Scanner) Complete() error {
+	off := s.curr
+	delta := s.batchRead
+	if s.batch != nil && uint64(s.batchRead) >= s.batch.Size {
+		fullsize, _ := s.batch.FullSize()
+		off = s.curr + uint64(fullsize)
+		delta = 0
+	}
+	internal.Debugf(s.gconf, "completing to offset %d, delta %d", off, delta)
+	return s.statem.Complete(off, uint64(delta))
+}
+
+func (s *Scanner) readMessage() error {
+	s.msg.Reset()
+	n, err := s.msg.ReadFrom(s.batchBufBr)
+	if err != nil {
+		return err
+	}
+	s.batchRead += int(n)
+	s.messagesRead++
+	s.totalMessagesRead++
+	return err
+}
+
+func (s *Scanner) doInitialRead() error {
+	var bs *protocol.BatchScanner
+	var err error
+	var nbatches int
+	var hasState bool
+	var delta uint64
+
+	if s.statem != nil {
+		_, _, err := s.statem.Get()
+		if err == nil {
+			hasState = true
+		}
+	}
+
+	if s.conf.UseTail { // offset was not explicitly set
+		if hasState {
+			off, delt, err := s.statem.Get()
+			delta = delt
+			if err != nil {
+				return err
+			}
+			s.curr = off
+			internal.Debugf(s.gconf, "starting from previous state: offset %d, delta %d", off, delta)
 			nbatches, bs, err = s.Client.ReadOffset(s.topic, s.curr, s.conf.Limit)
+			if err != nil {
+				return err
+			}
+		} else {
+			s.curr, nbatches, bs, err = s.Client.Tail(s.topic, s.conf.Limit)
 		}
-		if err != nil {
-			return s.scanErr(err)
-		}
-		s.s = bs
-		s.nbatches = nbatches
-		internal.Debugf(s.gconf, "started reading from %d", s.curr)
+	} else {
+		s.curr = s.conf.Offset
+		nbatches, bs, err = s.Client.ReadOffset(s.topic, s.curr, s.conf.Limit)
+	}
+	if err != nil {
+		return err
+	}
 
-		if !s.s.Scan() {
-			return s.scanErr(s.s.Error())
-		}
+	s.s = bs
+	s.nbatches = nbatches
+	internal.Debugf(s.gconf, "started reading from %d", s.curr)
+	if !s.s.Scan() {
+		return s.s.Error()
+	}
 
-		if err := s.setNextBatch(); err != nil {
-			return s.scanErr(err)
+	if err := s.setNextBatch(); err != nil {
+		return err
+	}
+
+	for uint64(s.batchRead) < delta {
+		if err := s.readMessage(); err != nil {
+			return err
 		}
-	} else if s.messagesRead >= s.batch.Messages {
+	}
+	return err
+}
+
+func (s *Scanner) scanNextBatch() error {
+	if s.messagesRead >= s.batch.Messages || s.batchRead >= int(s.batch.Size) {
 		if !s.conf.ReadForever && s.totalMessagesRead >= s.conf.Limit {
-			return s.scanErr(nil)
+			return nil
 		}
 
 		if s.batchesRead >= s.nbatches {
 			if err := s.requestMoreBatches(false); err == protocol.ErrNotFound {
 				if perr := s.pollBatch(); perr != nil {
-					return s.scanErr(perr)
+					return perr
 				}
 			} else if err != nil {
-				return s.scanErr(err)
+				return err
 			}
 		}
 
-		ok := s.s.Scan()
-		if !ok {
+		if !s.s.Scan() {
 			err := s.s.Error()
 			if err != nil && err != io.EOF {
-				return s.scanErr(err)
+				return err
 			}
 		}
 
 		if err := s.setNextBatch(); err != nil {
-			return s.scanErr(err)
+			return err
 		}
 	}
 
-	// read the next message in the batch
-	s.msg.Reset()
-	n, err := s.msg.ReadFrom(s.batchBufBr)
-	s.batchRead += int(n)
-	if err != nil {
-		return s.scanErr(err)
-	}
-	s.messagesRead++
-	s.totalMessagesRead++
-	return true
+	return nil
 }
 
 // Stop causes the scanner to stop making requests and returns ErrStopped
@@ -236,4 +311,12 @@ func (s *Scanner) Message() *protocol.Message {
 
 func (s *Scanner) Error() error {
 	return s.err
+}
+
+func (s *Scanner) Close() error {
+	internal.LogError(s.Client.Close())
+	if m, ok := s.statem.(internal.LifecycleManager); ok {
+		internal.LogError(m.Shutdown())
+	}
+	return nil
 }

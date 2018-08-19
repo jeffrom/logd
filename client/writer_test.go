@@ -44,7 +44,6 @@ func TestWriter(t *testing.T) {
 }
 
 func TestWriterConcurrent(t *testing.T) {
-	// t.SkipNow()
 	conf := DefaultTestConfig(testing.Verbose())
 	conf.BatchSize = 1024 * 1024
 	gconf := conf.ToGeneralConfig()
