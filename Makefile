@@ -147,7 +147,7 @@ test.report:
 
 .PHONY: test.report.summary
 test.report.summary:
-	echo -n "total: "; go tool cover -func=integration_test/out/all.cov.out | tail -n 1 | sed -e 's/\((statements)\|total:\)//g' | tr -s "[:space:]"
+	echo -n "total: "; go tool cover -func=cov.out | tail -n 1 | sed -e 's/\((statements)\|total:\)//g' | tr -s "[:space:]"
 
 .PHONY: test.report.html
 test.report.html:
