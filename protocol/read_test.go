@@ -8,7 +8,7 @@ import (
 )
 
 func TestWriteRead(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	read := NewRead(conf)
 	read.Offset = 1234567
 	read.Messages = 100

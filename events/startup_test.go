@@ -27,7 +27,7 @@ func TestStartup(t *testing.T) {
 	fixture := testhelper.LoadFixture("batch.small")
 	var testCases = map[string]startupTestCase{
 		"valid": {
-			conf: testhelper.DefaultTestConfig(testing.Verbose()),
+			conf: testhelper.DefaultConfig(testing.Verbose()),
 			topics: startupTCTopics{
 				"default": startupTCParts{0: fixture},
 			},
@@ -36,7 +36,7 @@ func TestStartup(t *testing.T) {
 			},
 		},
 		"empty": {
-			conf: testhelper.DefaultTestConfig(testing.Verbose()),
+			conf: testhelper.DefaultConfig(testing.Verbose()),
 			topics: startupTCTopics{
 				"default": startupTCParts{0: []byte{}},
 			},
@@ -45,7 +45,7 @@ func TestStartup(t *testing.T) {
 			},
 		},
 		"trailing zero": {
-			conf: testhelper.DefaultTestConfig(testing.Verbose()),
+			conf: testhelper.DefaultConfig(testing.Verbose()),
 			topics: startupTCTopics{
 				"default": startupTCParts{0: append(fixture, '0')},
 			},
@@ -54,7 +54,7 @@ func TestStartup(t *testing.T) {
 			},
 		},
 		"leading zero": {
-			conf: testhelper.DefaultTestConfig(testing.Verbose()),
+			conf: testhelper.DefaultConfig(testing.Verbose()),
 			topics: startupTCTopics{
 				"default": startupTCParts{0: append([]byte{0}, fixture...)},
 			},

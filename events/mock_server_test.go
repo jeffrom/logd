@@ -15,7 +15,7 @@ import (
 )
 
 func TestMockServer(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	q, _, shutdown := newMockServerQ(t, conf)
 
 	doStartHandler(t, q)
@@ -23,7 +23,7 @@ func TestMockServer(t *testing.T) {
 }
 
 func TestMockServerClose(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	q, s, shutdown := newMockServerQ(t, conf)
 	doStartHandler(t, q)
 	defer shutdown()
@@ -33,7 +33,7 @@ func TestMockServerClose(t *testing.T) {
 }
 
 func TestMockServerBatchAndRead(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	q, s, shutdown := newMockServerQ(t, conf)
 	doStartHandler(t, q)
 	defer shutdown()

@@ -34,7 +34,7 @@ func startHandlerConfig(t testing.TB, conf *config.Config) *Handlers {
 }
 
 func startHandler(t *testing.T) *Handlers {
-	return startHandlerConfig(t, testhelper.DefaultTestConfig(testing.Verbose()))
+	return startHandlerConfig(t, testhelper.DefaultConfig(testing.Verbose()))
 }
 
 func stopHandler(t testing.TB, h *Handlers) {
@@ -50,7 +50,7 @@ func TestHandlerStartStop(t *testing.T) {
 }
 
 func TestHandlerFileLogger(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	conf.MaxBatchSize /= 20
 	conf.PartitionSize /= 20
 
@@ -132,7 +132,7 @@ func checkReadMultipleBatches(t *testing.T, h *Handlers, fixture []byte, offs []
 }
 
 func TestPartitionRemoval(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	h := NewHandlers(conf)
 	doStartHandler(t, h)
 	defer doShutdownHandler(t, h)
@@ -159,7 +159,7 @@ func TestPartitionRemoval(t *testing.T) {
 }
 
 func TestReadNotFound(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	h := NewHandlers(conf)
 	doStartHandler(t, h)
 	defer doShutdownHandler(t, h)
@@ -181,7 +181,7 @@ func TestReadNotFound(t *testing.T) {
 }
 
 func TestUnknownCommand(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	h := NewHandlers(conf)
 	doStartHandler(t, h)
 	defer doShutdownHandler(t, h)

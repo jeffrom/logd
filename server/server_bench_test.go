@@ -20,7 +20,7 @@ func init() {
 func BenchmarkClientBatch(b *testing.B) {
 	b.SetParallelism(4)
 
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	srv := NewTestServer(conf)
 	rh := transport.NewMockRequestHandler(conf)
 	srv.SetQPusher(rh)

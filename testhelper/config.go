@@ -16,7 +16,7 @@ func init() {
 	}
 }
 
-func DefaultTestConfig(verbose bool) *config.Config {
+func DefaultConfig(verbose bool) *config.Config {
 	if verbose {
 		log.SetOutput(os.Stdout)
 	}

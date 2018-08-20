@@ -10,7 +10,7 @@ import (
 )
 
 func TestCloseRequest(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	req := NewRequest(conf)
 	cr := NewCloseRequest(conf)
 	fixture := []byte("CLOSE\r\n")
@@ -46,7 +46,7 @@ var invalidCloseRequests = map[string][]byte{
 }
 
 func TestCloseRequestInvalid(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	cr := NewCloseRequest(conf)
 
 	for name, b := range invalidCloseRequests {
@@ -63,7 +63,7 @@ func TestCloseRequestInvalid(t *testing.T) {
 }
 
 func TestCloseRequestWriteErrors(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	cr := NewCloseRequest(conf)
 	fixture := []byte("CLOSE\r\n")
 

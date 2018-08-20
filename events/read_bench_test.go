@@ -13,7 +13,7 @@ import (
 )
 
 func BenchmarkReadHead(b *testing.B) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	q := NewHandlers(conf)
 	doStartHandler(b, q)
 	defer doShutdownHandler(b, q)
@@ -22,7 +22,7 @@ func BenchmarkReadHead(b *testing.B) {
 }
 
 func BenchmarkReadTail(b *testing.B) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	q := NewHandlers(conf)
 	doStartHandler(b, q)
 	defer doShutdownHandler(b, q)
@@ -31,7 +31,7 @@ func BenchmarkReadTail(b *testing.B) {
 }
 
 func BenchmarkReadAll(b *testing.B) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	q := NewHandlers(conf)
 	doStartHandler(b, q)
 	defer doShutdownHandler(b, q)

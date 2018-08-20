@@ -14,19 +14,19 @@ import (
 )
 
 func TestWriteBatch(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	testWriteBatch(t, conf, "batch.small", []string{
 		"hi", "hallo", "sup",
 	})
 }
 
 func TestWriteBatchSmallest(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	testWriteBatch(t, conf, "batch.smallest", []string{"0"})
 }
 
 func TestWriteBatchMedium(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	fixture := testhelper.LoadFixture("batch.medium")
 	if conf.MaxBatchSize < len(fixture) {
 		conf.MaxBatchSize = len(fixture) * 2
@@ -40,7 +40,7 @@ func TestWriteBatchMedium(t *testing.T) {
 }
 
 func TestWriteBatchLarge(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	conf.MaxBatchSize = 1024 * 1024
 	conf.PartitionSize = 1024 * 1024 * 10
 
@@ -88,7 +88,7 @@ func testWriteBatch(t *testing.T, conf *config.Config, goldenFileName string, ar
 }
 
 func TestReadBatch(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	batch := NewBatch(conf)
 	testReadBatch(t, conf, "batch.small", batch)
 	batch.Reset()
@@ -96,12 +96,12 @@ func TestReadBatch(t *testing.T) {
 }
 
 func TestReadBatchSmallest(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	testRead(t, conf, "batch.smallest")
 }
 
 func TestReadBatchMedium(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	fixture := testhelper.LoadFixture("batch.medium")
 	if conf.MaxBatchSize < len(fixture) {
 		conf.MaxBatchSize = len(fixture) * 2
@@ -110,14 +110,14 @@ func TestReadBatchMedium(t *testing.T) {
 }
 
 func TestReadBatchLarge(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	conf.MaxBatchSize = 1024 * 1024
 	conf.PartitionSize = 1024 * 1024 * 10
 	testRead(t, conf, "batch.large")
 }
 
 func TestReadBatchTooLarge(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	conf.MaxBatchSize = 1024
 	fixture := testhelper.LoadFixture("batch.large")
 	batch := NewBatch(conf)
@@ -131,7 +131,7 @@ func TestReadBatchTooLarge(t *testing.T) {
 }
 
 func TestScanBatches(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	data := testhelper.LoadFixture("batch.small")
 	fixture := []byte{}
 
@@ -178,7 +178,7 @@ func TestScanBatches(t *testing.T) {
 }
 
 func TestBatchWriteErrors(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	batch := NewBatch(conf)
 	fixture := testhelper.LoadFixture("batch.small")
 
@@ -211,7 +211,7 @@ func TestBatchWriteErrors(t *testing.T) {
 }
 
 func TestBatchReadErrors(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	batch := NewBatch(conf)
 	fixture := testhelper.LoadFixture("batch.small")
 	r := testhelper.NewFailingReader(fixture)
@@ -265,7 +265,7 @@ var invalidBatches = map[string][]byte{
 }
 
 func TestBatchInvalid(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	batch := NewBatch(conf)
 
 	for name, b := range invalidBatches {
@@ -289,7 +289,7 @@ func TestBatchInvalid(t *testing.T) {
 }
 
 func TestBatchWriteTooLarge(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	conf.MaxBatchSize = 10
 	batch := NewBatch(conf)
 	batch.Append([]byte("AAAAAAAAAAAA"))
@@ -301,7 +301,7 @@ func TestBatchWriteTooLarge(t *testing.T) {
 }
 
 func TestBatchReadTooLarge(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	batch := NewBatch(conf)
 	fixture := testhelper.LoadFixture("batch.small")
 

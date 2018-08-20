@@ -14,14 +14,14 @@ import (
 
 func BenchmarkBatchFull(b *testing.B) {
 	b.SetParallelism(4)
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	conf.Hostport = ":0"
 	benchmarkBatchFull(b, conf, "batch.small", []string{"default"})
 }
 
 func BenchmarkBatchFullLarge(b *testing.B) {
 	b.SetParallelism(4)
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	conf.Hostport = ":0"
 	conf.MaxBatchSize = 1024 * 64
 	conf.PartitionSize = 1024 * 1024
@@ -51,7 +51,7 @@ func BenchmarkBatchFullLarge(b *testing.B) {
 
 func BenchmarkBatchFullTopics8(b *testing.B) {
 	b.SetParallelism(2)
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	conf.Hostport = ":0"
 	benchmarkBatchFull(b, conf, "batch.small", []string{
 		"default", "topic1", "topic2", "topic3",
