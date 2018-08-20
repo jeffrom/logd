@@ -9,7 +9,7 @@ import (
 const defaultTopic = "default"
 
 func TestWrite(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	logw := NewWriter(conf, defaultTopic)
 	fixture := testhelper.LoadFixture("batch.small")
 

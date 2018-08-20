@@ -57,6 +57,12 @@ func init() {
 
 	pflags.IntVar(&tmpConfig.MaxPartitions, "partitions", config.Default.MaxPartitions, "maximum number of partitions per topic")
 	viper.BindPFlag("partitions", pflags.Lookup("partitions"))
+
+	pflags.IntVar(&tmpConfig.FlushBatches, "flush-batches", config.Default.FlushBatches, "number of batches to write before flushing")
+	viper.BindPFlag("flush-batches", pflags.Lookup("flush-batches"))
+
+	pflags.DurationVar(&tmpConfig.FlushInterval, "flush-interval", config.Default.FlushInterval, "amount of time to wait before flushing")
+	viper.BindPFlag("flush-interval", pflags.Lookup("flush-interval"))
 }
 
 func initConfig() {

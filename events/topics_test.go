@@ -11,7 +11,7 @@ import (
 )
 
 func TestTopics(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	q := NewHandlers(conf)
 	doStartHandler(t, q)
 	defer doShutdownHandler(t, q)

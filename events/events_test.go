@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime/debug"
 	"testing"
+	"time"
 
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/protocol"
@@ -34,7 +35,7 @@ func startHandlerConfig(t testing.TB, conf *config.Config) *Handlers {
 }
 
 func startHandler(t *testing.T) *Handlers {
-	return startHandlerConfig(t, testhelper.DefaultTestConfig(testing.Verbose()))
+	return startHandlerConfig(t, testhelper.DefaultConfig(testing.Verbose()))
 }
 
 func stopHandler(t testing.TB, h *Handlers) {
@@ -49,16 +50,60 @@ func TestHandlerStartStop(t *testing.T) {
 	stopHandler(t, h)
 }
 
-func TestHandlerFileLogger(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
-	conf.MaxBatchSize /= 20
-	conf.PartitionSize /= 20
+type testConfigs map[string]*config.Config
 
-	// goal is to test every rotation case
-	runs := conf.MaxBatchSize
-	for i := 0; i < runs; i++ {
-		conf.PartitionSize--
-		testHandlerFileLogger(t, conf)
+func (tc testConfigs) forEach(cb func(*config.Config) *config.Config) testConfigs {
+	for name, conf := range tc {
+		tc[name] = cb(conf)
+	}
+	return tc
+}
+
+func buildTestConfigs() testConfigs {
+	confs := make(testConfigs)
+
+	c := testhelper.DefaultConfig(testing.Verbose())
+	confs["default"] = c
+
+	if testing.Short() {
+		return confs
+	}
+
+	c = testhelper.DefaultConfig(testing.Verbose())
+	c.FlushBatches = 1
+	confs["batch sync"] = c
+
+	c = testhelper.DefaultConfig(testing.Verbose())
+	c.FlushInterval = 1 * time.Millisecond
+	confs["interval sync"] = c
+
+	c = testhelper.DefaultConfig(testing.Verbose())
+	c.FlushBatches = 100
+	confs["batch sync 100"] = c
+
+	c = testhelper.DefaultConfig(testing.Verbose())
+	c.FlushInterval = 500 * time.Millisecond
+	confs["interval sync 500ms"] = c
+
+	return confs
+}
+
+func TestHandlerFileLogger(t *testing.T) {
+	confs := buildTestConfigs().forEach(func(conf *config.Config) *config.Config {
+		conf.MaxBatchSize /= 20
+		conf.PartitionSize /= 20
+		return conf
+	})
+
+	for name, conf := range confs {
+		t.Run(name, func(t *testing.T) {
+			// goal is to test every rotation case
+			runs := conf.MaxBatchSize
+			for i := 0; i < runs; i++ {
+				conf.PartitionSize--
+				testHandlerFileLogger(t, conf)
+			}
+		})
 	}
 }
 
@@ -132,7 +177,7 @@ func checkReadMultipleBatches(t *testing.T, h *Handlers, fixture []byte, offs []
 }
 
 func TestPartitionRemoval(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	h := NewHandlers(conf)
 	doStartHandler(t, h)
 	defer doShutdownHandler(t, h)
@@ -159,7 +204,7 @@ func TestPartitionRemoval(t *testing.T) {
 }
 
 func TestReadNotFound(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	h := NewHandlers(conf)
 	doStartHandler(t, h)
 	defer doShutdownHandler(t, h)
@@ -181,7 +226,7 @@ func TestReadNotFound(t *testing.T) {
 }
 
 func TestUnknownCommand(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	h := NewHandlers(conf)
 	doStartHandler(t, h)
 	defer doShutdownHandler(t, h)

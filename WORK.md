@@ -2,15 +2,6 @@
 
 # TODO
 
-- [ ] make consistency guarantees configurable. fast by default (at-most-once),
-      but also force disk flush before returning success (at-least-once) if
-      that's desired.
-  - most strict can use `creat(O_SYNC)`, or maybe just flush before
-    responding to each command
-  - least strict just needs to fsync during shutdown
-  - have a flush interval option. this can be implemented by just putting a
-    flush command into the queue at an interval. also document how it may be
-    better to just change the dirty page cache kernel settings.
 - [ ] audit / fix int types, such as batch size (should be int, not uint64)
 - [ ] simple replication, scanner failover
 - [ ] config validation
@@ -46,6 +37,15 @@
 
 ## July-August 2018
 
+- [x] make consistency guarantees configurable. fast by default (at-most-once),
+      but also force disk flush before returning success (at-least-once) if
+      that's desired.
+  - most strict can use `creat(O_SYNC)`, or maybe just flush before
+    responding to each command
+  - least strict just needs to fsync during shutdown
+  - have a flush interval option. this can be implemented by just putting a
+    flush command into the queue at an interval. also document how it may be
+    better to just change the dirty page cache kernel settings.
 - [x] Client graceful reconnect
 - [x] topics?
 - [x] migrate logd/log-cli to cobra

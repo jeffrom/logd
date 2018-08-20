@@ -8,7 +8,7 @@ import (
 )
 
 func TestPartition(t *testing.T) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	t.Log("starting in", conf.WorkDir)
 	p := NewPartitions(conf, defaultTopic)
 	w := NewWriter(conf, defaultTopic)

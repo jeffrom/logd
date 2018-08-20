@@ -19,7 +19,7 @@ import (
 // }
 
 func BenchmarkBatchFile(b *testing.B) {
-	conf := testhelper.DefaultTestConfig(testing.Verbose())
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	benchmarkBatch(b, conf, nil)
 }
 
