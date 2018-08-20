@@ -57,9 +57,9 @@ if err := s.Error(); err != nil {
 
 The goal is for server to be able to persist all messages when the network
 interface is saturated, while clients can send and receive tens of thousands of
-messages per second. The bottleneck should be kernel space, which can be
-leveraged for fast network and disk IO. For example, `sendfile` is used when
-sending message batches to client readers.
+messages per second. The bottleneck should be kernel space, specifically
+network and disk IO. The kernel should be leveraged here. For example,
+`sendfile` is used when sending message batches to client readers.
 
 Other goals are to minimize hot-path memory allocations and copying of bytes.
 

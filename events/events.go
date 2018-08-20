@@ -23,6 +23,51 @@ var errInvalidFormat = stderrors.New("Invalid command format")
 
 const defaultTopic = "default"
 
+type flushState struct {
+	conf    *config.Config
+	batches int
+	timer   *time.Timer
+}
+
+func newFlushState(conf *config.Config) *flushState {
+	s := &flushState{
+		conf: conf,
+	}
+	if conf.FlushInterval > 0 {
+		s.timer = time.NewTimer(conf.FlushInterval)
+	}
+	return s
+}
+
+func (s *flushState) incr() {
+	if s.conf.FlushMessages > 0 {
+		s.batches++
+	}
+}
+
+func (s *flushState) update() {
+	if s.conf.FlushMessages > 0 && s.batches >= s.conf.FlushMessages {
+		s.batches = 0
+	}
+}
+
+func (s *flushState) shouldFlush() bool {
+	if s.conf.FlushMessages > 0 {
+		if s.batches >= s.conf.FlushMessages {
+			return true
+		}
+	}
+	if s.conf.FlushInterval > 0 {
+		select {
+		case <-s.timer.C:
+			s.timer.Reset(s.conf.FlushInterval)
+			return true
+		default:
+		}
+	}
+	return false
+}
+
 // eventQ manages the receiving, processing, and responding to events.
 type eventQ struct {
 	conf         *config.Config
@@ -34,6 +79,7 @@ type eventQ struct {
 	batchScanner *protocol.BatchScanner
 	Stats        *internal.Stats
 	tmpBatch     *protocol.Batch
+	flushState   *flushState
 }
 
 // newEventQ creates a new instance of an EventQ
@@ -47,6 +93,7 @@ func newEventQ(conf *config.Config) *eventQ {
 		partArgBuf:   newPartitionArgList(conf), // partition arguments buffer
 		batchScanner: protocol.NewBatchScanner(conf, nil),
 		tmpBatch:     protocol.NewBatch(conf),
+		flushState:   newFlushState(conf),
 	}
 
 	return q
@@ -170,6 +217,11 @@ func (q *eventQ) handleBatch(req *protocol.Request) (*protocol.Response, error) 
 		return errResponse(q.conf, req, resp, err)
 	}
 
+	// maybe flush
+	if ferr := q.doFlush(); ferr != nil {
+		return errResponse(q.conf, req, resp, ferr)
+	}
+
 	// update log state
 	respOffset := topic.parts.nextOffset()
 	if aerr := topic.parts.addBatch(batch, req.FullSize()); aerr != nil {
@@ -184,6 +236,18 @@ func (q *eventQ) handleBatch(req *protocol.Request) (*protocol.Response, error) 
 	}
 
 	return resp, nil
+}
+
+func (q *eventQ) doFlush() error {
+	q.flushState.incr()
+	if q.flushState.shouldFlush() {
+		internal.Debugf(q.conf, "flushing topic %s", q.topic.name)
+		if err := q.topic.logw.Flush(); err != nil {
+			return err
+		}
+	}
+	q.flushState.update()
+	return nil
 }
 
 func (q *eventQ) handleRead(req *protocol.Request) (*protocol.Response, error) {

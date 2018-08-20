@@ -18,11 +18,13 @@ type Config struct {
 	IdleTimeout     time.Duration `json:"idle-timeout"`
 	ShutdownTimeout time.Duration `json:"shutdown-timeout"`
 
-	WorkDir       string `json:"work-dir"`
-	LogFileMode   int    `json:"log-file-mode"`
-	MaxBatchSize  int    `json:"max-batch-size"`
-	PartitionSize int    `json:"partition-size"`
-	MaxPartitions int    `json:"max-partitions"`
+	WorkDir       string        `json:"work-dir"`
+	LogFileMode   int           `json:"log-file-mode"`
+	MaxBatchSize  int           `json:"max-batch-size"`
+	PartitionSize int           `json:"partition-size"`
+	MaxPartitions int           `json:"max-partitions"`
+	FlushMessages int           `json:"flush-messages"`
+	FlushInterval time.Duration `json:"flush-interval"`
 }
 
 // New returns a new configuration object
@@ -41,4 +43,6 @@ var Default = &Config{
 	MaxBatchSize:    1024 * 64,
 	PartitionSize:   1024 * 1024 * 2000,
 	MaxPartitions:   8,
+	FlushMessages:   0,
+	FlushInterval:   -1,
 }
