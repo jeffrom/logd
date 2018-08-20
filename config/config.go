@@ -23,7 +23,7 @@ type Config struct {
 	MaxBatchSize  int           `json:"max-batch-size"`
 	PartitionSize int           `json:"partition-size"`
 	MaxPartitions int           `json:"max-partitions"`
-	FlushMessages int           `json:"flush-messages"`
+	FlushBatches  int           `json:"flush-batches"`
 	FlushInterval time.Duration `json:"flush-interval"`
 }
 
@@ -43,6 +43,6 @@ var Default = &Config{
 	MaxBatchSize:    1024 * 64,
 	PartitionSize:   1024 * 1024 * 2000,
 	MaxPartitions:   8,
-	FlushMessages:   0,
+	FlushBatches:    0,
 	FlushInterval:   -1,
 }

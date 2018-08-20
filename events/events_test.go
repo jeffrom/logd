@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime/debug"
 	"testing"
+	"time"
 
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/protocol"
@@ -49,16 +50,50 @@ func TestHandlerStartStop(t *testing.T) {
 	stopHandler(t, h)
 }
 
-func TestHandlerFileLogger(t *testing.T) {
-	conf := testhelper.DefaultConfig(testing.Verbose())
-	conf.MaxBatchSize /= 20
-	conf.PartitionSize /= 20
+func buildTestConfigs() map[string]*config.Config {
+	confs := make(map[string]*config.Config)
 
-	// goal is to test every rotation case
-	runs := conf.MaxBatchSize
-	for i := 0; i < runs; i++ {
-		conf.PartitionSize--
-		testHandlerFileLogger(t, conf)
+	c := testhelper.DefaultConfig(testing.Verbose())
+	confs["default"] = c
+
+	if testing.Short() {
+		return confs
+	}
+
+	c = testhelper.DefaultConfig(testing.Verbose())
+	c.FlushBatches = 1
+	confs["batch sync"] = c
+
+	c = testhelper.DefaultConfig(testing.Verbose())
+	c.FlushInterval = 1 * time.Millisecond
+	confs["interval sync"] = c
+
+	return confs
+}
+
+func forEachConfig(confs map[string]*config.Config, cb func(*config.Config) *config.Config) map[string]*config.Config {
+	for name, conf := range confs {
+		confs[name] = cb(conf)
+	}
+	return confs
+}
+
+func TestHandlerFileLogger(t *testing.T) {
+	confs := forEachConfig(buildTestConfigs(), func(conf *config.Config) *config.Config {
+		conf.MaxBatchSize /= 20
+		conf.PartitionSize /= 20
+		return conf
+	})
+
+	for name, conf := range confs {
+		t.Run(name, func(t *testing.T) {
+			// goal is to test every rotation case
+			runs := conf.MaxBatchSize
+			for i := 0; i < runs; i++ {
+				conf.PartitionSize--
+				testHandlerFileLogger(t, conf)
+			}
+		})
 	}
 }
 

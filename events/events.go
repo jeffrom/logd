@@ -40,20 +40,20 @@ func newFlushState(conf *config.Config) *flushState {
 }
 
 func (s *flushState) incr() {
-	if s.conf.FlushMessages > 0 {
+	if s.conf.FlushBatches > 0 {
 		s.batches++
 	}
 }
 
 func (s *flushState) update() {
-	if s.conf.FlushMessages > 0 && s.batches >= s.conf.FlushMessages {
+	if s.conf.FlushBatches > 0 && s.batches >= s.conf.FlushBatches {
 		s.batches = 0
 	}
 }
 
 func (s *flushState) shouldFlush() bool {
-	if s.conf.FlushMessages > 0 {
-		if s.batches >= s.conf.FlushMessages {
+	if s.conf.FlushBatches > 0 {
+		if s.batches >= s.conf.FlushBatches {
 			return true
 		}
 	}
