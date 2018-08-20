@@ -50,8 +50,17 @@ func TestHandlerStartStop(t *testing.T) {
 	stopHandler(t, h)
 }
 
-func buildTestConfigs() map[string]*config.Config {
-	confs := make(map[string]*config.Config)
+type testConfigs map[string]*config.Config
+
+func (tc testConfigs) forEach(cb func(*config.Config) *config.Config) testConfigs {
+	for name, conf := range tc {
+		tc[name] = cb(conf)
+	}
+	return tc
+}
+
+func buildTestConfigs() testConfigs {
+	confs := make(testConfigs)
 
 	c := testhelper.DefaultConfig(testing.Verbose())
 	confs["default"] = c
@@ -68,18 +77,19 @@ func buildTestConfigs() map[string]*config.Config {
 	c.FlushInterval = 1 * time.Millisecond
 	confs["interval sync"] = c
 
-	return confs
-}
+	c = testhelper.DefaultConfig(testing.Verbose())
+	c.FlushBatches = 100
+	confs["batch sync 100"] = c
 
-func forEachConfig(confs map[string]*config.Config, cb func(*config.Config) *config.Config) map[string]*config.Config {
-	for name, conf := range confs {
-		confs[name] = cb(conf)
-	}
+	c = testhelper.DefaultConfig(testing.Verbose())
+	c.FlushInterval = 500 * time.Millisecond
+	confs["interval sync 500ms"] = c
+
 	return confs
 }
 
 func TestHandlerFileLogger(t *testing.T) {
-	confs := forEachConfig(buildTestConfigs(), func(conf *config.Config) *config.Config {
+	confs := buildTestConfigs().forEach(func(conf *config.Config) *config.Config {
 		conf.MaxBatchSize /= 20
 		conf.PartitionSize /= 20
 		return conf
