@@ -31,7 +31,7 @@ go get github.com/jeffrom/logd
 `Writer` can be used for sending messages, in batches, to the log.
 
 ```go
-# safe for concurrent calls
+// safe for concurrent calls
 w := client.NewWriter(conf, "mytopic").WithStateHandler(myhandler)
 log.SetOutput(w)
 ```
