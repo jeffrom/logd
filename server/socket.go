@@ -309,8 +309,8 @@ func (s *Socket) handleConnection(conn *Conn) {
 		n, rerr := s.sendResponse(conn, resp)
 		if rerr != nil {
 			internal.LogError(conn.Flush())
-			s.finishRequest(req)
 			log.Printf("%s response error: %+v", conn.RemoteAddr(), rerr)
+			s.finishRequest(req)
 			return
 		}
 		internal.Debugf(s.conf, "%s: sent response (%d bytes)", conn.RemoteAddr(), n)
