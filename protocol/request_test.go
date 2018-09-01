@@ -10,7 +10,7 @@ import (
 
 func TestReadRequest(t *testing.T) {
 	conf := testhelper.DefaultConfig(testing.Verbose())
-	req := NewRequest(conf)
+	req := NewRequestConfig(conf)
 	fixture := testhelper.LoadFixture("batch.small")
 
 	n, err := req.ReadFrom(bufio.NewReader(bytes.NewBuffer(fixture)))

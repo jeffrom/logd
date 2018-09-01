@@ -52,7 +52,7 @@ func benchmarkRead(b *testing.B, conf *config.Config, q *Handlers, offs []uint64
 	bbuf := bytes.NewBuffer(buf)
 	// if it's too small, resets mutate the underlying buffer
 	br := bufio.NewReaderSize(bbuf, len(bufs[len(bufs)-1])*2)
-	req := protocol.NewRequest(conf)
+	req := protocol.NewRequestConfig(conf)
 	requestSet(b, conf, req, buf, bbuf, br)
 	ctx := context.Background()
 
@@ -77,7 +77,7 @@ func benchmarkRead(b *testing.B, conf *config.Config, q *Handlers, offs []uint64
 func writeBatches(b testing.TB, conf *config.Config, q *Handlers) []uint64 {
 	ctx := context.Background()
 	fixture := testhelper.LoadFixture("batch.small")
-	req := protocol.NewRequest(conf)
+	req := protocol.NewRequestConfig(conf)
 
 	_, err := req.ReadFrom(bufio.NewReader(bytes.NewBuffer(fixture)))
 	if err != nil {

@@ -11,7 +11,7 @@ import (
 
 func TestCloseRequest(t *testing.T) {
 	conf := testhelper.DefaultConfig(testing.Verbose())
-	req := NewRequest(conf)
+	req := NewRequestConfig(conf)
 	cr := NewCloseRequest(conf)
 	fixture := []byte("CLOSE\r\n")
 	buf := &bytes.Buffer{}
@@ -52,7 +52,7 @@ func TestCloseRequestInvalid(t *testing.T) {
 	for name, b := range invalidCloseRequests {
 		t.Run(name, func(t *testing.T) {
 			cr.Reset()
-			req := NewRequest(conf)
+			req := NewRequestConfig(conf)
 			_, err := req.ReadFrom(bufio.NewReader(bytes.NewBuffer(b)))
 			_, rerr := cr.FromRequest(req)
 			if err == nil && rerr == nil {

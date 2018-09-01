@@ -10,7 +10,7 @@ import (
 
 func BenchmarkRequestRead(b *testing.B) {
 	conf := protocolBenchConfig()
-	req := NewRequest(conf)
+	req := NewRequestConfig(conf)
 	fixture := testhelper.LoadFixture("batch.medium")
 	buf := bytes.NewBuffer(fixture)
 	br := bufio.NewReaderSize(buf, buf.Len())

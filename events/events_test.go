@@ -231,7 +231,7 @@ func TestUnknownCommand(t *testing.T) {
 	doStartHandler(t, h)
 	defer doShutdownHandler(t, h)
 
-	req := protocol.NewRequest(conf)
+	req := protocol.NewRequestConfig(conf)
 	resp, err := h.PushRequest(context.Background(), req)
 	if err != nil {
 		t.Fatal(err)
@@ -257,7 +257,7 @@ func checkNotFound(t testing.TB, conf *config.Config, b []byte) {
 }
 
 func newRequest(t testing.TB, conf *config.Config, p []byte) *protocol.Request {
-	req := protocol.NewRequest(conf)
+	req := protocol.NewRequestConfig(conf)
 
 	_, err := req.ReadFrom(bufio.NewReader(bytes.NewBuffer(p)))
 	if err != nil {

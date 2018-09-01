@@ -278,7 +278,7 @@ func TestBatchInvalid(t *testing.T) {
 			}
 
 			batch.Reset()
-			req := NewRequest(conf)
+			req := NewRequestConfig(conf)
 			_, err = req.ReadFrom(bufio.NewReader(bytes.NewBuffer(b)))
 			_, rerr := batch.FromRequest(req)
 			if err == nil && rerr == nil {

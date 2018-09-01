@@ -17,7 +17,7 @@ func TestMockRequestHandler(t *testing.T) {
 	})
 
 	ctx := context.Background()
-	req := protocol.NewRequest(conf)
+	req := protocol.NewRequestConfig(conf)
 	req.Name = protocol.CmdBatch
 	nextResp, err := rh.PushRequest(ctx, req)
 	if err != nil {

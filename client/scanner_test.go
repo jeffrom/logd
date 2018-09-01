@@ -269,7 +269,7 @@ func TestScannerUseTail(t *testing.T) {
 	s.SetTopic("default")
 
 	server.Expect(func(p []byte) io.WriterTo {
-		req := protocol.NewRequest(gconf)
+		req := protocol.NewRequestConfig(gconf)
 		if _, err := req.ReadFrom(bufio.NewReader(bytes.NewReader(p))); err != nil {
 			panic(err)
 		}
@@ -306,7 +306,7 @@ func mustComplete(t *testing.T, s *Scanner) {
 
 func okCallback(conf *config.Config, fixture []byte, off uint64) func([]byte) io.WriterTo {
 	return func(p []byte) io.WriterTo {
-		req := protocol.NewRequest(conf)
+		req := protocol.NewRequestConfig(conf)
 		if _, err := req.ReadFrom(bufio.NewReader(bytes.NewReader(p))); err != nil {
 			panic(err)
 		}

@@ -26,15 +26,27 @@ type Request struct {
 	bodysize int      //
 }
 
-// NewRequest returns a new instance of *Request
-func NewRequest(conf *config.Config) *Request {
+// NewRequest returns a new, unconfigured instance of *Request
+func NewRequest() *Request {
 	return &Request{
-		conf:      conf,
-		raw:       make([]byte, conf.MaxBatchSize),
 		responseC: make(chan *Response),
 		args:      make([][]byte, maxArgs),
 		respBuf:   newClosingBuffer(),
 	}
+}
+
+// NewRequestConfig returns a new instance of *Request
+func NewRequestConfig(conf *config.Config) *Request {
+	return NewRequest().WithConfig(conf)
+}
+
+// WithConfig returns the request instance with the supplied config.
+func (req *Request) WithConfig(conf *config.Config) *Request {
+	req.conf = conf
+	if len(req.raw) < conf.MaxBatchSize {
+		req.raw = make([]byte, conf.MaxBatchSize)
+	}
+	return req
 }
 
 // Reset sets the request to its initial values
@@ -46,6 +58,11 @@ func (req *Request) Reset() {
 	req.body = nil
 	req.bodysize = 0
 	req.respBuf.Reset()
+
+	select {
+	case <-req.responseC:
+	default:
+	}
 }
 
 func (req *Request) String() string {

@@ -11,7 +11,7 @@ import (
 
 func TestConfigRequest(t *testing.T) {
 	conf := testhelper.DefaultConfig(testing.Verbose())
-	req := NewRequest(conf)
+	req := NewRequestConfig(conf)
 	cr := NewConfigRequest(conf)
 	fixture := []byte("CONFIG\r\n")
 	buf := &bytes.Buffer{}
@@ -53,7 +53,7 @@ func TestConfigRequestInvalid(t *testing.T) {
 	for name, b := range invalidConfigRequests {
 		t.Run(name, func(t *testing.T) {
 			cr.Reset()
-			req := NewRequest(conf)
+			req := NewRequestConfig(conf)
 			_, err := req.ReadFrom(bufio.NewReader(bytes.NewBuffer(b)))
 			_, rerr := cr.FromRequest(req)
 			if err == nil && rerr == nil {

@@ -17,6 +17,12 @@ import (
 	"github.com/jeffrom/logd/transport"
 )
 
+var reqPool = sync.Pool{
+	New: func() interface{} {
+		return protocol.NewRequest()
+	},
+}
+
 // Socket handles socket connections
 type Socket struct {
 	conf *config.Config
@@ -273,13 +279,17 @@ func (s *Socket) handleConnection(conn *Conn) {
 			return
 		}
 
-		req := protocol.NewRequest(s.conf)
+		req := reqPool.Get().(*protocol.Request).WithConfig(s.conf)
+		req.Reset()
+
 		internal.Debugf(s.conf, "%s: waiting for request", conn.RemoteAddr())
 		if _, rerr := req.ReadFrom(conn.br); rerr != nil {
 			// conn.Flush()
 			if rerr != io.EOF {
 				log.Printf("%s read error: %+v", conn.RemoteAddr(), rerr)
 			}
+
+			s.finishRequest(req)
 			return
 		}
 
@@ -299,6 +309,7 @@ func (s *Socket) handleConnection(conn *Conn) {
 		n, rerr := s.sendResponse(conn, resp)
 		if rerr != nil {
 			internal.LogError(conn.Flush())
+			s.finishRequest(req)
 			log.Printf("%s response error: %+v", conn.RemoteAddr(), rerr)
 			return
 		}
@@ -306,8 +317,10 @@ func (s *Socket) handleConnection(conn *Conn) {
 
 		if ferr := conn.Flush(); ferr != nil || req.Name == protocol.CmdClose {
 			internal.Debugf(s.conf, "%s: closing", conn.RemoteAddr())
+			s.finishRequest(req)
 			return
 		}
+		s.finishRequest(req)
 	}
 }
 
@@ -318,7 +331,7 @@ func (s *Socket) waitForRequest(conn *Conn) (*protocol.Request, error) {
 	if err != nil {
 		return nil, err
 	}
-	return protocol.NewRequest(s.conf), nil
+	return protocol.NewRequestConfig(s.conf), nil
 }
 
 func (s *Socket) sendResponse(conn *Conn, resp *protocol.Response) (int, error) {
@@ -347,6 +360,10 @@ func (s *Socket) sendResponse(conn *Conn, resp *protocol.Response) (int, error) 
 		return conn.sendDefaultError()
 	}
 	return total, err
+}
+
+func (s *Socket) finishRequest(req *protocol.Request) {
+	reqPool.Put(req)
 }
 
 func (s *Socket) startInstrumentation(req *protocol.Request) time.Time {

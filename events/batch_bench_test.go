@@ -31,7 +31,7 @@ func benchmarkBatch(b *testing.B, conf *config.Config, logw logger.LogWriter) {
 
 	ctx := context.Background()
 	fixture := testhelper.LoadFixture("batch.small")
-	req := protocol.NewRequest(conf)
+	req := protocol.NewRequestConfig(conf)
 
 	_, err := req.ReadFrom(bufio.NewReader(bytes.NewBuffer(fixture)))
 	if err != nil {
