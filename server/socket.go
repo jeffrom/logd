@@ -13,6 +13,7 @@ import (
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/internal"
 	"github.com/jeffrom/logd/protocol"
+	"github.com/jeffrom/logd/stats"
 	"github.com/jeffrom/logd/transport"
 )
 
@@ -240,6 +241,8 @@ func (s *Socket) removeConn(conn *Conn) {
 
 func (s *Socket) handleConnection(conn *Conn) {
 	// s.q.Stats.Incr("connections")
+	// stats.TotalConnections.Add("tcp", 1)
+	// stats.ActiveConnections.Add("tcp", 1)
 
 	var (
 		ctx    context.Context
@@ -251,6 +254,7 @@ func (s *Socket) handleConnection(conn *Conn) {
 	defer func() {
 		cancel()
 		// s.q.Stats.Decr("connections")
+		// stats.ActiveConnections.Add("tcp", -1)
 
 		if err := conn.close(); err != nil {
 			internal.Debugf(s.conf, "error closing connection: %+v", err)
@@ -269,24 +273,17 @@ func (s *Socket) handleConnection(conn *Conn) {
 			return
 		}
 
-		// wait for a new request. continue along if there isn't one. All
-		// requests will be handled in this block, and after all commands have
-		// been migrated, this will be the whole loop
+		req := protocol.NewRequest(s.conf)
 		internal.Debugf(s.conf, "%s: waiting for request", conn.RemoteAddr())
-		req, err := s.waitForRequest(conn)
-		if err != nil || req == nil {
-			if err != io.EOF {
-				log.Printf("%s wait error: %+v", conn.RemoteAddr(), err)
+		if _, rerr := req.ReadFrom(conn.br); rerr != nil {
+			// conn.Flush()
+			if rerr != io.EOF {
+				log.Printf("%s read error: %+v", conn.RemoteAddr(), rerr)
 			}
 			return
 		}
 
-		internal.Debugf(s.conf, "%s: waited for request", conn.RemoteAddr())
-		if _, rerr := req.ReadFrom(conn.br); rerr != nil {
-			// conn.Flush()
-			log.Printf("%s read error: %+v", conn.RemoteAddr(), rerr)
-			return
-		}
+		// start := s.startInstrumentation(req)
 
 		internal.Debugf(s.conf, "%s: read request %v", conn.RemoteAddr(), req)
 		resp, rerr := s.q.PushRequest(ctx, req)
@@ -296,6 +293,8 @@ func (s *Socket) handleConnection(conn *Conn) {
 			resp = protocol.NewResponse(s.conf)
 		}
 		internal.Debugf(s.conf, "%s: got response: %+v", conn.RemoteAddr(), resp)
+
+		// s.finishInstrumentation(req, start)
 
 		n, rerr := s.sendResponse(conn, resp)
 		if rerr != nil {
@@ -348,4 +347,27 @@ func (s *Socket) sendResponse(conn *Conn, resp *protocol.Response) (int, error) 
 		return conn.sendDefaultError()
 	}
 	return total, err
+}
+
+func (s *Socket) startInstrumentation(req *protocol.Request) time.Time {
+	switch req.Name {
+	case protocol.CmdBatch, protocol.CmdRead, protocol.CmdTail:
+		return time.Now()
+	default:
+		return time.Time{}
+	}
+}
+
+func (s *Socket) finishInstrumentation(req *protocol.Request, start time.Time) {
+	if start.IsZero() {
+		return
+	}
+
+	switch req.Name {
+	case protocol.CmdBatch:
+		stats.Timing("batch.latency", start)
+	case protocol.CmdRead, protocol.CmdTail:
+		stats.Timing("read.latency", start)
+	default:
+	}
 }

@@ -89,6 +89,9 @@ func readLineFromBuf(r *bufio.Reader) (int64, []byte, []byte, error) {
 	word, err := r.ReadSlice('\n')
 	total := int64(len(word))
 	if err != nil {
+		if total < 2 {
+			return total, nil, word, err
+		}
 		return total, word[:len(word)-2], word, err
 	}
 
