@@ -53,9 +53,10 @@ type Client struct { // nolint: golint
 	scloser io.Closer
 
 	// temporarily cache batches when scanning
-	batch    *protocol.Batch
-	batchbr  *bufio.Reader
-	batchbuf *bytes.Buffer
+	batch       *protocol.Batch
+	batchbr     *bufio.Reader
+	batchbuf    *bytes.Buffer
+	rawbatchbuf *bytes.Buffer
 
 	// can cache these here since client should not be used concurrently
 	cr      *protocol.ClientResponse
@@ -84,6 +85,7 @@ func New(conf *Config) *Client {
 		done:         make(chan struct{}),
 		batch:        protocol.NewBatch(gconf),
 		batchbuf:     &bytes.Buffer{},
+		rawbatchbuf:  &bytes.Buffer{},
 		batchbr:      bufio.NewReaderSize(nil, conf.BatchSize),
 	}
 
@@ -114,6 +116,7 @@ func (c *Client) reset() {
 	c.unsetConn()
 	c.batch.Reset()
 	c.batchbuf.Reset()
+	c.rawbatchbuf.Reset()
 	select {
 	case <-c.done:
 	default:
@@ -224,7 +227,24 @@ func (c *Client) Batch(batch *protocol.Batch) (uint64, error) {
 		return 0, err
 	}
 
-	off, _, err := c.readBatchResponse(batch)
+	off, _, err := c.readBatchResponse()
+	return off, err
+}
+
+// Batch sends a BATCH request with a raw batch
+func (c *Client) BatchRaw(b []byte) (uint64, error) {
+	internal.Debugf(c.gconf, "%q -> %s", b, c.RemoteAddr())
+
+	c.rawbatchbuf.Reset()
+	if _, err := c.rawbatchbuf.Write(b); err != nil {
+		return 0, err
+	}
+
+	if _, _, err := c.do(c.rawbatchbuf); err != nil {
+		return 0, err
+	}
+
+	off, _, err := c.readBatchResponse()
 	return off, err
 }
 
@@ -261,7 +281,7 @@ func (c *Client) ReadOffset(topic []byte, offset uint64, limit int) (int, *proto
 		return 0, nil, err
 	}
 
-	respOff, nbatches, err := c.readBatchResponse(req)
+	respOff, nbatches, err := c.readBatchResponse()
 	if err != nil {
 		return 0, nil, err
 	}
@@ -292,7 +312,7 @@ func (c *Client) Tail(topic []byte, limit int) (uint64, int, *protocol.BatchScan
 		return 0, 0, nil, err
 	}
 
-	respOff, nbatches, err := c.readBatchResponse(req)
+	respOff, nbatches, err := c.readBatchResponse()
 	if err != nil {
 		return 0, 0, nil, err
 	}
@@ -455,7 +475,7 @@ func (c *Client) readClientResponse() (int64, error) {
 	return n, c.handleErr(err)
 }
 
-func (c *Client) readBatchResponse(wt io.WriterTo) (uint64, int, error) {
+func (c *Client) readBatchResponse() (uint64, int, error) {
 	return c.cr.Offset(), c.cr.Batches(), c.cr.Error()
 }
 
