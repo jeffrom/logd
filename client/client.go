@@ -322,6 +322,22 @@ func (c *Client) Close() error {
 	return nil
 }
 
+// Config sends a CONFIG request, returning parts the server's configuration
+// relevant to the client.
+func (c *Client) Config() (*config.Config, error) {
+	confreq := protocol.NewConfigRequest(c.gconf)
+	if _, _, err := c.doRequest(confreq); err != nil {
+		return nil, err
+	}
+
+	confResp := protocol.NewConfigResponse(c.gconf)
+	if err := confResp.Parse(c.cr.MultiResp()); err != nil {
+		return nil, err
+	}
+
+	return confResp.Config(), nil
+}
+
 func (c *Client) doRequest(wt io.WriterTo) (int64, int64, error) {
 	sent, recv, err := c.do(wt)
 	if err != nil {
@@ -447,6 +463,15 @@ func (c *Client) readCloseResponse() error {
 	if !c.cr.Ok() {
 		return errors.New("close failed")
 	}
+	return nil
+}
+
+func (c *Client) readConfigResponse() error {
+	b := c.cr.MultiResp()
+	if len(b) < 1 {
+		return errors.New("multi response empty")
+	}
+
 	return nil
 }
 

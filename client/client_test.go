@@ -341,6 +341,43 @@ func TestClose(t *testing.T) {
 	}
 }
 
+func TestConfig(t *testing.T) {
+	conf := DefaultTestConfig(testing.Verbose())
+	gconf := conf.ToGeneralConfig()
+	server, clientConn := testhelper.Pipe()
+	defer server.Close()
+	c := New(conf).SetConn(clientConn)
+
+	respb := &bytes.Buffer{}
+	confResp := protocol.NewConfigResponse(gconf)
+	confResp.WriteTo(respb)
+
+	server.Expect(func(p []byte) io.WriterTo {
+		if !bytes.Equal(p, []byte("CONFIG\r\n")) {
+			log.Panicf("expected:\n\n\t%q\n\n but got:\n\n\t%q", "CONFIG\r\n", p)
+		}
+		return protocol.NewClientMultiResponse(gconf, respb.Bytes())
+	})
+
+	rconf, err := c.Config()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if rconf.Hostport != gconf.Hostport {
+		t.Errorf("expected %q but got %q", gconf.Hostport, rconf.Hostport)
+	}
+	if rconf.Timeout != gconf.Timeout {
+		t.Errorf("expected %q but got %q", gconf.Timeout.String(), rconf.Timeout.String())
+	}
+	if rconf.IdleTimeout != gconf.IdleTimeout {
+		t.Errorf("expected %q but got %q", gconf.IdleTimeout.String(), rconf.IdleTimeout.String())
+	}
+	if rconf.MaxBatchSize != gconf.MaxBatchSize {
+		t.Errorf("expected %d but got %d", gconf.MaxBatchSize, rconf.MaxBatchSize)
+	}
+}
+
 func TestReconnect(t *testing.T) {
 	conf := DefaultTestConfig(testing.Verbose())
 	gconf := conf.ToGeneralConfig()

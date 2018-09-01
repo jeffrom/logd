@@ -51,6 +51,8 @@ type ClientResponse struct {
 	nbatches int
 	err      error
 	mokBuf   []byte
+	mokSize  int
+	nmok     int
 	digitbuf [32]byte
 }
 
@@ -115,6 +117,7 @@ func (cr *ClientResponse) Reset() {
 	cr.err = nil
 	cr.mokBuf = nil
 	cr.ok = false
+	cr.nmok = 0
 }
 
 // SetOffset sets the offset number for a batch response
@@ -159,7 +162,7 @@ func (cr *ClientResponse) Ok() bool {
 
 // MultiResp returns the responses MOK response body
 func (cr *ClientResponse) MultiResp() []byte {
-	return cr.mokBuf
+	return cr.mokBuf[:cr.nmok]
 }
 
 // WriteTo implements io.WriterTo
@@ -355,7 +358,11 @@ func (cr *ClientResponse) readFromBuf(r *bufio.Reader) (int64, error) {
 		}
 		cr.err = parseError(errBytes)
 	} else if isMok {
-		panic("MOK read not implemented")
+		nmok, err := cr.readMOK(line, r)
+		total += nmok
+		if err != nil {
+			return total, err
+		}
 	} else {
 		line, word, err = parseWord(line)
 		if err != nil {
@@ -383,4 +390,29 @@ func (cr *ClientResponse) readFromBuf(r *bufio.Reader) (int64, error) {
 	}
 
 	return total, err
+}
+
+func (cr *ClientResponse) readMOK(line []byte, r *bufio.Reader) (int64, error) {
+	_, word, err := parseWord(line)
+	if err != nil {
+		return 0, err
+	}
+
+	n, err := asciiToUint(word)
+	if err != nil {
+		return 0, err
+	}
+	cr.mokSize = int(n)
+
+	if len(cr.mokBuf) < int(n) {
+		cr.mokBuf = make([]byte, n)
+	}
+
+	read, err := io.ReadFull(r, cr.mokBuf[:int(n)])
+	cr.nmok = read
+	if err != nil {
+		return int64(read), err
+	}
+
+	return int64(read), nil
 }

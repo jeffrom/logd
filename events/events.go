@@ -80,6 +80,7 @@ type eventQ struct {
 	Stats        *internal.Stats
 	tmpBatch     *protocol.Batch
 	flushState   *flushState
+	confResp     *protocol.ConfigResponse
 }
 
 // newEventQ creates a new instance of an EventQ
@@ -94,6 +95,7 @@ func newEventQ(conf *config.Config) *eventQ {
 		batchScanner: protocol.NewBatchScanner(conf, nil),
 		tmpBatch:     protocol.NewBatch(conf),
 		flushState:   newFlushState(conf),
+		confResp:     protocol.NewConfigResponse(conf),
 	}
 
 	return q
@@ -161,6 +163,8 @@ func (q *eventQ) loop() { // nolint: gocyclo
 				resp, err = q.handleStats(req)
 			case protocol.CmdClose:
 				resp, err = q.handleClose(req)
+			case protocol.CmdConfig:
+				resp, err = q.handleConfig(req)
 			default:
 				log.Printf("unhandled request type passed: %v", req.Name)
 				resp, err = protocol.NewResponseErr(q.conf, req, protocol.ErrInvalid)
@@ -356,6 +360,16 @@ func (q *eventQ) handleStats(req *protocol.Request) (*protocol.Response, error) 
 func (q *eventQ) handleClose(req *protocol.Request) (*protocol.Response, error) {
 	resp := protocol.NewResponse(q.conf)
 	cr := protocol.NewClientOKResponse(q.conf)
+	_, err := req.WriteResponse(resp, cr)
+	if err != nil {
+		return errResponse(q.conf, req, resp, err)
+	}
+	return resp, nil
+}
+
+func (q *eventQ) handleConfig(req *protocol.Request) (*protocol.Response, error) {
+	resp := protocol.NewResponse(q.conf)
+	cr := protocol.NewClientMultiResponse(q.conf, q.confResp.MultiResponse())
 	_, err := req.WriteResponse(resp, cr)
 	if err != nil {
 		return errResponse(q.conf, req, resp, err)

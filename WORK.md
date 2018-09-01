@@ -5,8 +5,6 @@
 - [ ] audit / fix int types, such as batch size (should be int, not uint64)
 - [ ] simple replication, scanner failover
 - [ ] config validation
-- [ ] send config to new connections so it can be validated
-  - probably better to have client ask for it
 - [ ] `testhelper/mock_server.go` has some race condition problems. probably
       has to do with the closing connection stuff
 - [ ] verify batches in the connection goroutine to better leverage multiple
@@ -40,6 +38,8 @@
 
 ## July-August 2018
 
+- [x] send config to new connections so it can be validated
+  - probably better to have client ask for it
 - [x] make consistency guarantees configurable. fast by default (at-most-once),
       but also force disk flush before returning success (at-least-once) if
       that's desired.

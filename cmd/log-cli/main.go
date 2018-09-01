@@ -75,6 +75,22 @@ var ReadCmd = &cobra.Command{
 	},
 }
 
+var ConfigCmd = &cobra.Command{
+	Use:     "config",
+	Aliases: []string{"conf"},
+	Short:   "Read server config",
+	Long:    ``,
+	Run: func(cmd *cobra.Command, args []string) {
+		internal.Debugf(tmpConfig.ToGeneralConfig(), "%+v", tmpConfig)
+		c := client.New(tmpConfig)
+		serverConf, err := c.Config()
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("%+v\n", serverConf)
+	},
+}
+
 func getFile(s string, in bool) (*os.File, error) {
 	if s == "-" || s == "" {
 		f := os.Stdout
@@ -307,6 +323,7 @@ func doRead(conf *client.Config, c *cobra.Command) error {
 func main() {
 	RootCmd.AddCommand(WriteCmd)
 	RootCmd.AddCommand(ReadCmd)
+	RootCmd.AddCommand(ConfigCmd)
 
 	if err := RootCmd.Execute(); err != nil {
 		fmt.Println(err)

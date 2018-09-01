@@ -57,6 +57,7 @@ var bmsgStart = []byte("MSG ")
 var bbatchStart = []byte("BATCH ")
 var breadStart = []byte("READ ")
 var btailStart = []byte("TAIL ")
+var bconfig = []byte("CONFIG\r\n")
 var bok = []byte("OK")
 var bokResp = []byte("OK\r\n")
 var bokStart = []byte("OK ")
@@ -87,6 +88,13 @@ func parseWord(line []byte) ([]byte, []byte, error) {
 func readLineFromBuf(r *bufio.Reader) (int64, []byte, []byte, error) {
 	word, err := r.ReadSlice('\n')
 	total := int64(len(word))
+	if err != nil {
+		return total, word[:len(word)-2], word, err
+	}
+
+	if word[len(word)-2] != '\r' {
+		return total, word[:len(word)-2], word, errors.New("missing \r in newline")
+	}
 	return total, word[:len(word)-2], word, err
 }
 
