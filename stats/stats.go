@@ -50,3 +50,19 @@ func periodicFlush() {
 		})
 	}
 }
+
+func PrettyTime(ns float64) string {
+	if ns > float64(time.Second*60) {
+		return fmt.Sprintf("%.2fm", ns/float64(time.Second*60))
+	}
+	if ns > float64(time.Second) {
+		return fmt.Sprintf("%.2fs", ns/float64(time.Second))
+	}
+	if ns > float64(time.Millisecond) {
+		return fmt.Sprintf("%.2fms", ns/float64(time.Millisecond))
+	}
+	if ns > float64(time.Microsecond) {
+		return fmt.Sprintf("%.2fμ", ns/float64(time.Microsecond))
+	}
+	return fmt.Sprintf("%.2fns", ns)
+}

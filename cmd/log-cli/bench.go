@@ -9,6 +9,7 @@ import (
 
 	"github.com/jeffrom/logd/client"
 	"github.com/jeffrom/logd/protocol"
+	"github.com/jeffrom/logd/stats"
 	"github.com/spf13/cobra"
 )
 
@@ -39,11 +40,20 @@ type benchConfig struct {
 	duration  time.Duration
 }
 
+const fillAmt = 10
+
 type benchCounts struct {
 	started  time.Time
 	inbytes  int64
 	outbytes int64
 	batches  int64
+	timing   *stats.Histogram
+}
+
+func newBenchCounts() *benchCounts {
+	return &benchCounts{
+		timing: stats.NewHistogram(),
+	}
 }
 
 func (c *benchCounts) String() string {
@@ -53,14 +63,22 @@ func (c *benchCounts) String() string {
 	formatted := prettyNumBytes(float64(c.outbytes))
 	formattedPer := prettyNumBytes(float64(c.outbytes) / dur)
 	s := fmt.Sprintf("%s:\t\t%s\t\t%s/s\n",
-		fill("bytes out", 10), fill(formatted, 10), formattedPer)
+		fill("bytes out", fillAmt), fill(formatted, fillAmt), formattedPer)
 	b.WriteString(s)
 
 	formatted = prettyNum(float64(c.batches))
 	formattedPer = prettyNum(float64(c.batches) / dur)
 	s = fmt.Sprintf("%s:\t\t%s\t\t%s/s\n",
-		fill("batches", 10), fill(formatted, 10), formattedPer)
+		fill("batches", fillAmt), fill(formatted, fillAmt), formattedPer)
 	b.WriteString(s)
+
+	b.WriteString(fmt.Sprintf("%s:\n", fill("timing", fillAmt)))
+	b.WriteString(fmt.Sprintf("\tmin %s\n", stats.PrettyTime(c.timing.Quantile(0.0))))
+	b.WriteString(fmt.Sprintf("\tp50 %s\n", stats.PrettyTime(c.timing.Quantile(0.50))))
+	b.WriteString(fmt.Sprintf("\tp90 %s\n", stats.PrettyTime(c.timing.Quantile(0.90))))
+	b.WriteString(fmt.Sprintf("\tp95 %s\n", stats.PrettyTime(c.timing.Quantile(0.95))))
+	b.WriteString(fmt.Sprintf("\tp99 %s\n", stats.PrettyTime(c.timing.Quantile(0.99))))
+	b.WriteString(fmt.Sprintf("\tmax %s\n", stats.PrettyTime(c.timing.Quantile(1.0))))
 
 	return b.String()
 }
@@ -89,11 +107,13 @@ func (bc *benchConn) start() {
 		default:
 		}
 
+		start := time.Now()
 		if _, err := bc.c.BatchRaw(bc.input); err != nil {
 			panic(err)
 		}
 
 		if !atomic.CompareAndSwapInt64(&bc.counts.batches, 0, 1) {
+			bc.counts.timing.Add(float64(time.Since(start).Nanoseconds()))
 			atomic.AddInt64(&bc.counts.outbytes, int64(len(bc.input)))
 			atomic.AddInt64(&bc.counts.batches, 1)
 		}
@@ -130,7 +150,7 @@ func doBench(bconf *benchConfig, cmd *cobra.Command) error {
 
 func benchLoop(bconf *benchConfig) (*benchCounts, error) {
 	done := time.After(bconf.duration)
-	counts := &benchCounts{}
+	counts := newBenchCounts()
 	inputs := generateBatches(bconf)
 
 	counts.started = time.Now()
