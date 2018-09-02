@@ -90,7 +90,7 @@ func (c *Config) ToGeneralConfig() *config.Config {
 	gconf := &config.Config{}
 	*gconf = *config.Default
 	gconf.Verbose = c.Verbose
-	gconf.Hostport = c.Hostport
+	gconf.Host = c.Hostport
 	gconf.MaxBatchSize = c.BatchSize
 	return gconf
 }

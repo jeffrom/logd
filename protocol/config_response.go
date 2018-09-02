@@ -39,7 +39,7 @@ func (cr *ConfigResponse) Reset() {
 	cr.size = 0
 	cr.b.Reset()
 
-	cr.readConf.Hostport = ""
+	cr.readConf.Host = ""
 	cr.readConf.Timeout = 0
 	cr.readConf.IdleTimeout = 0
 	cr.readConf.MaxBatchSize = 0
@@ -71,7 +71,7 @@ func (cr *ConfigResponse) WriteTo(w io.Writer) (int64, error) {
 		return total, err
 	}
 
-	n, err = w.Write([]byte(cr.conf.Hostport))
+	n, err = w.Write([]byte(cr.conf.Host))
 	total += int64(n)
 	if err != nil {
 		return total, err
@@ -176,7 +176,7 @@ func (cr *ConfigResponse) readFromBuf(r *bufio.Reader) (int64, error) {
 
 		switch string(kb) {
 		case "Hostport: ":
-			cr.readConf.Hostport = string(vb)
+			cr.readConf.Host = string(vb)
 		case "Timeout: ":
 			dur, err := time.ParseDuration(string(vb))
 			if err != nil {

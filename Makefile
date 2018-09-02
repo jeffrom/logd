@@ -44,6 +44,7 @@ deps:
 	dep ensure -v
 	go get github.com/wadey/gocovmerge
 	go get golang.org/x/tools/cmd/benchcmp
+	go get github.com/AlekSi/gocoverutil
 	mkdir -p report
 	mkdir -p integration_test/out
 
@@ -79,7 +80,6 @@ test.cover:
 .PHONY: test.coverprofile
 # $(foreach pkg,$(SHORT_PKGS),go test -coverprofile=integration_test/out/unit.$(pkg).cov.out -covermode=count -coverpkg ./... ./$(pkg);)
 test.coverprofile:
-	go get github.com/AlekSi/gocoverutil
 	gocoverutil -coverprofile=cov.out test -covermode=count ./...
 
 .PHONY: test.golden

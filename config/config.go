@@ -10,7 +10,8 @@ type Config struct {
 
 	Verbose     bool   `json:"verbose"`
 	CanShutdown bool   `json:"can-shutdown"`
-	Hostport    string `json:"host"`
+	Host        string `json:"host"`
+	HttpHost    string `json:"http-host"`
 
 	// Timeout determines how long to wait during requests before closing the
 	// connection if the request hasn't completed.
@@ -34,7 +35,8 @@ func New() *Config {
 
 // Default is the default application config
 var Default = &Config{
-	Hostport:        "localhost:1774",
+	Host:            "localhost:1774",
+	HttpHost:        "localhost:1775",
 	Timeout:         2 * time.Second,
 	IdleTimeout:     30 * time.Second,
 	ShutdownTimeout: 15 * time.Second,

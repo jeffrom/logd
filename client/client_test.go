@@ -364,8 +364,8 @@ func TestConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if rconf.Hostport != gconf.Hostport {
-		t.Errorf("expected %q but got %q", gconf.Hostport, rconf.Hostport)
+	if rconf.Host != gconf.Host {
+		t.Errorf("expected %q but got %q", gconf.Host, rconf.Host)
 	}
 	if rconf.Timeout != gconf.Timeout {
 		t.Errorf("expected %q but got %q", gconf.Timeout.String(), rconf.Timeout.String())

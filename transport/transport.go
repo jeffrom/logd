@@ -12,7 +12,7 @@ type Server interface {
 	GoServe()
 	Stop() error
 	ListenAddr() net.Addr
-	SetQPusher(q RequestHandler)
+	SetHandler(h RequestHandler)
 }
 
 // RequestHandler lets a server push requests to the event q

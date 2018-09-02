@@ -69,7 +69,7 @@ func TestClose(t *testing.T) {
 	conf := testhelper.DefaultConfig(testing.Verbose())
 	srv := NewTestServer(conf)
 	rh := transport.NewMockRequestHandler(conf)
-	srv.SetQPusher(rh)
+	srv.SetHandler(rh)
 	srv.GoServe()
 
 	c, err := client.Dial(srv.ListenAddr().String())
@@ -89,7 +89,7 @@ func TestBatch(t *testing.T) {
 	conf := testhelper.DefaultConfig(testing.Verbose())
 	srv := NewTestServer(conf)
 	rh := transport.NewMockRequestHandler(conf)
-	srv.SetQPusher(rh)
+	srv.SetHandler(rh)
 	srv.GoServe()
 	defer CloseTestServer(t, srv, rh)
 
@@ -123,7 +123,7 @@ func TestFailedRequest(t *testing.T) {
 	conf := testhelper.DefaultConfig(testing.Verbose())
 	srv := NewTestServer(conf)
 	rh := transport.NewMockRequestHandler(conf)
-	srv.SetQPusher(rh)
+	srv.SetHandler(rh)
 	srv.GoServe()
 	defer CloseTestServer(t, srv, rh)
 

@@ -23,7 +23,7 @@ func BenchmarkClientBatch(b *testing.B) {
 	conf := testhelper.DefaultConfig(testing.Verbose())
 	srv := NewTestServer(conf)
 	rh := transport.NewMockRequestHandler(conf)
-	srv.SetQPusher(rh)
+	srv.SetHandler(rh)
 	srv.GoServe()
 	defer CloseTestServer(b, srv, rh)
 

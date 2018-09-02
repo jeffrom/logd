@@ -21,8 +21,8 @@ func init() {
 
 	TotalRequests = expvar.NewMap("requests.total")
 
-	expvar.Publish("batch.latency", metric.NewHistogram("5m1s", "15m30s", "1h1m"))
-	expvar.Publish("read.latency", metric.NewHistogram("5m1s", "15m30s", "1h1m"))
+	// expvar.Publish("batch.latency", metric.NewHistogram("5m1s", "15m30s", "1h1m"))
+	// expvar.Publish("read.latency", metric.NewHistogram("5m1s", "15m30s", "1h1m"))
 
 	// go periodicFlush()
 	// go tmpSetupHTTP()

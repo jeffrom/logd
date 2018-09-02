@@ -33,7 +33,10 @@ func init() {
 	pflags.BoolVarP(&tmpConfig.Verbose, "verbose", "v", config.Default.Verbose, "print debug output")
 	viper.BindPFlag("verbose", pflags.Lookup("verbose"))
 
-	pflags.StringVar(&tmpConfig.Hostport, "host", config.Default.Hostport, "a `HOST:PORT` combination to listen on")
+	pflags.StringVar(&tmpConfig.Host, "host", config.Default.Host, "a `HOST:PORT` combination for the tcp server to listen on")
+	viper.BindPFlag("host", pflags.Lookup("host"))
+
+	pflags.StringVar(&tmpConfig.HttpHost, "http-host", config.Default.HttpHost, "a `HOST:PORT` combination for the http server to listen on")
 	viper.BindPFlag("host", pflags.Lookup("host"))
 
 	pflags.DurationVar(&tmpConfig.Timeout, "timeout", config.Default.Timeout, "duration to wait for requests to complete")

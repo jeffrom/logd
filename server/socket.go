@@ -40,7 +40,7 @@ type Socket struct {
 	shutdownC    chan struct{}
 	shuttingDown bool
 
-	q transport.RequestHandler
+	h transport.RequestHandler
 }
 
 // NewSocket will return a new instance of a log server
@@ -66,9 +66,9 @@ func (s *Socket) ListenAddr() net.Addr {
 	return s.ln.Addr()
 }
 
-// SetQPusher implements transport.Server
-func (s *Socket) SetQPusher(q transport.RequestHandler) {
-	s.q = q
+// SetHandler implements transport.Server
+func (s *Socket) SetHandler(h transport.RequestHandler) {
+	s.h = h
 }
 
 func (s *Socket) listenAndServe(wait bool) error {
@@ -296,7 +296,7 @@ func (s *Socket) handleConnection(conn *Conn) {
 		// start := s.startInstrumentation(req)
 
 		internal.Debugf(s.conf, "%s: read request %v", conn.RemoteAddr(), req)
-		resp, rerr := s.q.PushRequest(ctx, req)
+		resp, rerr := s.h.PushRequest(ctx, req)
 		if rerr != nil {
 			// internal.LogError(conn.Flush())
 			log.Printf("%s error: %+v", conn.RemoteAddr(), rerr)

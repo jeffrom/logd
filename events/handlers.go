@@ -43,8 +43,12 @@ func NewHandlers(conf *config.Config) *Handlers {
 		shutdownC: make(chan error, 1),
 	}
 
-	if conf.Hostport != "" {
-		h.Register(server.NewSocket(conf.Hostport, conf))
+	if conf.Host != "" {
+		h.Register(server.NewSocket(conf.Host, conf))
+	}
+
+	if conf.HttpHost != "" {
+		h.Register(server.NewHttp(conf))
 	}
 
 	return h
@@ -53,7 +57,7 @@ func NewHandlers(conf *config.Config) *Handlers {
 // Register adds a server to the event queue. The queue should be stopped when
 // Register is called.
 func (h *Handlers) Register(server transport.Server) {
-	server.SetQPusher(h)
+	server.SetHandler(h)
 	h.servers = append(h.servers, server)
 }
 

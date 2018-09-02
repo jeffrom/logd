@@ -14,9 +14,9 @@ type MockSocket struct {
 
 // NewMockSocket returns a new instance of a mock socket server
 func NewMockSocket(conf *config.Config) *MockSocket {
-	conf.Hostport = ""
+	conf.Host = ""
 	s := &MockSocket{
-		Socket: NewSocket(conf.Hostport, conf),
+		Socket: NewSocket(conf.Host, conf),
 		ml:     newMockListener(conf),
 	}
 	s.Socket.ln = s.ml
