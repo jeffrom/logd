@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"io"
 	"log"
+	"sync"
 
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/internal"
@@ -11,11 +12,12 @@ import (
 	"github.com/jeffrom/logd/protocol"
 )
 
-// topics manages the topics for an event queue.
+// topics manages the topic filesystem for the event queues.
 type topics struct {
 	conf    *config.Config
 	manager logger.TopicManager
 	m       map[string]*topic
+	mu      sync.Mutex // for m
 }
 
 func newTopics(conf *config.Config) *topics {
@@ -27,7 +29,9 @@ func newTopics(conf *config.Config) *topics {
 }
 
 func (t *topics) reset() {
+	t.mu.Lock()
 	t.m = make(map[string]*topic)
+	t.mu.Unlock()
 }
 
 // Setup implements internal.LifecycleManager
@@ -63,6 +67,7 @@ func (t *topics) Setup() error {
 // Shutdown implements LifecycleManager
 func (t *topics) Shutdown() error {
 	var firstErr error
+	t.mu.Lock()
 	for _, topic := range t.m {
 		err := topic.Shutdown()
 		if err != nil && firstErr == nil {
@@ -71,12 +76,15 @@ func (t *topics) Shutdown() error {
 			log.Printf("shutdown: %+v", err)
 		}
 	}
+	t.mu.Unlock()
 	t.reset()
 	return firstErr
 }
 
 func (t *topics) add(name string) (*topic, error) {
+	t.mu.Lock()
 	topic, ok := t.m[name]
+	t.mu.Unlock()
 	if !ok {
 		log.Printf("initializing topic: %s", name)
 		if err := t.manager.Create(name); err != nil {
@@ -86,7 +94,9 @@ func (t *topics) add(name string) (*topic, error) {
 		if err := topic.Setup(); err != nil {
 			return nil, err
 		}
+		t.mu.Lock()
 		t.m[name] = topic
+		t.mu.Unlock()
 	}
 	return topic, nil
 }

@@ -68,7 +68,7 @@ func (s *flushState) shouldFlush() bool {
 	return false
 }
 
-// eventQ manages the receiving, processing, and responding to events.
+// eventQ synchronizes access to the log.
 type eventQ struct {
 	conf         *config.Config
 	in           chan *protocol.Request

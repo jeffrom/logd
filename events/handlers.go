@@ -23,11 +23,11 @@ var blockingReqs = map[protocol.CmdType]bool{
 type Handlers struct {
 	conf      *config.Config
 	h         map[string]*eventQ
+	mu        sync.Mutex // for h
 	asyncQ    *eventQ
 	topics    *topics
 	servers   []transport.Server
 	shutdownC chan error
-	mu        sync.Mutex
 }
 
 // NewHandlers returns a new instance of *Handlers.
@@ -68,14 +68,17 @@ func (h *Handlers) GoStart() error {
 		return err
 	}
 
+	h.mu.Lock()
 	for name, topic := range h.topics.m {
 		q := newEventQ(h.conf)
 		q.setTopic(topic)
 		if err := q.GoStart(); err != nil {
+			h.mu.Unlock()
 			return err
 		}
 		h.h[name] = q
 	}
+	h.mu.Unlock()
 
 	for _, server := range h.servers {
 		server.GoServe()
@@ -124,22 +127,36 @@ func (h *Handlers) pushBlockingRequest(ctx context.Context, req *protocol.Reques
 	}
 
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	if q, ok := h.h[name]; ok {
+		h.mu.Unlock()
 		return q.PushRequest(ctx, req)
 	}
+	h.mu.Unlock()
 
+	// create a new topic if there isn't already one
 	if req.Name == protocol.CmdBatch {
+		// make sure we only create one new topic so we don't lose messages or
+		// do extra work.
+		h.mu.Lock()
+		if q, ok := h.h[name]; ok {
+			h.mu.Unlock()
+			return q.PushRequest(ctx, req)
+		}
+
 		q := newEventQ(h.conf)
 		topic, err := h.topics.add(name)
 		if err != nil {
+			h.mu.Unlock()
 			return nil, err
 		}
 		q.setTopic(topic)
 		if err := q.GoStart(); err != nil {
+			h.mu.Unlock()
 			return nil, err
 		}
+
 		h.h[name] = q
+		h.mu.Unlock()
 		return q.PushRequest(ctx, req)
 	}
 	return h.asyncQ.PushRequest(ctx, req)

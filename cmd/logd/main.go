@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"runtime/trace"
 	"strings"
 	"syscall"
 
@@ -17,6 +18,7 @@ import (
 
 var cfgFile string
 var tmpConfig = config.New()
+var traceFile = ""
 
 func init() {
 	cobra.OnInitialize(initConfig)
@@ -63,6 +65,8 @@ func init() {
 
 	pflags.DurationVar(&tmpConfig.FlushInterval, "flush-interval", config.Default.FlushInterval, "amount of time to wait before flushing")
 	viper.BindPFlag("flush-interval", pflags.Lookup("flush-interval"))
+
+	pflags.StringVar(&traceFile, "trace", "", "save execution trace data")
 }
 
 func initConfig() {
@@ -88,6 +92,16 @@ var RootCmd = &cobra.Command{
 	Short: "logd - networked log transport",
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
+		if traceFile != "" {
+			f, err := os.Create(traceFile)
+			if err != nil {
+				panic(err)
+			}
+			defer f.Close()
+
+			trace.Start(f)
+			defer trace.Stop()
+		}
 		conf := tmpConfig
 		h := events.NewHandlers(conf)
 

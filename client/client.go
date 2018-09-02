@@ -240,6 +240,7 @@ func (c *Client) BatchRaw(b []byte) (uint64, error) {
 		return 0, err
 	}
 
+	// TODO same as Batch retries todo above
 	if _, _, err := c.do(c.rawbatchbuf); err != nil {
 		return 0, err
 	}
