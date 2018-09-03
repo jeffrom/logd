@@ -37,7 +37,7 @@ func New() *Config {
 var Default = &Config{
 	Host:            "localhost:1774",
 	HttpHost:        "localhost:1775",
-	Timeout:         2 * time.Second,
+	Timeout:         10 * time.Second,
 	IdleTimeout:     30 * time.Second,
 	ShutdownTimeout: 15 * time.Second,
 	WorkDir:         "logs/",

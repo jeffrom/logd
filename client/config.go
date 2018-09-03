@@ -40,7 +40,7 @@ type Config struct {
 var DefaultConfig = &Config{
 	Verbose:              false,
 	Hostport:             "127.0.0.1:1774",
-	Timeout:              1 * time.Second,
+	Timeout:              10 * time.Second,
 	WriteTimeout:         -1,
 	ReadTimeout:          -1,
 	Count:                false,
