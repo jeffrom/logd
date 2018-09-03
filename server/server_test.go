@@ -28,7 +28,7 @@ func NewTestServer(conf *config.Config) *Socket {
 func expectClose(rh *transport.MockRequestHandler) {
 	rh.Expect(func(req *protocol.Request) *protocol.Response {
 		conf := testhelper.DefaultConfig(testing.Verbose())
-		resp := protocol.NewResponse(conf)
+		resp := protocol.NewResponseConfig(conf)
 		cr := protocol.NewClientOKResponse(conf)
 		req.WriteResponse(resp, cr)
 		return resp
@@ -108,7 +108,7 @@ func TestBatch(t *testing.T) {
 	t.Log(batch)
 
 	rh.Expect(func(req *protocol.Request) *protocol.Response {
-		resp := protocol.NewResponse(conf)
+		resp := protocol.NewResponseConfig(conf)
 		cr := protocol.NewClientBatchResponse(conf, 0, 1)
 		req.WriteResponse(resp, cr)
 		return resp
@@ -142,7 +142,7 @@ func TestFailedRequest(t *testing.T) {
 	t.Log(batch)
 
 	rh.Expect(func(req *protocol.Request) *protocol.Response {
-		resp := protocol.NewResponse(conf)
+		resp := protocol.NewResponseConfig(conf)
 		return resp
 	})
 

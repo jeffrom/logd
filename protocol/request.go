@@ -14,6 +14,7 @@ type Request struct {
 	conf      *config.Config
 	Name      CmdType
 	responseC chan *Response
+	Response  *Response
 
 	respBuf *closingBuffer
 
@@ -30,6 +31,7 @@ type Request struct {
 func NewRequest() *Request {
 	return &Request{
 		responseC: make(chan *Response),
+		Response:  NewResponse(),
 		args:      make([][]byte, maxArgs),
 		respBuf:   newClosingBuffer(),
 	}
@@ -46,6 +48,7 @@ func (req *Request) WithConfig(conf *config.Config) *Request {
 	if len(req.raw) < conf.MaxBatchSize {
 		req.raw = make([]byte, conf.MaxBatchSize)
 	}
+	req.Response.WithConfig(conf)
 	return req
 }
 
@@ -58,6 +61,7 @@ func (req *Request) Reset() {
 	req.body = nil
 	req.bodysize = 0
 	req.respBuf.Reset()
+	req.Response.Reset()
 
 	select {
 	case <-req.responseC:

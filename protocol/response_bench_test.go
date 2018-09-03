@@ -7,7 +7,7 @@ import (
 
 func BenchmarkBatchResponseWrite(b *testing.B) {
 	conf := protocolBenchConfig()
-	cr := NewClientResponse(conf)
+	cr := NewClientResponseConfig(conf)
 	cr.SetOffset(1000)
 	w := ioutil.Discard
 

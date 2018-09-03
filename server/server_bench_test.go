@@ -28,7 +28,7 @@ func BenchmarkClientBatch(b *testing.B) {
 	defer CloseTestServer(b, srv, rh)
 
 	rh.Respond(func(req *protocol.Request) *protocol.Response {
-		resp := protocol.NewResponse(conf)
+		resp := protocol.NewResponseConfig(conf)
 		cr := protocol.NewClientBatchResponse(conf, 0, 1)
 		req.WriteResponse(resp, cr)
 		return resp

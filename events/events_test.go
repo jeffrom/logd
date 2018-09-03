@@ -241,7 +241,7 @@ func TestUnknownCommand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cr := protocol.NewClientResponse(conf)
+	cr := protocol.NewClientResponseConfig(conf)
 	if _, rerr := cr.ReadFrom(bufio.NewReader(r)); rerr != nil {
 		t.Fatalf("unexpected error reading response: %+v", rerr)
 	}
@@ -293,7 +293,7 @@ func checkBatchResp(t testing.TB, conf *config.Config, resp *protocol.Response) 
 	}
 	defer r.Close()
 
-	cr := protocol.NewClientResponse(conf)
+	cr := protocol.NewClientResponseConfig(conf)
 	if _, rerr := cr.ReadFrom(bufio.NewReader(r)); rerr != nil {
 		log.Panicf("unexpected error reading batch: %+v", rerr)
 	}

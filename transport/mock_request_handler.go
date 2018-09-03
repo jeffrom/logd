@@ -137,7 +137,7 @@ func (rh *MockRequestHandler) PushRequest(ctx context.Context, req *protocol.Req
 	select {
 	case resp := <-req.Responded():
 		if resp == nil {
-			return protocol.NewResponse(config.Default), errors.New("no response")
+			return protocol.NewResponseConfig(config.Default), errors.New("no response")
 		}
 		return resp, nil
 	case <-ctx.Done():

@@ -9,7 +9,7 @@ import (
 
 func TestWriteClientResponse(t *testing.T) {
 	conf := testhelper.DefaultConfig(testing.Verbose())
-	resp := NewClientResponse(conf)
+	resp := NewClientResponseConfig(conf)
 	resp.SetOffset(10)
 	resp.SetBatches(20)
 	fixture := testhelper.LoadFixture("batch_response.simple")

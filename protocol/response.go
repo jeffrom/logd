@@ -89,29 +89,46 @@ func (resp RespType) String() string {
 // Response is a response the conn can use to send bytes back to the client.
 // can returns bytes as well as *os.File-s
 type Response struct {
-	conf       *config.Config
-	readers    []io.ReadCloser
-	numReaders int
-	numScanned int
+	conf           *config.Config
+	ClientResponse *ClientResponse
+	readers        []io.ReadCloser
+	numReaders     int
+	numScanned     int
 }
 
-// NewResponse returns a new response
-func NewResponse(conf *config.Config) *Response {
+// NewResponse returns a new response.
+func NewResponse() *Response {
 	return &Response{
-		conf:    conf,
-		readers: make([]io.ReadCloser, conf.MaxPartitions+1),
+		ClientResponse: NewClientResponse(),
 	}
+}
+
+func (r *Response) WithConfig(conf *config.Config) *Response {
+	r.conf = conf
+	if len(r.readers) < conf.MaxPartitions+1 {
+		r.readers = make([]io.ReadCloser, conf.MaxPartitions+1)
+	}
+	r.ClientResponse.WithConfig(conf)
+	return r
+}
+
+// NewResponseConfig returns a new response with configuration.
+func NewResponseConfig(conf *config.Config) *Response {
+	return NewResponse().WithConfig(conf)
 }
 
 // NewResponseErr returns a new instance of Response and writes it to the request
 func NewResponseErr(conf *config.Config, req *Request, err error) (*Response, error) {
 	clientResp := NewClientErrResponse(conf, err)
-	resp := NewResponse(conf)
+	resp := NewResponseConfig(conf)
 	if _, werr := req.WriteResponse(resp, clientResp); werr != nil {
 		return resp, werr
 	}
 	return resp, err
 }
+
+// func (r *Response) WithError(req *Request, err error) (*Response, error) {
+// }
 
 // Reset sets the response to its initial values
 func (r *Response) Reset() {
@@ -120,6 +137,7 @@ func (r *Response) Reset() {
 	}
 	r.numReaders = 0
 	r.numScanned = 0
+	r.ClientResponse.Reset()
 }
 
 // AddReader adds a reader for the server to send back over the conn

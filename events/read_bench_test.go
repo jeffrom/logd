@@ -58,6 +58,7 @@ func benchmarkRead(b *testing.B, conf *config.Config, q *Handlers, offs []uint64
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
+		req.Response.Reset()
 		_, err := q.PushRequest(ctx, req)
 		if err != nil {
 			b.Fatalf("unexpected error doing read: %+v", err)
@@ -87,6 +88,7 @@ func writeBatches(b testing.TB, conf *config.Config, q *Handlers) []uint64 {
 	var offs []uint64
 	n := conf.MaxPartitions * len(fixture)
 	for i := 0; i < n; i++ {
+		req.Response.Reset()
 		resp, err := q.PushRequest(ctx, req)
 		if err != nil {
 			b.Fatalf("unexpected error writing batches: %+v", err)

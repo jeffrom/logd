@@ -78,7 +78,7 @@ func New(conf *Config) *Client {
 		dialer:       &netDialer{},
 		readTimeout:  conf.getReadTimeout(),
 		writeTimeout: conf.getWriteTimeout(),
-		cr:           protocol.NewClientResponse(gconf),
+		cr:           protocol.NewClientResponseConfig(gconf),
 		bs:           protocol.NewBatchScanner(gconf, nil),
 		readreq:      protocol.NewRead(gconf),
 		tailreq:      protocol.NewTail(gconf),

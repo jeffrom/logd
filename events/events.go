@@ -203,7 +203,7 @@ func (q *eventQ) Stop() error {
 }
 
 func (q *eventQ) handleBatch(req *protocol.Request) (*protocol.Response, error) {
-	resp := protocol.NewResponse(q.conf)
+	resp := req.Response
 	q.tmpBatch.Reset()
 	batch, err := q.tmpBatch.FromRequest(req)
 	if err != nil {
@@ -240,7 +240,9 @@ func (q *eventQ) handleBatch(req *protocol.Request) (*protocol.Response, error) 
 	}
 
 	// respond
-	cr := protocol.NewClientBatchResponse(q.conf, respOffset, 1)
+	cr := req.Response.ClientResponse
+	cr.SetOffset(respOffset)
+	cr.SetBatches(1)
 	_, err = req.WriteResponse(resp, cr)
 	if err != nil {
 		return errResponse(q.conf, req, resp, err)
@@ -262,7 +264,7 @@ func (q *eventQ) doFlush() error {
 }
 
 func (q *eventQ) handleRead(req *protocol.Request) (*protocol.Response, error) {
-	resp := protocol.NewResponse(q.conf)
+	resp := req.Response
 	readreq, err := protocol.NewRead(q.conf).FromRequest(req)
 	if err != nil {
 		return errResponse(q.conf, req, resp, err)
@@ -287,7 +289,9 @@ func (q *eventQ) handleRead(req *protocol.Request) (*protocol.Response, error) {
 	}
 
 	// respond OK
-	cr := protocol.NewClientBatchResponse(q.conf, readreq.Offset, partArgs.nbatches)
+	cr := req.Response.ClientResponse
+	cr.SetOffset(readreq.Offset)
+	cr.SetBatches(partArgs.nbatches)
 	_, err = req.WriteResponse(resp, cr)
 	if err != nil {
 		return errResponse(q.conf, req, resp, err)
@@ -310,7 +314,7 @@ func (q *eventQ) handleRead(req *protocol.Request) (*protocol.Response, error) {
 }
 
 func (q *eventQ) handleTail(req *protocol.Request) (*protocol.Response, error) {
-	resp := protocol.NewResponse(q.conf)
+	resp := req.Response
 	tailreq, err := protocol.NewTail(q.conf).FromRequest(req)
 	if err != nil {
 		return errResponse(q.conf, req, resp, err)
@@ -333,7 +337,9 @@ func (q *eventQ) handleTail(req *protocol.Request) (*protocol.Response, error) {
 	}
 
 	// respond OK
-	cr := protocol.NewClientBatchResponse(q.conf, off, partArgs.nbatches)
+	cr := req.Response.ClientResponse
+	cr.SetOffset(off)
+	cr.SetBatches(partArgs.nbatches)
 	_, err = req.WriteResponse(resp, cr)
 	if err != nil {
 		return errResponse(q.conf, req, resp, err)
@@ -355,8 +361,9 @@ func (q *eventQ) handleTail(req *protocol.Request) (*protocol.Response, error) {
 }
 
 func (q *eventQ) handleStats(req *protocol.Request) (*protocol.Response, error) {
-	resp := protocol.NewResponse(q.conf)
-	cr := protocol.NewClientMultiResponse(q.conf, stats.MultiOK())
+	resp := req.Response
+	cr := req.Response.ClientResponse
+	cr.SetMultiResp(stats.MultiOK())
 	_, err := req.WriteResponse(resp, cr)
 	if err != nil {
 		return errResponse(q.conf, req, resp, err)
@@ -365,8 +372,9 @@ func (q *eventQ) handleStats(req *protocol.Request) (*protocol.Response, error) 
 }
 
 func (q *eventQ) handleClose(req *protocol.Request) (*protocol.Response, error) {
-	resp := protocol.NewResponse(q.conf)
-	cr := protocol.NewClientOKResponse(q.conf)
+	resp := req.Response
+	cr := req.Response.ClientResponse
+	cr.SetOK()
 	_, err := req.WriteResponse(resp, cr)
 	if err != nil {
 		return errResponse(q.conf, req, resp, err)
@@ -375,8 +383,9 @@ func (q *eventQ) handleClose(req *protocol.Request) (*protocol.Response, error) 
 }
 
 func (q *eventQ) handleConfig(req *protocol.Request) (*protocol.Response, error) {
-	resp := protocol.NewResponse(q.conf)
-	cr := protocol.NewClientMultiResponse(q.conf, q.confResp.MultiResponse())
+	resp := req.Response
+	cr := req.Response.ClientResponse
+	cr.SetMultiResp(q.confResp.MultiResponse())
 	_, err := req.WriteResponse(resp, cr)
 	if err != nil {
 		return errResponse(q.conf, req, resp, err)

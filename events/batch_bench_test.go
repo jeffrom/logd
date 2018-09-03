@@ -40,6 +40,7 @@ func benchmarkBatch(b *testing.B, conf *config.Config, logw logger.LogWriter) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
+		req.Response.Reset()
 		_, err := h.PushRequest(ctx, req)
 		if err != nil {
 			b.Fatalf("unexpected error writing batches: %+v", err)

@@ -56,18 +56,21 @@ type ClientResponse struct {
 	digitbuf [32]byte
 }
 
-// NewClientResponse creates a new instance of *ClientResponse
-func NewClientResponse(conf *config.Config) *ClientResponse {
-	cr := &ClientResponse{
-		conf: conf,
-	}
+func NewClientResponse() *ClientResponse { return &ClientResponse{} }
 
+func (cr *ClientResponse) WithConfig(conf *config.Config) *ClientResponse {
+	cr.conf = conf
 	return cr
+}
+
+// NewClientResponseConfig creates a new instance of *ClientResponse
+func NewClientResponseConfig(conf *config.Config) *ClientResponse {
+	return NewClientResponse().WithConfig(conf)
 }
 
 // NewClientBatchResponse returns a successful batch *ClientResponse
 func NewClientBatchResponse(conf *config.Config, off uint64, batches int) *ClientResponse {
-	cr := NewClientResponse(conf)
+	cr := NewClientResponseConfig(conf)
 	cr.SetOffset(off)
 	cr.SetBatches(batches)
 	return cr
@@ -75,21 +78,21 @@ func NewClientBatchResponse(conf *config.Config, off uint64, batches int) *Clien
 
 // NewClientOKResponse returns a successful batch *ClientResponse
 func NewClientOKResponse(conf *config.Config) *ClientResponse {
-	cr := NewClientResponse(conf)
-	cr.ok = true
+	cr := NewClientResponseConfig(conf)
+	cr.SetOK()
 	return cr
 }
 
 // NewClientMultiResponse returns a successful MOK response
 func NewClientMultiResponse(conf *config.Config, p []byte) *ClientResponse {
-	cr := NewClientResponse(conf)
+	cr := NewClientResponseConfig(conf)
 	cr.SetMultiResp(p)
 	return cr
 }
 
 // NewClientErrResponse returns an error response
 func NewClientErrResponse(conf *config.Config, err error) *ClientResponse {
-	cr := NewClientResponse(conf)
+	cr := NewClientResponseConfig(conf)
 	cr.SetError(err)
 	return cr
 }
@@ -153,6 +156,10 @@ func (cr *ClientResponse) Error() error {
 // SetMultiResp sets the MOK response body
 func (cr *ClientResponse) SetMultiResp(p []byte) {
 	cr.mokBuf = p
+}
+
+func (cr *ClientResponse) SetOK() {
+	cr.ok = true
 }
 
 // Ok returns true if the request has succeeded
