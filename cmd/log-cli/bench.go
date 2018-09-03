@@ -103,6 +103,7 @@ func (bc *benchConn) start() {
 	for {
 		select {
 		case <-bc.done:
+			bc.c.Close()
 			return
 		default:
 		}
