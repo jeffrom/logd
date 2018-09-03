@@ -319,7 +319,7 @@ func (s *Socket) doRequest(ctx context.Context, conn *Conn) error {
 	stats.BytesOut.Add(int64(n))
 	if reqerr != nil {
 		internal.LogError(conn.Flush())
-		log.Printf("%s response error: %+v", conn.RemoteAddr(), reqerr)
+		log.Printf("%s: response error: %+v", conn.RemoteAddr(), reqerr)
 		s.finishRequest(req)
 		return reqerr
 	}

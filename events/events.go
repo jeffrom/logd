@@ -3,6 +3,7 @@ package events
 import (
 	"context"
 	stderrors "errors"
+	"expvar"
 	"io"
 	"log"
 	"time"
@@ -156,16 +157,22 @@ func (q *eventQ) loop() { // nolint: gocyclo
 			switch req.Name {
 			case protocol.CmdBatch:
 				resp, err = q.handleBatch(req)
+				instrumentRequest(stats.BatchRequests, stats.BatchErrors, err)
 			case protocol.CmdRead:
 				resp, err = q.handleRead(req)
+				instrumentRequest(stats.ReadRequests, stats.ReadErrors, err)
 			case protocol.CmdTail:
 				resp, err = q.handleTail(req)
+				instrumentRequest(stats.TailRequests, stats.TailErrors, err)
 			case protocol.CmdStats:
 				resp, err = q.handleStats(req)
+				instrumentRequest(stats.StatsRequests, stats.StatsErrors, err)
 			case protocol.CmdClose:
 				resp, err = q.handleClose(req)
+				instrumentRequest(stats.CloseRequests, stats.CloseErrors, err)
 			case protocol.CmdConfig:
 				resp, err = q.handleConfig(req)
+				instrumentRequest(stats.ConfigRequests, stats.ConfigErrors, err)
 			default:
 				log.Printf("unhandled request type passed: %v", req.Name)
 				resp, err = protocol.NewResponseErr(q.conf, req, protocol.ErrInvalid)
@@ -175,8 +182,6 @@ func (q *eventQ) loop() { // nolint: gocyclo
 				log.Printf("error handling %s request: %+v", &req.Name, err)
 			}
 			req.Respond(resp)
-
-			stats.TotalRequests.Add(1)
 		case <-q.stopC:
 			return
 		}
@@ -241,7 +246,6 @@ func (q *eventQ) handleBatch(req *protocol.Request) (*protocol.Response, error) 
 		return errResponse(q.conf, req, resp, err)
 	}
 
-	stats.BatchRequests.Add(1)
 	return resp, nil
 }
 
@@ -464,16 +468,18 @@ func (q *eventQ) PushRequest(ctx context.Context, req *protocol.Request) (*proto
 }
 
 func errResponse(conf *config.Config, req *protocol.Request, resp *protocol.Response, err error) (*protocol.Response, error) {
-	stats.TotalErrors.Add(1)
-	switch req.Name {
-	case protocol.CmdBatch:
-		stats.BatchErrors.Add(1)
-	default:
-	}
-
 	clientResp := protocol.NewClientErrResponse(conf, err)
 	if _, werr := req.WriteResponse(resp, clientResp); werr != nil {
 		return resp, werr
 	}
 	return resp, err
+}
+
+func instrumentRequest(stat *expvar.Int, errStat *expvar.Int, err error) {
+	stats.TotalRequests.Add(1)
+	if err != nil {
+		errStat.Add(1)
+	} else {
+		stat.Add(1)
+	}
 }

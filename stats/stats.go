@@ -14,8 +14,18 @@ var (
 	BytesOut          *expvar.Int
 	TotalRequests     *expvar.Int
 	BatchRequests     *expvar.Int
+	ReadRequests      *expvar.Int
+	TailRequests      *expvar.Int
+	StatsRequests     *expvar.Int
+	CloseRequests     *expvar.Int
+	ConfigRequests    *expvar.Int
 	TotalErrors       *expvar.Int
 	BatchErrors       *expvar.Int
+	ReadErrors        *expvar.Int
+	TailErrors        *expvar.Int
+	StatsErrors       *expvar.Int
+	CloseErrors       *expvar.Int
+	ConfigErrors      *expvar.Int
 )
 
 func init() {
@@ -27,9 +37,19 @@ func init() {
 
 	TotalRequests = expvar.NewInt("requests.total")
 	BatchRequests = expvar.NewInt("requests.batch")
+	ReadRequests = expvar.NewInt("requests.read")
+	TailRequests = expvar.NewInt("requests.tail")
+	StatsRequests = expvar.NewInt("requests.stats")
+	CloseRequests = expvar.NewInt("requests.close")
+	ConfigRequests = expvar.NewInt("requests.config")
 
 	TotalErrors = expvar.NewInt("errors.total")
 	BatchErrors = expvar.NewInt("errors.batch")
+	ReadErrors = expvar.NewInt("errors.read")
+	TailErrors = expvar.NewInt("errors.tail")
+	StatsErrors = expvar.NewInt("errors.stats")
+	CloseErrors = expvar.NewInt("errors.close")
+	ConfigErrors = expvar.NewInt("errors.config")
 }
 
 // MultiOK returns an MOK response body
@@ -51,7 +71,7 @@ func periodicFlush() {
 	for {
 		time.Sleep(5 * time.Second)
 		expvar.Do(func(kv expvar.KeyValue) {
-			if kv.Key == "memstats" {
+			if kv.Key == "memstats" || kv.Key == "cmdline" {
 				return
 			}
 			fmt.Println(kv.Key, kv.Value.String())
