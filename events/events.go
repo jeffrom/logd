@@ -175,7 +175,13 @@ func (q *eventQ) loop() { // nolint: gocyclo
 				instrumentRequest(stats.ConfigRequests, stats.ConfigErrors, err)
 			default:
 				log.Printf("unhandled request type passed: %v", req.Name)
-				resp, err = protocol.NewResponseErr(q.conf, req, protocol.ErrInvalid)
+				resp = req.Response
+				cr := req.Response.ClientResponse
+				cr.SetError(protocol.ErrInvalid)
+				err = protocol.ErrInvalid
+				if _, werr := req.WriteResponse(resp, cr); werr != nil {
+					err = werr
+				}
 			}
 
 			if err != nil && err != protocol.ErrNotFound {
@@ -477,7 +483,8 @@ func (q *eventQ) PushRequest(ctx context.Context, req *protocol.Request) (*proto
 }
 
 func errResponse(conf *config.Config, req *protocol.Request, resp *protocol.Response, err error) (*protocol.Response, error) {
-	clientResp := protocol.NewClientErrResponse(conf, err)
+	clientResp := req.Response.ClientResponse
+	clientResp.SetError(err)
 	if _, werr := req.WriteResponse(resp, clientResp); werr != nil {
 		return resp, werr
 	}

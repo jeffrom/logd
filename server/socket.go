@@ -309,7 +309,7 @@ func (s *Socket) doRequest(ctx context.Context, conn *Conn) error {
 	if rerr != nil {
 		// internal.LogError(conn.Flush())
 		log.Printf("%s error: %+v", conn.RemoteAddr(), rerr)
-		resp = protocol.NewResponseConfig(s.conf)
+		resp = req.Response
 	}
 	internal.Debugf(s.conf, "%s: got response: %+v", conn.RemoteAddr(), resp)
 

@@ -127,9 +127,6 @@ func NewResponseErr(conf *config.Config, req *Request, err error) (*Response, er
 	return resp, err
 }
 
-// func (r *Response) WithError(req *Request, err error) (*Response, error) {
-// }
-
 // Reset sets the response to its initial values
 func (r *Response) Reset() {
 	for i := 0; i < r.numReaders; i++ {
