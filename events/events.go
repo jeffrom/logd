@@ -3,6 +3,7 @@ package events
 import (
 	"context"
 	stderrors "errors"
+	"expvar"
 	"io"
 	"log"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/internal"
 	"github.com/jeffrom/logd/protocol"
+	"github.com/jeffrom/logd/stats"
 )
 
 // this file contains the core logic of the program. Commands come from the
@@ -155,16 +157,22 @@ func (q *eventQ) loop() { // nolint: gocyclo
 			switch req.Name {
 			case protocol.CmdBatch:
 				resp, err = q.handleBatch(req)
+				instrumentRequest(stats.BatchRequests, stats.BatchErrors, err)
 			case protocol.CmdRead:
 				resp, err = q.handleRead(req)
+				instrumentRequest(stats.ReadRequests, stats.ReadErrors, err)
 			case protocol.CmdTail:
 				resp, err = q.handleTail(req)
+				instrumentRequest(stats.TailRequests, stats.TailErrors, err)
 			case protocol.CmdStats:
 				resp, err = q.handleStats(req)
+				instrumentRequest(stats.StatsRequests, stats.StatsErrors, err)
 			case protocol.CmdClose:
 				resp, err = q.handleClose(req)
+				instrumentRequest(stats.CloseRequests, stats.CloseErrors, err)
 			case protocol.CmdConfig:
 				resp, err = q.handleConfig(req)
+				instrumentRequest(stats.ConfigRequests, stats.ConfigErrors, err)
 			default:
 				log.Printf("unhandled request type passed: %v", req.Name)
 				resp, err = protocol.NewResponseErr(q.conf, req, protocol.ErrInvalid)
@@ -174,7 +182,6 @@ func (q *eventQ) loop() { // nolint: gocyclo
 				log.Printf("error handling %s request: %+v", &req.Name, err)
 			}
 			req.Respond(resp)
-
 		case <-q.stopC:
 			return
 		}
@@ -349,7 +356,7 @@ func (q *eventQ) handleTail(req *protocol.Request) (*protocol.Response, error) {
 
 func (q *eventQ) handleStats(req *protocol.Request) (*protocol.Response, error) {
 	resp := protocol.NewResponse(q.conf)
-	cr := protocol.NewClientMultiResponse(q.conf, q.Stats.Bytes())
+	cr := protocol.NewClientMultiResponse(q.conf, stats.MultiOK())
 	_, err := req.WriteResponse(resp, cr)
 	if err != nil {
 		return errResponse(q.conf, req, resp, err)
@@ -466,4 +473,13 @@ func errResponse(conf *config.Config, req *protocol.Request, resp *protocol.Resp
 		return resp, werr
 	}
 	return resp, err
+}
+
+func instrumentRequest(stat *expvar.Int, errStat *expvar.Int, err error) {
+	stats.TotalRequests.Add(1)
+	if err != nil {
+		errStat.Add(1)
+	} else {
+		stat.Add(1)
+	}
 }

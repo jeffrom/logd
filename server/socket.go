@@ -247,8 +247,8 @@ func (s *Socket) removeConn(conn *Conn) {
 
 func (s *Socket) handleConnection(conn *Conn) {
 	// s.q.Stats.Incr("connections")
-	// stats.TotalConnections.Add("tcp", 1)
-	// stats.ActiveConnections.Add("tcp", 1)
+	stats.TotalConnections.Add(1)
+	stats.ActiveConnections.Add(1)
 
 	var (
 		ctx    context.Context
@@ -260,7 +260,7 @@ func (s *Socket) handleConnection(conn *Conn) {
 	defer func() {
 		cancel()
 		// s.q.Stats.Decr("connections")
-		// stats.ActiveConnections.Add("tcp", -1)
+		stats.ActiveConnections.Add(-1)
 
 		if err := conn.close(); err != nil {
 			internal.Debugf(s.conf, "error closing connection: %+v", err)
@@ -274,54 +274,64 @@ func (s *Socket) handleConnection(conn *Conn) {
 			break
 		}
 
-		if err := conn.setWaitForCmdDeadline(); err != nil {
-			log.Printf("%s error: %+v", conn.RemoteAddr(), err)
+		if err := s.doRequest(ctx, conn); err != nil {
 			return
 		}
-
-		req := reqPool.Get().(*protocol.Request).WithConfig(s.conf)
-		req.Reset()
-
-		internal.Debugf(s.conf, "%s: waiting for request", conn.RemoteAddr())
-		if _, rerr := req.ReadFrom(conn.br); rerr != nil {
-			// conn.Flush()
-			if rerr != io.EOF {
-				log.Printf("%s read error: %+v", conn.RemoteAddr(), rerr)
-			}
-
-			s.finishRequest(req)
-			return
-		}
-
-		// start := s.startInstrumentation(req)
-
-		internal.Debugf(s.conf, "%s: read request %v", conn.RemoteAddr(), req)
-		resp, rerr := s.h.PushRequest(ctx, req)
-		if rerr != nil {
-			// internal.LogError(conn.Flush())
-			log.Printf("%s error: %+v", conn.RemoteAddr(), rerr)
-			resp = protocol.NewResponse(s.conf)
-		}
-		internal.Debugf(s.conf, "%s: got response: %+v", conn.RemoteAddr(), resp)
-
-		// s.finishInstrumentation(req, start)
-
-		n, rerr := s.sendResponse(conn, resp)
-		if rerr != nil {
-			internal.LogError(conn.Flush())
-			log.Printf("%s response error: %+v", conn.RemoteAddr(), rerr)
-			s.finishRequest(req)
-			return
-		}
-		internal.Debugf(s.conf, "%s: sent response (%d bytes)", conn.RemoteAddr(), n)
-
-		if ferr := conn.Flush(); ferr != nil || req.Name == protocol.CmdClose {
-			internal.Debugf(s.conf, "%s: closing", conn.RemoteAddr())
-			s.finishRequest(req)
-			return
-		}
-		s.finishRequest(req)
 	}
+}
+
+func (s *Socket) doRequest(ctx context.Context, conn *Conn) error {
+	if err := conn.setWaitForCmdDeadline(); err != nil {
+		log.Printf("%s error: %+v", conn.RemoteAddr(), err)
+		return err
+	}
+
+	req := reqPool.Get().(*protocol.Request).WithConfig(s.conf)
+	req.Reset()
+
+	internal.Debugf(s.conf, "%s: waiting for request", conn.RemoteAddr())
+	readn, rerr := req.ReadFrom(conn.br)
+	stats.BytesIn.Add(readn)
+	if rerr != nil {
+		// conn.Flush()
+		if rerr != io.EOF {
+			log.Printf("%s read error: %+v", conn.RemoteAddr(), rerr)
+		}
+
+		s.finishRequest(req)
+		return rerr
+	}
+
+	// start := s.startInstrumentation(req)
+
+	internal.Debugf(s.conf, "%s: read request %v", conn.RemoteAddr(), req)
+	resp, rerr := s.h.PushRequest(ctx, req)
+	if rerr != nil {
+		// internal.LogError(conn.Flush())
+		log.Printf("%s error: %+v", conn.RemoteAddr(), rerr)
+		resp = protocol.NewResponse(s.conf)
+	}
+	internal.Debugf(s.conf, "%s: got response: %+v", conn.RemoteAddr(), resp)
+
+	// s.finishInstrumentation(req, start)
+
+	n, reqerr := s.sendResponse(conn, resp)
+	stats.BytesOut.Add(int64(n))
+	if reqerr != nil {
+		internal.LogError(conn.Flush())
+		log.Printf("%s: response error: %+v", conn.RemoteAddr(), reqerr)
+		s.finishRequest(req)
+		return reqerr
+	}
+	internal.Debugf(s.conf, "%s: sent response (%d bytes)", conn.RemoteAddr(), n)
+
+	if ferr := conn.Flush(); ferr != nil || req.Name == protocol.CmdClose {
+		internal.Debugf(s.conf, "%s: closing", conn.RemoteAddr())
+		s.finishRequest(req)
+		return ferr
+	}
+	s.finishRequest(req)
+	return nil
 }
 
 // TODO should this take context and wait for ctx.Done()?
@@ -382,9 +392,9 @@ func (s *Socket) finishInstrumentation(req *protocol.Request, start time.Time) {
 
 	switch req.Name {
 	case protocol.CmdBatch:
-		stats.Timing("batch.latency", start)
+		// stats.Timing("batch.latency", start)
 	case protocol.CmdRead, protocol.CmdTail:
-		stats.Timing("read.latency", start)
+		// stats.Timing("read.latency", start)
 	default:
 	}
 }
