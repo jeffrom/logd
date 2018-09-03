@@ -241,6 +241,7 @@ func (q *eventQ) handleBatch(req *protocol.Request) (*protocol.Response, error) 
 		return errResponse(q.conf, req, resp, err)
 	}
 
+	stats.BatchRequests.Add(1)
 	return resp, nil
 }
 
@@ -463,6 +464,13 @@ func (q *eventQ) PushRequest(ctx context.Context, req *protocol.Request) (*proto
 }
 
 func errResponse(conf *config.Config, req *protocol.Request, resp *protocol.Response, err error) (*protocol.Response, error) {
+	stats.TotalErrors.Add(1)
+	switch req.Name {
+	case protocol.CmdBatch:
+		stats.BatchErrors.Add(1)
+	default:
+	}
+
 	clientResp := protocol.NewClientErrResponse(conf, err)
 	if _, werr := req.WriteResponse(resp, clientResp); werr != nil {
 		return resp, werr

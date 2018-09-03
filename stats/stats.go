@@ -13,6 +13,9 @@ var (
 	BytesIn           *expvar.Int
 	BytesOut          *expvar.Int
 	TotalRequests     *expvar.Int
+	BatchRequests     *expvar.Int
+	TotalErrors       *expvar.Int
+	BatchErrors       *expvar.Int
 )
 
 func init() {
@@ -23,6 +26,10 @@ func init() {
 	BytesOut = expvar.NewInt("bytes.out")
 
 	TotalRequests = expvar.NewInt("requests.total")
+	BatchRequests = expvar.NewInt("requests.batch")
+
+	TotalErrors = expvar.NewInt("errors.total")
+	BatchErrors = expvar.NewInt("errors.batch")
 }
 
 // MultiOK returns an MOK response body
