@@ -1,42 +1,43 @@
 package stats
 
 import (
+	"bytes"
 	"expvar"
 	"fmt"
-	"net/http"
 	"time"
-
-	"github.com/zserge/metric"
 )
 
 var (
-	TotalConnections  *expvar.Map
-	ActiveConnections *expvar.Map
-	TotalRequests     *expvar.Map
+	TotalConnections  *expvar.Int
+	ActiveConnections *expvar.Int
+	BytesIn           *expvar.Int
+	BytesOut          *expvar.Int
+	TotalRequests     *expvar.Int
 )
 
 func init() {
-	TotalConnections = expvar.NewMap("conns.total")
-	ActiveConnections = expvar.NewMap("conns.active")
+	TotalConnections = expvar.NewInt("conns.total")
+	ActiveConnections = expvar.NewInt("conns.active")
 
-	TotalRequests = expvar.NewMap("requests.total")
+	BytesIn = expvar.NewInt("bytes.in")
+	BytesOut = expvar.NewInt("bytes.out")
 
-	// expvar.Publish("batch.latency", metric.NewHistogram("5m1s", "15m30s", "1h1m"))
-	// expvar.Publish("read.latency", metric.NewHistogram("5m1s", "15m30s", "1h1m"))
-
-	// go periodicFlush()
-	// go tmpSetupHTTP()
+	TotalRequests = expvar.NewInt("requests.total")
 }
 
-// Timing updates a histogram with millisecond timing
-func Timing(name string, start time.Time) {
-	expvar.Get(name).(metric.Metric).Add(float64(time.Since(start).Nanoseconds()) / float64(time.Millisecond))
-}
-
-func tmpSetupHTTP() {
-	http.Handle("/debug/metrics", metric.Handler(metric.Exposed))
-	http.Handle("/debug/expvar", expvar.Handler())
-	http.ListenAndServe(":1775", nil)
+// MultiOK returns an MOK response body
+func MultiOK() []byte {
+	b := &bytes.Buffer{}
+	expvar.Do(func(kv expvar.KeyValue) {
+		if kv.Key == "memstats" || kv.Key == "cmdline" {
+			return
+		}
+		b.WriteString(kv.Key)
+		b.WriteString(": ")
+		b.WriteString(kv.Value.String())
+		b.WriteString("\r\n")
+	})
+	return b.Bytes()
 }
 
 func periodicFlush() {

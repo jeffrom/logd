@@ -95,12 +95,6 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/zserge/metric"
-  packages = ["."]
-  revision = "97e3019af51acba148e6234f10c443d7d3521069"
-
-[[projects]]
-  branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
   revision = "fa5fdf94c78965f1aa8423f0cc50b8b8d728b05a"
@@ -127,6 +121,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "39c69c4cb770348689d89a72196110a619cfcb85ba2afc05ccdda5af58b22064"
+  inputs-digest = "1b17d968694c47c10ed164357a89345250489775999838115db7da66aa44617a"
   solver-name = "gps-cdcl"
   solver-version = 1

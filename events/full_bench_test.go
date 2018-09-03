@@ -122,3 +122,7 @@ func benchmarkBatchFull(b *testing.B, conf *config.Config, fixturename string, t
 		}
 	})
 }
+
+func benchmarkReadFull(b *testing.B, conf *config.Config, topics []string) {
+
+}

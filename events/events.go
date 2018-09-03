@@ -12,6 +12,7 @@ import (
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/internal"
 	"github.com/jeffrom/logd/protocol"
+	"github.com/jeffrom/logd/stats"
 )
 
 // this file contains the core logic of the program. Commands come from the
@@ -175,6 +176,7 @@ func (q *eventQ) loop() { // nolint: gocyclo
 			}
 			req.Respond(resp)
 
+			stats.TotalRequests.Add(1)
 		case <-q.stopC:
 			return
 		}
@@ -349,7 +351,7 @@ func (q *eventQ) handleTail(req *protocol.Request) (*protocol.Response, error) {
 
 func (q *eventQ) handleStats(req *protocol.Request) (*protocol.Response, error) {
 	resp := protocol.NewResponse(q.conf)
-	cr := protocol.NewClientMultiResponse(q.conf, q.Stats.Bytes())
+	cr := protocol.NewClientMultiResponse(q.conf, stats.MultiOK())
 	_, err := req.WriteResponse(resp, cr)
 	if err != nil {
 		return errResponse(q.conf, req, resp, err)
