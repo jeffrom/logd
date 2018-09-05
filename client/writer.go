@@ -1,6 +1,7 @@
 package client
 
 import (
+	"fmt"
 	"log"
 	"math"
 	"sync"
@@ -248,6 +249,7 @@ func (w *Writer) loop() {
 			}
 
 			w.err = err
+			fmt.Println(off, delta, err)
 			w.resC <- cmd.res.vals(off, delta, err)
 
 		case <-w.timer.C:
@@ -281,6 +283,8 @@ func (w *Writer) handleMsg(cmd *writerCmd) (uint64, uint64, error) {
 		if off, err := w.handleFlush(cmd); err != nil {
 			return off, 0, err
 		}
+		w.off += w.delta
+		w.delta = 0
 	}
 
 	if err := w.batch.Append(p); err != nil {
@@ -292,7 +296,8 @@ func (w *Writer) handleMsg(cmd *writerCmd) (uint64, uint64, error) {
 		w.timerStarted = true
 	}
 
-	return w.off, w.delta, nil
+	w.delta += uint64(len(p))
+	return w.off, w.delta - uint64(len(p)), nil
 }
 
 func (w *Writer) shouldFlush(size int) bool {
