@@ -66,14 +66,28 @@ const (
 type writerCmd struct {
 	kind writerCmdType
 	data []byte
+	res  *writerRes
 }
 
-var cachedFlushCmd = &writerCmd{kind: cmdFlush}
-var cachedCloseCmd = &writerCmd{kind: cmdClose}
+type writerRes struct {
+	off   uint64
+	delta uint64
+	err   error
+}
+
+func (wr *writerRes) vals(off, delta uint64, err error) *writerRes {
+	wr.off = off
+	wr.delta = delta
+	wr.err = err
+	return wr
+}
+
+var cachedFlushCmd = &writerCmd{kind: cmdFlush, res: &writerRes{}}
+var cachedCloseCmd = &writerCmd{kind: cmdClose, res: &writerRes{}}
 
 var cmdPool = sync.Pool{
 	New: func() interface{} {
-		return &writerCmd{}
+		return &writerCmd{res: &writerRes{}}
 	},
 }
 
@@ -84,7 +98,10 @@ type Writer struct {
 	gconf        *config.Config
 	topic        []byte
 	state        writerState
-	resC         chan error
+	resC         chan *writerRes
+	off          uint64
+	delta        uint64
+	flushcmd     *writerCmd
 	stateManager StatePusher
 
 	retries      int
@@ -100,16 +117,17 @@ type Writer struct {
 func NewWriter(conf *Config, topic string) *Writer {
 	gconf := conf.ToGeneralConfig()
 	w := &Writer{
-		Client: New(conf),
-		conf:   conf,
-		gconf:  gconf,
-		topic:  []byte(topic),
-		state:  stateClosed,
-		timer:  time.NewTimer(-1),
-		batch:  protocol.NewBatch(gconf),
-		inC:    make(chan *writerCmd),
-		resC:   make(chan error),
-		stopC:  make(chan struct{}),
+		Client:   New(conf),
+		conf:     conf,
+		gconf:    gconf,
+		topic:    []byte(topic),
+		state:    stateClosed,
+		timer:    time.NewTimer(-1),
+		batch:    protocol.NewBatch(gconf),
+		inC:      make(chan *writerCmd),
+		resC:     make(chan *writerRes),
+		flushcmd: &writerCmd{}, // cached for timer flush
+		stopC:    make(chan struct{}),
 	}
 
 	go w.loop()
@@ -132,6 +150,8 @@ func (w *Writer) Reset(topic string) {
 	w.stopTimer()
 	w.timerStarted = false
 	w.state = stateClosed
+	w.off = 0
+	w.delta = 0
 }
 
 func (w *Writer) Write(p []byte) (int, error) {
@@ -139,32 +159,52 @@ func (w *Writer) Write(p []byte) (int, error) {
 	cmd.kind = cmdMsg
 	cmd.data = p
 
-	err := w.doCommand(cmd)
+	res := w.doCommand(cmd)
 	cmdPool.Put(cmd)
-	if err != nil {
-		return 0, err
+	if res.err != nil {
+		return 0, res.err
 	}
 	return len(p), nil
 }
 
+// WriteOffset writes a message, returning the offset, delta, and error, if
+// any.
+func (w *Writer) WriteOffset(p []byte) (uint64, uint64, error) {
+	cmd := cmdPool.Get().(*writerCmd)
+	cmd.kind = cmdMsg
+	cmd.data = p
+
+	res := w.doCommand(cmd)
+	cmdPool.Put(cmd)
+	return res.off, res.delta, res.err
+}
+
 // Flush implements the LogWriter interface
 func (w *Writer) Flush() error {
-	return w.doCommand(cachedFlushCmd)
+	res := w.doCommand(cachedFlushCmd)
+	return res.err
+}
+
+// FlushOffset flushes the current batch to the log, returning the batch offset
+// and error, if any.
+func (w *Writer) FlushOffset() (uint64, error) {
+	res := w.doCommand(cachedFlushCmd)
+	return res.off, res.err
 }
 
 // Close implements the LogWriter interface
 func (w *Writer) Close() error {
 	internal.Debugf(w.gconf, "closing writer")
-	err := w.doCommand(cachedCloseCmd)
+	res := w.doCommand(cachedCloseCmd)
 	w.stop()
-	return err
+	return res.err
 }
 
-func (w *Writer) doCommand(cmd *writerCmd) error {
+func (w *Writer) doCommand(cmd *writerCmd) *writerRes {
 	w.inC <- cmd
 
-	err := <-w.resC
-	return err
+	res := <-w.resC
+	return res
 }
 
 func (w *Writer) stopTimer() {
@@ -190,16 +230,17 @@ func (w *Writer) loop() {
 				return
 			}
 			if w.err != nil {
-				w.resC <- w.err
+				w.resC <- cmd.res.vals(0, 0, w.err)
 				continue
 			}
 
+			var off, delta uint64
 			var err error
 			switch cmd.kind {
 			case cmdMsg:
-				err = w.handleMsg(cmd.data)
+				off, delta, err = w.handleMsg(cmd)
 			case cmdFlush:
-				err = w.handleFlush()
+				off, err = w.handleFlush(cmd)
 			case cmdClose:
 				err = w.handleClose()
 			default:
@@ -207,7 +248,7 @@ func (w *Writer) loop() {
 			}
 
 			w.err = err
-			w.resC <- err
+			w.resC <- cmd.res.vals(off, delta, err)
 
 		case <-w.timer.C:
 			internal.Debugf(w.gconf, "<-timer.C %s", w.state)
@@ -215,7 +256,7 @@ func (w *Writer) loop() {
 			// case stateClosed:
 			// 	w.stopTimer()
 			case stateConnected:
-				err := w.handleFlush()
+				_, err := w.handleFlush(w.flushcmd)
 				w.err = err
 				if err == nil {
 					w.resetTimer(w.conf.WaitInterval)
@@ -229,20 +270,21 @@ func (w *Writer) loop() {
 	}
 }
 
-func (w *Writer) handleMsg(p []byte) error {
+func (w *Writer) handleMsg(cmd *writerCmd) (uint64, uint64, error) {
+	p := cmd.data
 	if err := w.setErr(w.ensureConn()); err != nil {
 		w.startReconnect()
-		return err
+		return w.off, w.delta, err
 	}
 
 	if w.shouldFlush(len(p)) {
-		if err := w.handleFlush(); err != nil {
-			return err
+		if off, err := w.handleFlush(cmd); err != nil {
+			return off, 0, err
 		}
 	}
 
 	if err := w.batch.Append(p); err != nil {
-		return err
+		return w.off, w.delta, err
 	}
 
 	if !w.timerStarted {
@@ -250,22 +292,22 @@ func (w *Writer) handleMsg(p []byte) error {
 		w.timerStarted = true
 	}
 
-	return nil
+	return w.off, w.delta, nil
 }
 
 func (w *Writer) shouldFlush(size int) bool {
 	return (w.batch.CalcSize()+protocol.MessageSize(size) >= w.conf.BatchSize)
 }
 
-func (w *Writer) handleFlush() error {
+func (w *Writer) handleFlush(cmd *writerCmd) (uint64, error) {
 	if w.err != nil {
-		return w.err
+		return w.off, w.err
 	}
 
 	batch := w.batch
 	batch.SetTopic(w.topic)
 	if batch.Empty() {
-		return nil
+		return w.off, nil
 	}
 
 	w.state = stateFlushing
@@ -276,21 +318,21 @@ func (w *Writer) handleFlush() error {
 			perr := w.stateManager.Push(off, serr, batch.Copy())
 			batch.Reset()
 			if perr != nil {
-				return perr
+				return w.off, perr
 			}
 		}
 		batch.Reset()
-		return err
+		return w.off, err
 	}
 	batch.Reset()
 	w.state = stateConnected
 
 	if w.stateManager != nil {
 		if perr := w.stateManager.Push(off, nil, nil); perr != nil {
-			return perr
+			return w.off, perr
 		}
 	}
-	return err
+	return w.off, err
 }
 
 func (w *Writer) handleClose() error {
