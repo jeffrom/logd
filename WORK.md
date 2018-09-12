@@ -10,12 +10,18 @@
 - [ ] verify batches in the connection goroutine to better leverage multiple
       processors for the expensive checksum
   - option to disable checksum verification would also be good
+- [ ] verify topics concurrently during startup
 
 # maybe later
 
+<!-- - [ ] XXX writer: on each flush, send a map or array of offset:delta -> message to
+      a callback -->
+
+- [ ] a version of Write that accepts a callback which receives the message,
+      offset, delta, and error that is called when a flush occurs.
 - [ ] track / limit / reuse concurrent fds in use
 - [ ] record READ misses
-- [ ] log file compression
+- [ ] over the wire compression
 - [ ] documentation with many use cases, event log, pub sub, replication,
       changing master
 - [ ] figure out linting

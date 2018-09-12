@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"math"
@@ -67,6 +68,7 @@ const (
 type writerCmd struct {
 	kind writerCmdType
 	data []byte
+	cb   WriterCallback
 	res  *writerRes
 }
 
@@ -77,9 +79,7 @@ type writerRes struct {
 }
 
 func (wr *writerRes) vals(off, delta uint64, err error) *writerRes {
-	wr.off = off
-	wr.delta = delta
-	wr.err = err
+	wr.off, wr.delta, wr.err = off, delta, err
 	return wr
 }
 
@@ -92,6 +92,47 @@ var cmdPool = sync.Pool{
 	},
 }
 
+// WriterCallback can be implemented in order to handle individual messages
+// after the batch is flushed. It receives the message, batch offset, delta,
+// and error, if any
+type WriterCallback func(ctx context.Context, off, delta uint64, p []byte, err error)
+
+type wrappedWriterCb func(cb WriterCallback)
+
+// writeResult is used to send a callback back to the calling goroutine so it
+// can be executed there.
+// type writeResult chan WriterCallback
+
+// MessageHandler represents a goroutine that handles messages after flush.
+// Depending on whether x is set, it will immediately process all messages that
+// come in, or messages can be manually waited on. If the handler is manually
+// waiting, it can be in the same goroutine as the message writer.
+type MessageHandler struct {
+	conf        *config.Config
+	writeResult chan wrappedWriterCb
+	stopC       chan struct{}
+	done        chan error
+}
+
+func (h *MessageHandler) ReadForever() {
+	for {
+		select {
+		case cb := <-h.Next():
+			fmt.Println(cb)
+			// cb()
+		}
+	}
+}
+
+func (h *MessageHandler) Stop() error {
+	h.stopC <- struct{}{}
+	return <-h.done
+}
+
+func (h *MessageHandler) Next() chan wrappedWriterCb {
+	return h.writeResult
+}
+
 // Writer writes message batches to the log server
 type Writer struct {
 	*Client
@@ -100,8 +141,6 @@ type Writer struct {
 	topic        []byte
 	state        writerState
 	resC         chan *writerRes
-	off          uint64
-	delta        uint64
 	flushcmd     *writerCmd
 	stateManager StatePusher
 
@@ -151,8 +190,6 @@ func (w *Writer) Reset(topic string) {
 	w.stopTimer()
 	w.timerStarted = false
 	w.state = stateClosed
-	w.off = 0
-	w.delta = 0
 }
 
 func (w *Writer) Write(p []byte) (int, error) {
@@ -168,29 +205,16 @@ func (w *Writer) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// WriteOffset writes a message, returning the offset, delta, and error, if
-// any.
-func (w *Writer) WriteOffset(p []byte) (uint64, uint64, error) {
-	cmd := cmdPool.Get().(*writerCmd)
-	cmd.kind = cmdMsg
-	cmd.data = p
-
-	res := w.doCommand(cmd)
-	cmdPool.Put(cmd)
-	return res.off, res.delta, res.err
+// WriteAsync writes a message and calls cb when the batch is flushed.
+// TODO this needs to accept a MessageHandler
+func (w *Writer) WriteAsync(p []byte, handler *MessageHandler) (int, error) {
+	return 0, nil
 }
 
 // Flush implements the LogWriter interface
 func (w *Writer) Flush() error {
 	res := w.doCommand(cachedFlushCmd)
 	return res.err
-}
-
-// FlushOffset flushes the current batch to the log, returning the batch offset
-// and error, if any.
-func (w *Writer) FlushOffset() (uint64, error) {
-	res := w.doCommand(cachedFlushCmd)
-	return res.off, res.err
 }
 
 // Close implements the LogWriter interface
@@ -235,13 +259,12 @@ func (w *Writer) loop() {
 				continue
 			}
 
-			var off, delta uint64
 			var err error
 			switch cmd.kind {
 			case cmdMsg:
-				off, delta, err = w.handleMsg(cmd)
+				err = w.handleMsg(cmd)
 			case cmdFlush:
-				off, err = w.handleFlush(cmd)
+				err = w.handleFlush(cmd)
 			case cmdClose:
 				err = w.handleClose()
 			default:
@@ -249,8 +272,7 @@ func (w *Writer) loop() {
 			}
 
 			w.err = err
-			fmt.Println(off, delta, err)
-			w.resC <- cmd.res.vals(off, delta, err)
+			w.resC <- cmd.res.vals(0, 0, err)
 
 		case <-w.timer.C:
 			internal.Debugf(w.gconf, "<-timer.C %s", w.state)
@@ -258,7 +280,7 @@ func (w *Writer) loop() {
 			// case stateClosed:
 			// 	w.stopTimer()
 			case stateConnected:
-				_, err := w.handleFlush(w.flushcmd)
+				err := w.handleFlush(w.flushcmd)
 				w.err = err
 				if err == nil {
 					w.resetTimer(w.conf.WaitInterval)
@@ -272,23 +294,23 @@ func (w *Writer) loop() {
 	}
 }
 
-func (w *Writer) handleMsg(cmd *writerCmd) (uint64, uint64, error) {
+func (w *Writer) handleMsg(cmd *writerCmd) error {
+	// TODO this should probably check this is the first time we've tried and
+	// if not, just continue retrying the connection.
 	p := cmd.data
 	if err := w.setErr(w.ensureConn()); err != nil {
 		w.startReconnect()
-		return w.off, w.delta, err
+		return err
 	}
 
 	if w.shouldFlush(len(p)) {
-		if off, err := w.handleFlush(cmd); err != nil {
-			return off, 0, err
+		if err := w.handleFlush(cmd); err != nil {
+			return err
 		}
-		w.off += w.delta
-		w.delta = 0
 	}
 
 	if err := w.batch.Append(p); err != nil {
-		return w.off, w.delta, err
+		return err
 	}
 
 	if !w.timerStarted {
@@ -296,48 +318,57 @@ func (w *Writer) handleMsg(cmd *writerCmd) (uint64, uint64, error) {
 		w.timerStarted = true
 	}
 
-	w.delta += uint64(len(p))
-	return w.off, w.delta - uint64(len(p)), nil
+	if cmd.cb != nil {
+		// TODO add cb to an array along with the message bytes. they should
+		// all be called after flush.
+		// NOTE probably need a channel on the calling goroutine that it can
+		// send the data back to when the batch has been flushed. that way the
+		// code in the callback doesn't have to be executed in the connection's
+		// goroutine.
+	}
+
+	return nil
 }
 
 func (w *Writer) shouldFlush(size int) bool {
 	return (w.batch.CalcSize()+protocol.MessageSize(size) >= w.conf.BatchSize)
 }
 
-func (w *Writer) handleFlush(cmd *writerCmd) (uint64, error) {
+func (w *Writer) handleFlush(cmd *writerCmd) error {
 	if w.err != nil {
-		return w.off, w.err
+		return w.err
 	}
 
 	batch := w.batch
 	batch.SetTopic(w.topic)
 	if batch.Empty() {
-		return w.off, nil
+		return nil
 	}
 
 	w.state = stateFlushing
 	off, err := w.Batch(batch)
+	// TODO defer call all registered WriterCallbacks
 	internal.Debugf(w.gconf, "flush complete, err: %+v", err)
 	if serr := w.setErr(err); serr != nil {
 		if w.stateManager != nil {
 			perr := w.stateManager.Push(off, serr, batch.Copy())
 			batch.Reset()
 			if perr != nil {
-				return w.off, perr
+				return perr
 			}
 		}
 		batch.Reset()
-		return w.off, err
+		return err
 	}
 	batch.Reset()
 	w.state = stateConnected
 
 	if w.stateManager != nil {
 		if perr := w.stateManager.Push(off, nil, nil); perr != nil {
-			return w.off, perr
+			return perr
 		}
 	}
-	return w.off, err
+	return err
 }
 
 func (w *Writer) handleClose() error {
