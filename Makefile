@@ -5,7 +5,7 @@ SHORT_PKGS ?= $(shell go list -f '{{.Name}}' ./... | grep -v main)
 PKG_DIRS ?= $(shell go list -f '{{.Dir}}' ./...)
 WITHOUT_APPTEST ?= $(shell go list -f '{{.Name}}' ./... | grep -v main | grep -v app$$)
 
-GENERATED_FILES ?= __* testdata/*.actual.golden logd.test log-cli.test *.pprof
+GENERATED_FILES ?= __* testdata/*.actual.golden logd.test log-cli.test
 
 .PHONY: all
 all: build
@@ -25,7 +25,6 @@ clean:
 .PHONY: clean.reports
 clean.reports:
 	rm -rf integration_test/out/* report/*
-	rm -rf *.pprof
 
 .PHONY: clean.docker
 clean.docker:

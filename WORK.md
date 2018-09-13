@@ -13,9 +13,12 @@
 
 # maybe later
 
+- [ ] make Partitioner an io.ReaderAt
+  - this would let us do lookups in parallel, and use mmap for this
+    - https://github.com/golang/exp/tree/master/mmap
 - [ ] track / limit / reuse concurrent fds in use
 - [ ] record READ misses
-- [ ] log file compression
+- [ ] over the wire compression
 - [ ] documentation with many use cases, event log, pub sub, replication,
       changing master
 - [ ] figure out linting

@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -48,19 +49,28 @@ type Partitions struct {
 	topic      string
 	partitions []Partitioner
 	tempDir    string
-	refs       map[uint64]int
-	mu         sync.Mutex
+
+	refs map[uint64]int
+	mu   sync.Mutex
+
+	pathb     *bytes.Buffer
+	pathCache map[string]map[uint64]string
 }
 
 // NewPartitions returns an instance of Partitions, which implements
 // PartitionManager
 func NewPartitions(conf *config.Config, topic string) *Partitions {
-	return &Partitions{
+	p := &Partitions{
 		conf:       conf,
 		topic:      topic,
 		partitions: make([]Partitioner, conf.MaxPartitions),
 		refs:       make(map[uint64]int),
+		pathb:      &bytes.Buffer{},
+		pathCache:  make(map[string]map[uint64]string),
 	}
+
+	p.pathCache[conf.WorkDir] = make(map[uint64]string)
+	return p
 }
 
 func (p *Partitions) reset() {
@@ -96,7 +106,9 @@ func (p *Partitions) ensureTempDir() error {
 		if err != nil {
 			return err
 		}
+
 		p.tempDir = tmpDir
+		p.pathCache[p.tempDir] = make(map[uint64]string)
 	}
 	return nil
 }
@@ -120,12 +132,42 @@ func (p *Partitions) Remove(off uint64) error {
 	if p.getRefs(off) <= 0 {
 		return p.removeFile(off)
 	}
+
+	delete(p.pathCache[p.conf.WorkDir], off)
 	return nil
+}
+
+func (p *Partitions) lookup(workdir string, off uint64) (string, bool) {
+	d, ok := p.pathCache[workdir]
+	if !ok {
+		panic("uncached working directory: " + workdir)
+	}
+
+	s, ok := d[off]
+	return s, ok
+}
+
+func (p *Partitions) filePath(workdir string, off uint64) string {
+	if s, ok := p.lookup(workdir, off); ok {
+		return s
+	}
+
+	p.pathb.Reset()
+	p.pathb.WriteString(path.Clean(workdir))
+	p.pathb.WriteString("/")
+	p.pathb.WriteString(p.topic)
+	p.pathb.WriteString("/")
+	p.pathb.WriteString(strconv.FormatUint(off, 10))
+	p.pathb.WriteString(".log")
+
+	s := p.pathb.String()
+	p.pathCache[workdir][off] = s
+	return s
 }
 
 // Get implements PartitionManager
 func (p *Partitions) Get(off uint64, delta, limit int) (Partitioner, error) {
-	fname := path.Join(p.conf.WorkDir, p.topic, strconv.FormatUint(off, 10)+".log")
+	fname := p.filePath(p.conf.WorkDir, off)
 	f, err := os.Open(fname)
 	if err != nil {
 		return nil, err
@@ -204,7 +246,7 @@ func (p *Partitions) list(prefix string, tmp bool) ([]Partitioner, error) {
 }
 
 func (p *Partitions) tmpPath(off uint64) string {
-	return filepath.Join(p.tempDir, p.topic, fmt.Sprint(off)+".log")
+	return p.filePath(p.tempDir, off)
 }
 
 // Shutdown implements internal.LifecycleManager
@@ -289,6 +331,7 @@ func (p *Partitions) removeFile(off uint64) error {
 			log.Printf("error removing %s: %+v", fullpath, err)
 		}
 	}()
+	delete(p.pathCache[p.tempDir], off)
 	return nil
 }
 
