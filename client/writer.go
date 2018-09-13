@@ -254,7 +254,7 @@ func (w *Writer) handleMsg(p []byte) error {
 }
 
 func (w *Writer) shouldFlush(size int) bool {
-	return (w.batch.CalcSize()+protocol.MessageSize(size) >= w.conf.BatchSize)
+	return (w.batch.CalcSize()+protocol.MessageSize(size)+8 >= w.conf.BatchSize)
 }
 
 func (w *Writer) handleFlush() error {

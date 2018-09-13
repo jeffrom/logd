@@ -95,6 +95,18 @@ func (c *Config) ToGeneralConfig() *config.Config {
 	return gconf
 }
 
+// FromGeneralConfig returns a new client config that copies common attributes.
+func (c *Config) FromGeneralConfig(conf *config.Config) *Config {
+	newc := &Config{}
+	*newc = *c
+
+	c.Verbose = conf.Verbose
+	c.Hostport = conf.Host
+	c.BatchSize = conf.MaxBatchSize
+
+	return newc
+}
+
 // BenchConfig manages benchmark configuration
 type BenchConfig struct {
 	Verbose bool

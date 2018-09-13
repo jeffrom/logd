@@ -77,6 +77,9 @@ func (r *Read) FromRequest(req *Request) (*Read, error) {
 
 // Validate checks the READ arguments are valid
 func (r *Read) Validate() error {
+	if r.Messages < 1 {
+		return ErrInvalid
+	}
 	return nil
 }
 

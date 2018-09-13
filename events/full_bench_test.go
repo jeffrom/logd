@@ -3,6 +3,7 @@ package events
 import (
 	"bufio"
 	"bytes"
+	"io"
 	"sync"
 	"testing"
 
@@ -16,6 +17,7 @@ func BenchmarkBatchFull(b *testing.B) {
 	b.SetParallelism(4)
 	conf := testhelper.DefaultConfig(testing.Verbose())
 	conf.Host = ":0"
+
 	benchmarkBatchFull(b, conf, "batch.small", []string{"default"})
 }
 
@@ -25,38 +27,29 @@ func BenchmarkBatchFullLarge(b *testing.B) {
 	conf.Host = ":0"
 	conf.MaxBatchSize = 1024 * 64
 	conf.PartitionSize = 1024 * 1024
+
 	benchmarkBatchFull(b, conf, "batch.large", []string{"default"})
 }
-
-// func BenchmarkBatchFullNewTopic(b *testing.B) {
-// 	b.SetParallelism(4)
-// 	conf := testhelper.DefaultTestConfig(testing.Verbose())
-// 	conf.Hostport = ":0"
-// 	benchmarkBatchFull(b, conf, "batch.small", []string{"topic1"})
-// }
-
-// func BenchmarkBatchFullTopics2(b *testing.B) {
-// 	b.SetParallelism(2)
-// 	conf := testhelper.DefaultTestConfig(testing.Verbose())
-// 	conf.Hostport = ":0"
-// 	benchmarkBatchFull(b, conf, "batch.small", []string{"default", "topic1"})
-// }
-
-// func BenchmarkBatchFullTopics4(b *testing.B) {
-// 	b.SetParallelism(2)
-// 	conf := testhelper.DefaultTestConfig(testing.Verbose())
-// 	conf.Hostport = ":0"
-// 	benchmarkBatchFull(b, conf, "batch.small", []string{"default", "topic1", "topic2", "topic3"})
-// }
 
 func BenchmarkBatchFullTopics8(b *testing.B) {
 	b.SetParallelism(2)
 	conf := testhelper.DefaultConfig(testing.Verbose())
 	conf.Host = ":0"
+
 	benchmarkBatchFull(b, conf, "batch.small", []string{
 		"default", "topic1", "topic2", "topic3",
 		"topic4", "topic5", "topic6", "topic7",
 	})
+}
+
+func BenchmarkReadFull(b *testing.B) {
+	b.SetParallelism(4)
+	conf := testhelper.DefaultConfig(testing.Verbose())
+	conf.MaxBatchSize = 65535
+	conf.PartitionSize = conf.MaxBatchSize * 100
+	conf.Host = ":0"
+
+	benchmarkReadFull(b, conf)
 }
 
 type repeater struct {
@@ -123,6 +116,65 @@ func benchmarkBatchFull(b *testing.B, conf *config.Config, fixturename string, t
 	})
 }
 
-func benchmarkReadFull(b *testing.B, conf *config.Config, topics []string) {
+func benchmarkReadFull(b *testing.B, conf *config.Config) {
+	h := NewHandlers(conf)
+	if err := h.GoStart(); err != nil {
+		b.Fatal(err)
+	}
+	addr := h.servers[0].ListenAddr().String()
 
+	fixture := testhelper.LoadFixture("words.txt")
+	fillTopic(b, conf, h, fixture)
+
+	b.ResetTimer()
+	b.RunParallel(func(b *testing.PB) {
+		c, err := client.Dial(addr)
+		if err != nil {
+			panic(err)
+		}
+		defer c.Close()
+
+		topic := []byte("default")
+
+		for b.Next() {
+			_, bs, err := c.ReadOffset(topic, 0, 3)
+			if err != nil {
+				panic(err)
+			}
+
+			for bs.Scan() {
+			}
+			if err := bs.Error(); err != nil && err != io.EOF {
+				panic(err)
+			}
+		}
+	})
+}
+
+func fillTopic(b *testing.B, conf *config.Config, h *Handlers, data []byte) {
+	// c, err := client.Dial(h.servers[0].ListenAddr().String())
+	// if err != nil {
+	// 	b.Fatal(err)
+	// }
+
+	s := bufio.NewScanner(bytes.NewBuffer(data))
+	s.Split(bufio.ScanLines)
+	cconf := client.DefaultConfig.FromGeneralConfig(conf)
+	cconf.Hostport = h.servers[0].ListenAddr().String()
+	w := client.NewWriter(cconf, "default")
+	defer w.Close()
+	// read := 0
+
+	for s.Scan() {
+		// read += len(s.Bytes()) + len(fmt.Sprintf("MSG %d\r\n\r\n", len(s.Bytes())))
+
+		b := make([]byte, len(s.Bytes()))
+		copy(b, s.Bytes())
+		_, err := w.Write(b)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	w.Flush()
 }
