@@ -32,8 +32,7 @@ func (s *BatchScanner) Reset(r io.Reader) {
 	s.r = r
 	// NOTE Reset actually always allocates, newreader will reuse a
 	// bufio.Reader if it's larger.
-	// s.br.Reset(r)
-	s.br = bufio.NewReader(r)
+	s.br.Reset(r)
 	s.err = nil
 	s.scanned = 0
 }
