@@ -120,6 +120,7 @@ func (h *Handlers) PushRequest(ctx context.Context, req *protocol.Request) (*pro
 		return h.pushBlockingRequest(ctx, req)
 	} else {
 		return h.asyncQ.PushRequest(ctx, req)
+		// return h.asyncQ.handleRequest(req)
 	}
 	return nil, nil
 }
@@ -131,11 +132,14 @@ func (h *Handlers) pushBlockingRequest(ctx context.Context, req *protocol.Reques
 	}
 
 	h.mu.Lock()
-	if q, ok := h.h[name]; ok {
-		h.mu.Unlock()
+	q, ok := h.h[name]
+	h.mu.Unlock()
+	if ok {
+		// if req.Name == protocol.CmdRead || req.Name == protocol.CmdTail {
+		// 	return q.handleRequest(req)
+		// }
 		return q.PushRequest(ctx, req)
 	}
-	h.mu.Unlock()
 
 	// create a new topic if there isn't already one
 	if req.Name == protocol.CmdBatch {

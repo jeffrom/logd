@@ -150,39 +150,7 @@ func (q *eventQ) loop() { // nolint: gocyclo
 		select {
 		// new flow for handling requests passed in from servers
 		case req := <-q.in:
-			var resp *protocol.Response
-			var err error
-			internal.Debugf(q.conf, "request: %s", &req.Name)
-
-			switch req.Name {
-			case protocol.CmdBatch:
-				resp, err = q.handleBatch(req)
-				instrumentRequest(stats.BatchRequests, stats.BatchErrors, err)
-			case protocol.CmdRead:
-				resp, err = q.handleRead(req)
-				instrumentRequest(stats.ReadRequests, stats.ReadErrors, err)
-			case protocol.CmdTail:
-				resp, err = q.handleTail(req)
-				instrumentRequest(stats.TailRequests, stats.TailErrors, err)
-			case protocol.CmdStats:
-				resp, err = q.handleStats(req)
-				instrumentRequest(stats.StatsRequests, stats.StatsErrors, err)
-			case protocol.CmdClose:
-				resp, err = q.handleClose(req)
-				instrumentRequest(stats.CloseRequests, stats.CloseErrors, err)
-			case protocol.CmdConfig:
-				resp, err = q.handleConfig(req)
-				instrumentRequest(stats.ConfigRequests, stats.ConfigErrors, err)
-			default:
-				log.Printf("unhandled request type passed: %v", req.Name)
-				resp = req.Response
-				cr := req.Response.ClientResponse
-				cr.SetError(protocol.ErrInvalid)
-				err = protocol.ErrInvalid
-				if _, werr := req.WriteResponse(resp, cr); werr != nil {
-					err = werr
-				}
-			}
+			resp, err := q.handleRequest(req)
 
 			if err != nil && err != protocol.ErrNotFound {
 				log.Printf("error handling %s request: %+v", &req.Name, err)
@@ -192,6 +160,45 @@ func (q *eventQ) loop() { // nolint: gocyclo
 			return
 		}
 	}
+}
+
+// TODO maybe conns can just run this in their goroutine for nonblocking requests
+func (q *eventQ) handleRequest(req *protocol.Request) (*protocol.Response, error) {
+	var resp *protocol.Response
+	var err error
+	internal.Debugf(q.conf, "request: %s", &req.Name)
+
+	switch req.Name {
+	case protocol.CmdBatch:
+		resp, err = q.handleBatch(req)
+		instrumentRequest(stats.BatchRequests, stats.BatchErrors, err)
+	case protocol.CmdRead:
+		resp, err = q.handleRead(req)
+		instrumentRequest(stats.ReadRequests, stats.ReadErrors, err)
+	case protocol.CmdTail:
+		resp, err = q.handleTail(req)
+		instrumentRequest(stats.TailRequests, stats.TailErrors, err)
+	case protocol.CmdStats:
+		resp, err = q.handleStats(req)
+		instrumentRequest(stats.StatsRequests, stats.StatsErrors, err)
+	case protocol.CmdClose:
+		resp, err = q.handleClose(req)
+		instrumentRequest(stats.CloseRequests, stats.CloseErrors, err)
+	case protocol.CmdConfig:
+		resp, err = q.handleConfig(req)
+		instrumentRequest(stats.ConfigRequests, stats.ConfigErrors, err)
+	default:
+		log.Printf("unhandled request type passed: %v", req.Name)
+		resp = req.Response
+		cr := req.Response.ClientResponse
+		cr.SetError(protocol.ErrInvalid)
+		err = protocol.ErrInvalid
+		if _, werr := req.WriteResponse(resp, cr); werr != nil {
+			err = werr
+		}
+	}
+
+	return resp, err
 }
 
 // Stop halts the event queue

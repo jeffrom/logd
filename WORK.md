@@ -10,9 +10,15 @@
 - [ ] verify batches in the connection goroutine to better leverage multiple
       processors for the expensive checksum
   - option to disable checksum verification would also be good
+- [ ] verify topics concurrently during startup
 
 # maybe later
 
+<!-- - [ ] XXX writer: on each flush, send a map or array of offset:delta -> message to
+      a callback -->
+
+- [ ] a version of client.Writer.Write that accepts a callback which receives
+      the message, offset, delta, and error that is called when a flush occurs.
 - [ ] make Partitioner an io.ReaderAt
   - this would let us do lookups in parallel, and use mmap for this
     - https://github.com/golang/exp/tree/master/mmap

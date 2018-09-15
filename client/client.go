@@ -509,7 +509,7 @@ func (c *Client) handleErr(err error) error {
 }
 
 func isRetryable(err error) bool {
-	if err == io.EOF || err == io.ErrClosedPipe {
+	if err == nil || err == io.EOF || err == io.ErrClosedPipe {
 		return true
 	}
 	if nerr, ok := err.(net.Error); ok && nerr.Timeout() || nerr.Temporary() {

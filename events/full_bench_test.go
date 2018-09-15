@@ -43,6 +43,15 @@ func BenchmarkBatchFullTopics8(b *testing.B) {
 }
 
 func BenchmarkReadFull(b *testing.B) {
+	conf := testhelper.DefaultConfig(testing.Verbose())
+	conf.MaxBatchSize = 65535
+	conf.PartitionSize = conf.MaxBatchSize * 100
+	conf.Host = ":0"
+
+	benchmarkReadFull(b, conf)
+}
+
+func BenchmarkReadFull4(b *testing.B) {
 	b.SetParallelism(4)
 	conf := testhelper.DefaultConfig(testing.Verbose())
 	conf.MaxBatchSize = 65535
