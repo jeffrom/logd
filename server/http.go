@@ -23,10 +23,13 @@ type Http struct {
 
 // NewHttp returns a new instance of *Http.
 func NewHttp(conf *config.Config) *Http {
+	mux := http.NewServeMux()
 	return &Http{
 		conf: conf,
-		mux:  http.NewServeMux(),
-		srv:  &http.Server{},
+		mux:  mux,
+		srv: &http.Server{
+			Handler: mux,
+		},
 	}
 }
 
@@ -55,6 +58,8 @@ func (s *Http) setupHandlers() {
 	s.mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 
 	s.mux.Handle("/debug/vars", expvar.Handler())
+
+	s.mux.Handle("/log", &logHandler{conf: s.conf, h: s.h})
 }
 
 // Stop implements transport.Server interface.

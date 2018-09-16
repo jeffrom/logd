@@ -11,6 +11,10 @@
       processors for the expensive checksum
   - option to disable checksum verification would also be good
 - [ ] verify topics concurrently during startup
+- [ ] http server
+  - should have a json protocol
+  - logd protocol is working
+    | curl -X POST -d $'READ default 0 3\r\n' -H 'Content-type: application/logd' http://localhost:1775/log
 
 # maybe later
 
