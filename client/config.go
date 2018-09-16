@@ -57,6 +57,13 @@ var DefaultConfig = &Config{
 	Limit: 15,
 }
 
+// NewConfig returns a new default client configuration.
+func NewConfig() *Config {
+	conf := &Config{}
+	*conf = *DefaultConfig
+	return conf
+}
+
 // Validate returns an error pointing to incorrect values for the
 // configuration, if any.
 func (c *Config) Validate() error {

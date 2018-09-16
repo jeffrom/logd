@@ -234,6 +234,7 @@ func (w *Writer) handleMsg(p []byte) error {
 		w.startReconnect()
 		return err
 	}
+	w.state = stateConnected
 
 	if w.shouldFlush(len(p)) {
 		if err := w.handleFlush(); err != nil {
@@ -295,6 +296,7 @@ func (w *Writer) handleFlush() error {
 
 func (w *Writer) handleClose() error {
 	if w.err != nil && w.Client.Conn != nil {
+		w.state = stateClosed
 		return w.Client.Conn.Close()
 	}
 	internal.LogError(w.Client.flush())

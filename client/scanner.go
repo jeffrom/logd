@@ -33,21 +33,32 @@ type Scanner struct {
 	curr              uint64
 	err               error
 	done              chan struct{}
+	usetail           bool
+	startoff          uint64
 }
 
 // NewScanner returns a new instance of *Scanner
-func NewScanner(conf *Config) *Scanner {
-	return &Scanner{
+func NewScanner(conf *Config, topic string) *Scanner {
+	s := &Scanner{
 		conf:     conf,
 		batchBuf: &bytes.Buffer{},
 		msg:      protocol.NewMessage(conf.ToGeneralConfig()),
 		done:     make(chan struct{}),
+		usetail:  conf.UseTail,
+		startoff: conf.Offset,
 	}
+
+	if topic != "" {
+		s.Client = New(conf)
+		s.topic = []byte(topic)
+	}
+
+	return s
 }
 
 // ScannerForClient returns a new scanner from a Client
 func ScannerForClient(c *Client) *Scanner {
-	s := NewScanner(c.conf)
+	s := NewScanner(c.conf, "")
 	s.Client = c
 	return s
 }
@@ -83,6 +94,8 @@ func (s *Scanner) Reset() {
 	s.batchesRead = 0
 	s.nbatches = 0
 	s.s = nil
+	s.usetail = s.conf.UseTail
+	s.startoff = s.conf.Offset
 
 	select {
 	case <-s.done:
@@ -104,6 +117,21 @@ func (s *Scanner) SetTopic(topic string) {
 // Topic returns the topic for the scanner.
 func (s *Scanner) Topic() string {
 	return string(s.topic)
+}
+
+func (s *Scanner) UseTail() {
+	if s.messagesRead > 0 {
+		panic("attempted to set offset while already scanning")
+	}
+	s.usetail = true
+}
+
+func (s *Scanner) SetOffset(off uint64) {
+	if s.messagesRead > 0 {
+		panic("attempted to set offset while already scanning")
+	}
+	s.usetail = false
+	s.startoff = off
 }
 
 // Scan reads the next message. If it encounters an error, it returns false.
@@ -185,7 +213,7 @@ func (s *Scanner) doInitialRead() error {
 			s.curr, nbatches, bs, err = s.Client.Tail(s.topic, s.conf.Limit)
 		}
 	} else {
-		s.curr = s.conf.Offset
+		s.curr = s.startoff
 		nbatches, bs, err = s.Client.ReadOffset(s.topic, s.curr, s.conf.Limit)
 	}
 	if err != nil {
