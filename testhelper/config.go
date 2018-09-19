@@ -49,9 +49,9 @@ func IntegrationTestConfig(verbose bool) *config.Config {
 
 	c := &config.Config{
 		Verbose:         verbose,
-		Timeout:         200 * time.Millisecond,
-		IdleTimeout:     200 * time.Millisecond,
-		ShutdownTimeout: 1 * time.Second,
+		Timeout:         1 * time.Second,
+		IdleTimeout:     3 * time.Second,
+		ShutdownTimeout: 2 * time.Second,
 		LogFileMode:     0644,
 		WorkDir:         TmpLog(),
 		MaxBatchSize:    1024 * 20,
