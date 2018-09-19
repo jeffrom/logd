@@ -28,33 +28,6 @@ func TestWriter(t *testing.T) {
 	w.Client.dialer = server
 	// TODO this prevents a race but would be better to do connections in a
 	// separate goroutine from expectations
-	// w.ensureConn()
-	defer w.Close()
-	defer expectServerClose(t, gconf, server)
-
-	server.Expect(func(p []byte) io.WriterTo {
-		if !bytes.Equal(fixture, p) {
-			log.Panicf("expected:\n\n\t%q\n\nbut got:\n\n\t%q\n", fixture, p)
-		}
-		return protocol.NewClientBatchResponse(gconf, 10, 1)
-	})
-
-	writeBatch(t, w, "hi", "hallo", "sup")
-	flushBatch(t, w)
-}
-
-func TestWriterTimeout(t *testing.T) {
-	t.SkipNow()
-	conf := DefaultTestConfig(testing.Verbose())
-	conf.WaitInterval = 10 * time.Millisecond
-	gconf := conf.ToGeneralConfig()
-	fixture := testhelper.LoadFixture("batch.small")
-	server, _ := testhelper.Pipe()
-	defer server.Close()
-	w := NewWriter(conf, "default")
-	w.Client.dialer = server
-	// TODO this prevents a race but would be better to do connections in a
-	// separate goroutine from expectations
 	w.ensureConn()
 	defer w.Close()
 	defer expectServerClose(t, gconf, server)
@@ -67,6 +40,7 @@ func TestWriterTimeout(t *testing.T) {
 	})
 
 	writeBatch(t, w, "hi", "hallo", "sup")
+	flushBatch(t, w)
 }
 
 func TestWriterConcurrent(t *testing.T) {
