@@ -86,7 +86,9 @@ func (s *Scanner) Reset() {
 	s.curr = 0
 	s.messagesRead = 0
 	s.totalMessagesRead = 0
-	s.batch.Reset()
+	if s.batch != nil {
+		s.batch.Reset()
+	}
 	s.batchBuf.Reset()
 	s.batchBufBr = bufio.NewReader(s.batchBuf)
 	s.msg.Reset()
@@ -196,7 +198,7 @@ func (s *Scanner) doInitialRead() error {
 		}
 	}
 
-	if s.conf.UseTail { // offset was not explicitly set
+	if s.usetail { // offset was not explicitly set
 		if hasState {
 			off, delt, err := s.statem.Get()
 			delta = delt
@@ -247,6 +249,9 @@ func (s *Scanner) scanNextBatch() error {
 
 		if s.batchesRead >= s.nbatches {
 			if err := s.requestMoreBatches(false); err == protocol.ErrNotFound {
+				if !s.conf.ReadForever {
+					return protocol.ErrNotFound
+				}
 				if perr := s.pollBatch(); perr != nil {
 					return perr
 				}
@@ -308,9 +313,6 @@ func (s *Scanner) setNextBatch() error {
 }
 
 func (s *Scanner) pollBatch() error {
-	if !s.conf.ReadForever {
-		return protocol.ErrNotFound
-	}
 	for {
 		time.Sleep(s.conf.WaitInterval)
 		err := s.requestMoreBatches(true)

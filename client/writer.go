@@ -182,10 +182,13 @@ func (w *Writer) loop() {
 		select {
 		case <-w.stopC:
 			internal.Debugf(w.gconf, "<-stopC")
+			close(w.inC)
 			return
 
 		case cmd := <-w.inC:
-			internal.Debugf(w.gconf, "inC <- %s", cmd.kind)
+			if cmd.kind != cmdMsg {
+				internal.Debugf(w.gconf, "inC <- %s", cmd.kind)
+			}
 			if cmd == nil { // channel closed
 				return
 			}

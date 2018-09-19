@@ -231,7 +231,7 @@ func (c *Client) Batch(batch *protocol.Batch) (uint64, error) {
 	return off, err
 }
 
-// Batch sends a BATCH request with a raw batch
+// BatchRaw sends a BATCH request with a raw batch
 func (c *Client) BatchRaw(b []byte) (uint64, error) {
 	internal.Debugf(c.gconf, "%q -> %s", b, c.RemoteAddr())
 
@@ -271,7 +271,7 @@ func (c *Client) readBatches(nbatches int, r *bufio.Reader) (int64, error) {
 // ReadOffset sends a READ request, returning a scanner that can be used to
 // iterate over the messages in the response.
 func (c *Client) ReadOffset(topic []byte, offset uint64, limit int) (int, *protocol.BatchScanner, error) {
-	internal.Debugf(c.gconf, "READ %s %d %d -> %s", topic, offset, limit, c.RemoteAddr())
+	internal.Debugf(c.gconf, "READ %s %d %d", topic, offset, limit)
 	req := c.readreq
 	req.Reset()
 	req.SetTopic(topic)
@@ -303,7 +303,7 @@ func (c *Client) ReadOffset(topic []byte, offset uint64, limit int) (int, *proto
 // Tail sends a TAIL request, returning the initial offset and a scanner
 // starting from the first available batch.
 func (c *Client) Tail(topic []byte, limit int) (uint64, int, *protocol.BatchScanner, error) {
-	internal.Debugf(c.gconf, "TAIL %s %d -> %s", topic, limit, c.RemoteAddr())
+	internal.Debugf(c.gconf, "TAIL %s %d", topic, limit)
 	req := c.tailreq
 	req.Reset()
 	req.SetTopic(topic)

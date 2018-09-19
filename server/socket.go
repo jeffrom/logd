@@ -142,6 +142,10 @@ func (s *Socket) accept() {
 
 // GoServe starts a server without blocking the current goroutine
 func (s *Socket) GoServe() {
+	s.mu.Lock()
+	s.shuttingDown = false
+	s.mu.Unlock()
+
 	go func() {
 		if err := s.listenAndServe(true); err != nil {
 			panic(err)
