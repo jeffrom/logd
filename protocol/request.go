@@ -70,6 +70,7 @@ func (req *Request) Reset() {
 }
 
 func (req *Request) String() string {
+	// return fmt.Sprintf("%q", req.raw[:req.read])
 	return req.Name.String()
 }
 
@@ -182,6 +183,7 @@ func (req *Request) readFromBuf(r *bufio.Reader) (int64, error) {
 		return total, err
 	}
 
+	// fmt.Printf("read request: %q\n", req.raw[:total])
 	expectedArgs := argLens[req.Name]
 
 	for i := 0; i < expectedArgs; i++ {

@@ -1,8 +1,8 @@
 package events
 
 import (
-	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/jeffrom/logd/client"
@@ -19,7 +19,7 @@ func newIntegrationTestClientConfig(verbose bool) *client.Config {
 	c.Verbose = verbose
 	c.BatchSize = 1024 * 20
 
-	c.ConnRetryInterval /= 2
+	c.ConnRetryInterval /= 4
 	c.ConnRetries = 3
 	return c
 }
@@ -78,13 +78,13 @@ func (ts *integrationTest) setup(t *testing.T) {
 
 func (ts *integrationTest) shutdown(t *testing.T) {
 	defer doShutdownHandler(t, ts.h)
-	for _, w := range ts.writers {
-		if err := w.Close(); err != nil {
+	for _, s := range ts.scanners {
+		if err := s.Close(); err != nil {
 			t.Error(err)
 		}
 	}
-	for _, s := range ts.scanners {
-		if err := s.Close(); err != nil {
+	for _, w := range ts.writers {
+		if err := w.Close(); err != nil {
 			t.Error(err)
 		}
 	}
@@ -117,7 +117,7 @@ func TestIntegration(t *testing.T) {
 
 func testIntegration(t *testing.T, ts *integrationTest) {
 	ts.setup(t)
-	// defer ts.shutdown(t)
+	defer ts.shutdown(t)
 
 	testIntegrationWriter(t, ts)
 }
@@ -125,6 +125,7 @@ func testIntegration(t *testing.T, ts *integrationTest) {
 func testIntegrationWriter(t *testing.T, ts *integrationTest) {
 	errC := make(chan error, ts.n)
 	wg := sync.WaitGroup{}
+	var wrote int32
 	for _, w := range ts.writers {
 		// s := ts.scanners[n]
 		wg.Add(1)
@@ -137,6 +138,7 @@ func testIntegrationWriter(t *testing.T, ts *integrationTest) {
 					errC <- errors.Wrap(err, "write failed")
 					return
 				}
+				atomic.AddInt32(&wrote, 1)
 			}
 
 			if err := w.Flush(); err != nil {
@@ -149,20 +151,9 @@ func testIntegrationWriter(t *testing.T, ts *integrationTest) {
 
 	wg.Wait()
 	failOnErrors(t, errC)
-	for _, w := range ts.writers {
-		w.Close()
-	}
 	// ts.h.h["default"].topic.logw.Flush()
 
-	if err := ts.h.Stop(); err != nil {
-		errC <- errors.Wrap(err, "shutdown failed")
-		return
-	}
-	if err := ts.h.GoStart(); err != nil {
-		errC <- errors.Wrap(err, "restart failed")
-		return
-	}
-
+	var read int32
 	for _, s := range ts.scanners {
 		wg.Add(1)
 
@@ -171,10 +162,11 @@ func testIntegrationWriter(t *testing.T, ts *integrationTest) {
 
 			s.Reset()
 			s.UseTail()
+			s.SetLimit(int(atomic.LoadInt32(&wrote)) + 10)
 			passed := false
 			for s.Scan() {
 				passed = true
-				fmt.Println(s.Message().String())
+				atomic.AddInt32(&read, 1)
 			}
 			if err := s.Error(); err != nil {
 				errC <- errors.Wrap(err, "scan failed")
@@ -189,7 +181,19 @@ func testIntegrationWriter(t *testing.T, ts *integrationTest) {
 	}
 
 	wg.Wait()
+	if read != wrote {
+		t.Fatalf("wrote %d messages but read %d", wrote, read)
+	}
 	failOnErrors(t, errC)
+
+	// if err := ts.h.Stop(); err != nil {
+	// 	errC <- errors.Wrap(err, "shutdown failed")
+	// 	return
+	// }
+	// if err := ts.h.GoStart(); err != nil {
+	// 	errC <- errors.Wrap(err, "restart failed")
+	// 	return
+	// }
 }
 
 func failOnErrors(t *testing.T, errC chan error) {

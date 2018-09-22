@@ -65,6 +65,9 @@ func (t *Tail) FromRequest(req *Request) (*Tail, error) {
 
 // Validate checks the TAIL arguments are valid
 func (t *Tail) Validate() error {
+	if t.ntopic < 1 {
+		return errNoTopic
+	}
 	return nil
 }
 

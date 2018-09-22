@@ -111,12 +111,12 @@ func DialConfig(addr string, conf *Config) (*Client, error) {
 
 func (c *Client) reset() {
 	c.cr.Reset()
-	c.readreq.Reset()
-	c.tailreq.Reset()
+	// c.readreq.Reset()
+	// c.tailreq.Reset()
 	c.unsetConn()
-	c.batch.Reset()
-	c.batchbuf.Reset()
-	c.rawbatchbuf.Reset()
+	// c.batch.Reset()
+	// c.batchbuf.Reset()
+	// c.rawbatchbuf.Reset()
 	select {
 	case <-c.done:
 	default:
@@ -332,7 +332,7 @@ func (c *Client) Close() error {
 	}()
 
 	closereq := protocol.NewCloseRequest(c.gconf)
-	if _, _, err := c.doRequest(closereq); err != nil {
+	if _, _, err := c.do(closereq); err != nil {
 		return err
 	}
 

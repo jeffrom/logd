@@ -47,6 +47,9 @@ var (
 	// configured max batch size.
 	errTooLarge = errors.New("too large")
 
+	// errNoTopic indicates a topic missing from the request.
+	errNoTopic = errors.New("request missing topic")
+
 	//
 	// protocol responses
 	//

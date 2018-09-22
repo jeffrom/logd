@@ -35,6 +35,7 @@ type Scanner struct {
 	done              chan struct{}
 	usetail           bool
 	startoff          uint64
+	limit             int
 }
 
 // NewScanner returns a new instance of *Scanner
@@ -46,6 +47,7 @@ func NewScanner(conf *Config, topic string) *Scanner {
 		done:     make(chan struct{}),
 		usetail:  conf.UseTail,
 		startoff: conf.Offset,
+		limit:    conf.Limit,
 	}
 
 	if topic != "" {
@@ -98,6 +100,7 @@ func (s *Scanner) Reset() {
 	s.s = nil
 	s.usetail = s.conf.UseTail
 	s.startoff = s.conf.Offset
+	s.limit = s.conf.Limit
 
 	select {
 	case <-s.done:
@@ -136,9 +139,13 @@ func (s *Scanner) SetOffset(off uint64) {
 	s.startoff = off
 }
 
+func (s *Scanner) SetLimit(n int) {
+	s.limit = n
+}
+
 // Scan reads the next message. If it encounters an error, it returns false.
 func (s *Scanner) Scan() bool {
-	if !s.conf.ReadForever && s.totalMessagesRead >= s.conf.Limit {
+	if !s.conf.ReadForever && s.totalMessagesRead >= s.limit {
 		return s.scanErr(nil)
 	}
 
@@ -207,16 +214,16 @@ func (s *Scanner) doInitialRead() error {
 			}
 			s.curr = off
 			internal.Debugf(s.gconf, "starting from previous state: offset %d, delta %d", off, delta)
-			nbatches, bs, err = s.Client.ReadOffset(s.topic, s.curr, s.conf.Limit)
+			nbatches, bs, err = s.Client.ReadOffset(s.topic, s.curr, s.limit)
 			if err != nil {
 				return err
 			}
 		} else {
-			s.curr, nbatches, bs, err = s.Client.Tail(s.topic, s.conf.Limit)
+			s.curr, nbatches, bs, err = s.Client.Tail(s.topic, s.limit)
 		}
 	} else {
 		s.curr = s.startoff
-		nbatches, bs, err = s.Client.ReadOffset(s.topic, s.curr, s.conf.Limit)
+		nbatches, bs, err = s.Client.ReadOffset(s.topic, s.curr, s.limit)
 	}
 	if err != nil {
 		return err
@@ -243,7 +250,7 @@ func (s *Scanner) doInitialRead() error {
 
 func (s *Scanner) scanNextBatch() error {
 	if s.messagesRead >= s.batch.Messages || s.batchRead >= int(s.batch.Size) {
-		if !s.conf.ReadForever && s.totalMessagesRead >= s.conf.Limit {
+		if !s.conf.ReadForever && s.totalMessagesRead >= s.limit {
 			return nil
 		}
 
@@ -290,7 +297,7 @@ func (s *Scanner) requestMoreBatches(poll bool) error {
 	if !poll {
 		s.curr += uint64(s.bs.Scanned())
 	}
-	nbatches, bs, err := s.Client.ReadOffset(s.topic, s.curr, s.conf.Limit)
+	nbatches, bs, err := s.Client.ReadOffset(s.topic, s.curr, s.limit)
 	if err != nil {
 		return err
 	}
