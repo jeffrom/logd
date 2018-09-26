@@ -379,7 +379,7 @@ func TestConfig(t *testing.T) {
 }
 
 func TestReconnect(t *testing.T) {
-	t.Skip("mock server race")
+	// t.Skip("mock server race")
 	conf := DefaultTestConfig(testing.Verbose())
 	gconf := conf.ToGeneralConfig()
 	fixture := testhelper.LoadFixture("batch.small")
