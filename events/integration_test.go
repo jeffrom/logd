@@ -119,7 +119,9 @@ func testIntegration(t *testing.T, ts *integrationTest) {
 	ts.setup(t)
 	defer ts.shutdown(t)
 
-	testIntegrationWriter(t, ts)
+	t.Run("write then read", func(t *testing.T) {
+		testIntegrationWriter(t, ts)
+	})
 }
 
 func testIntegrationWriter(t *testing.T, ts *integrationTest) {
