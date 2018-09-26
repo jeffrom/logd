@@ -174,6 +174,7 @@ func testIntegrationWriter(t *testing.T, ts *integrationTest) {
 				atomic.AddInt32(&read, 1)
 			}
 			if err := s.Error(); err != nil && int(atomic.LoadInt32(&read)) < (int(atomic.LoadInt32(&wrote))/n) {
+				t.Logf("expected to read %d but read %d (err: %+v)", atomic.LoadInt32(&wrote), atomic.LoadInt32(&read), err)
 				errC <- errors.Wrap(err, "scan failed")
 				return
 			}
