@@ -220,10 +220,12 @@ func (s *Scanner) doInitialRead() error {
 			}
 		} else {
 			s.curr, nbatches, bs, err = s.Client.Tail(s.topic, s.limit)
+			internal.Debugf(s.gconf, "starting with %d batches from log tail at %d (err: %+v)", nbatches, s.curr, err)
 		}
 	} else {
 		s.curr = s.startoff
 		nbatches, bs, err = s.Client.ReadOffset(s.topic, s.curr, s.limit)
+		internal.Debugf(s.gconf, "starting with %d batches from offset %d (err: %+v)", nbatches, s.curr, err)
 	}
 	if err != nil {
 		return err
@@ -249,13 +251,15 @@ func (s *Scanner) doInitialRead() error {
 }
 
 func (s *Scanner) scanNextBatch() error {
-	if s.messagesRead >= s.batch.Messages || s.batchRead >= int(s.batch.Size) {
-		if !s.conf.ReadForever && s.totalMessagesRead >= s.limit {
-			return nil
-		}
+	// if s.messagesRead >= s.batch.Messages || s.batchRead >= int(s.batch.Size) {
+	if s.batchRead >= int(s.batch.Size) {
+		// if !s.conf.ReadForever && s.totalMessagesRead >= s.limit {
+		// 	return nil
+		// }
 
 		if s.batchesRead >= s.nbatches {
-			if err := s.requestMoreBatches(false); err == protocol.ErrNotFound {
+			err := s.requestMoreBatches(false)
+			if err == protocol.ErrNotFound {
 				if !s.conf.ReadForever {
 					return protocol.ErrNotFound
 				}
@@ -298,6 +302,9 @@ func (s *Scanner) requestMoreBatches(poll bool) error {
 		s.curr += uint64(s.bs.Scanned())
 	}
 	nbatches, bs, err := s.Client.ReadOffset(s.topic, s.curr, s.limit)
+	internal.Debugf(s.gconf,
+		"requested more batches from %d. read %d messages (%d/%d bytes) (err: %+v)",
+		s.curr, s.messagesRead, s.batchRead, s.batch.Size, err)
 	if err != nil {
 		return err
 	}

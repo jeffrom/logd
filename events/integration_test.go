@@ -123,8 +123,10 @@ func testIntegration(t *testing.T, ts *integrationTest) {
 }
 
 func testIntegrationWriter(t *testing.T, ts *integrationTest) {
+	n := 10000
 	errC := make(chan error, ts.n)
 	wg := sync.WaitGroup{}
+
 	var wrote int32
 	for _, w := range ts.writers {
 		// s := ts.scanners[n]
@@ -132,7 +134,7 @@ func testIntegrationWriter(t *testing.T, ts *integrationTest) {
 
 		go func(w *client.Writer) {
 			defer wg.Done()
-			for i := 0; i < 10000; i++ {
+			for i := 0; i < n; i++ {
 				_, err := w.Write([]byte("oh dang sup"))
 				if err != nil {
 					errC <- errors.Wrap(err, "write failed")
@@ -151,6 +153,9 @@ func testIntegrationWriter(t *testing.T, ts *integrationTest) {
 
 	wg.Wait()
 	failOnErrors(t, errC)
+	if int(atomic.LoadInt32(&wrote)) != n {
+		t.Errorf("expected to write %d but wrote %d", n, atomic.LoadInt32(&wrote))
+	}
 	// ts.h.h["default"].topic.logw.Flush()
 
 	var read int32
@@ -168,7 +173,7 @@ func testIntegrationWriter(t *testing.T, ts *integrationTest) {
 				passed = true
 				atomic.AddInt32(&read, 1)
 			}
-			if err := s.Error(); err != nil {
+			if err := s.Error(); err != nil && int(atomic.LoadInt32(&read)) < (int(atomic.LoadInt32(&wrote))/n) {
 				errC <- errors.Wrap(err, "scan failed")
 				return
 			}
