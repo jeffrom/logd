@@ -79,7 +79,7 @@ test.cover:
 .PHONY: test.coverprofile
 # $(foreach pkg,$(SHORT_PKGS),go test -coverprofile=integration_test/out/unit.$(pkg).cov.out -covermode=count -coverpkg ./... ./$(pkg);)
 test.coverprofile:
-	gocoverutil -coverprofile=cov.out test -covermode=count ./...
+	gocoverutil -coverprofile=cov.out test -v -covermode=count ./...
 
 .PHONY: test.golden
 test.golden:
