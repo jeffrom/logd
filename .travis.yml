@@ -2,4 +2,7 @@ language: go
 go:
     - "1.10"
 script: make ci
-cache: vendor
+cache:
+    directories:
+        - vendor
+        - $GOPATH
