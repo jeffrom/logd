@@ -50,7 +50,7 @@ func stdlog(f *os.File, distance int, s string, args ...interface{}) {
 
 // Debugf prints a debug log message to stdout
 func Debugf(conf *config.Config, s string, args ...interface{}) {
-	if !conf.Verbose {
+	if true || !conf.Verbose {
 		return
 	}
 
