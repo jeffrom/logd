@@ -50,7 +50,7 @@ func stdlog(f *os.File, distance int, s string, args ...interface{}) {
 
 // Debugf prints a debug log message to stdout
 func Debugf(conf *config.Config, s string, args ...interface{}) {
-	if true || !conf.Verbose {
+	if !conf.Verbose {
 		return
 	}
 
@@ -88,7 +88,7 @@ func LogAndReturnError(err error) error {
 
 // IgnoreError logs the error if one occurred
 func IgnoreError(verbose bool, err error) {
-	if false && verbose && err != nil {
+	if verbose && err != nil {
 		stdlog(os.Stderr, 2, "error ignored: %+v", err)
 	}
 }

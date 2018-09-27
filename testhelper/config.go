@@ -2,7 +2,6 @@ package testhelper
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"testing"
@@ -21,7 +20,6 @@ func DefaultConfig(verbose bool) *config.Config {
 	if verbose {
 		log.SetOutput(os.Stdout)
 	}
-	log.SetOutput(ioutil.Discard)
 
 	c := &config.Config{
 		Verbose:         verbose,
@@ -48,7 +46,6 @@ func IntegrationTestConfig(verbose bool) *config.Config {
 	if verbose {
 		log.SetOutput(os.Stdout)
 	}
-	log.SetOutput(ioutil.Discard)
 
 	c := &config.Config{
 		Verbose:         verbose,
