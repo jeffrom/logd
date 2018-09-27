@@ -19,6 +19,9 @@ import (
 )
 
 func TestWriter(t *testing.T) {
+	if testhelper.IsCI() {
+		t.Skip("mock server has race condition")
+	}
 	conf := DefaultTestConfig(testing.Verbose())
 	gconf := conf.ToGeneralConfig()
 	fixture := testhelper.LoadFixture("batch.small")
@@ -44,6 +47,9 @@ func TestWriter(t *testing.T) {
 }
 
 func TestWriterConcurrent(t *testing.T) {
+	if testhelper.IsCI() {
+		t.Skip("mock server has race condition")
+	}
 	conf := DefaultTestConfig(testing.Verbose())
 	conf.BatchSize = 1024 * 1024
 	gconf := conf.ToGeneralConfig()
@@ -95,7 +101,9 @@ func TestWriterConcurrent(t *testing.T) {
 }
 
 func TestWriterFillBatch(t *testing.T) {
-	t.Skip("mock server has race condition")
+	if testhelper.IsCI() {
+		t.Skip("mock server has race condition")
+	}
 	conf := DefaultTestConfig(testing.Verbose())
 	gconf := conf.ToGeneralConfig()
 	server, _ := testhelper.Pipe()
@@ -131,7 +139,9 @@ func TestWriterFillBatch(t *testing.T) {
 }
 
 func TestWriterTwoBatches(t *testing.T) {
-	t.Skip("mock server has race condition")
+	if testhelper.IsCI() {
+		t.Skip("mock server has race condition")
+	}
 	conf := DefaultTestConfig(testing.Verbose())
 	gconf := conf.ToGeneralConfig()
 	server, _ := testhelper.Pipe()
@@ -179,7 +189,9 @@ func TestWriterTwoBatches(t *testing.T) {
 }
 
 func TestWriterConnectFailure(t *testing.T) {
-	// t.Skip("temporarily skipping until reconnect logic is fixed")
+	if testhelper.IsCI() {
+		t.Skip("mock server has race condition")
+	}
 	conf := DefaultTestConfig(testing.Verbose())
 	conf.ConnRetries = 0
 	log.Print(conf)
@@ -213,7 +225,9 @@ func TestWriterConnectFailure(t *testing.T) {
 }
 
 func TestWriterStatePusher(t *testing.T) {
-	t.Skip("mock server has race condition")
+	if testhelper.IsCI() {
+		t.Skip("mock server has race condition")
+	}
 	conf := DefaultTestConfig(testing.Verbose())
 	gconf := conf.ToGeneralConfig()
 	fixture := testhelper.LoadFixture("batch.small")
