@@ -4,5 +4,5 @@ go:
 script: make ci
 cache:
     directories:
-        - vendor
-        - $GOPATH
+        - $GOPATH/github.com/jeffrom/logd/vendor
+        - $GOPATH/bin
