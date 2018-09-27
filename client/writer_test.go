@@ -213,6 +213,7 @@ func TestWriterConnectFailure(t *testing.T) {
 }
 
 func TestWriterStatePusher(t *testing.T) {
+	t.Skip("mock server has race condition")
 	conf := DefaultTestConfig(testing.Verbose())
 	gconf := conf.ToGeneralConfig()
 	fixture := testhelper.LoadFixture("batch.small")
