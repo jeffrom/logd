@@ -112,6 +112,8 @@ func NewWriter(conf *Config, topic string) *Writer {
 		stopC:  make(chan struct{}),
 	}
 
+	w.stopTimer()
+
 	go w.loop()
 	return w
 }
@@ -316,7 +318,7 @@ func (w *Writer) startReconnect() {
 
 func (w *Writer) resetTimer(interval time.Duration) {
 	if interval > 0 {
-		w.timer.Reset(w.conf.ConnRetryInterval)
+		w.timer.Reset(interval)
 	}
 }
 
