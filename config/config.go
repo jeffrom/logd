@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -31,6 +32,10 @@ type Config struct {
 // New returns a new configuration object
 func New() *Config {
 	return &Config{}
+}
+
+func (c *Config) String() string {
+	return fmt.Sprintf("%+v", *c)
 }
 
 // Default is the default application config

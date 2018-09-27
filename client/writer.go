@@ -182,10 +182,13 @@ func (w *Writer) loop() {
 		select {
 		case <-w.stopC:
 			internal.Debugf(w.gconf, "<-stopC")
+			close(w.inC)
 			return
 
 		case cmd := <-w.inC:
-			internal.Debugf(w.gconf, "inC <- %s", cmd.kind)
+			if cmd.kind != cmdMsg {
+				internal.Debugf(w.gconf, "inC <- %s", cmd.kind)
+			}
 			if cmd == nil { // channel closed
 				return
 			}
@@ -234,6 +237,7 @@ func (w *Writer) handleMsg(p []byte) error {
 		w.startReconnect()
 		return err
 	}
+	w.state = stateConnected
 
 	if w.shouldFlush(len(p)) {
 		if err := w.handleFlush(); err != nil {
@@ -295,6 +299,7 @@ func (w *Writer) handleFlush() error {
 
 func (w *Writer) handleClose() error {
 	if w.err != nil && w.Client.Conn != nil {
+		w.state = stateClosed
 		return w.Client.Conn.Close()
 	}
 	internal.LogError(w.Client.flush())

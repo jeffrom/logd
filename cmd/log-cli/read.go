@@ -59,11 +59,16 @@ func doRead(conf *client.Config, c *cobra.Command) error {
 		}
 	}()
 
+	n := 0
 	for scanner.Scan() {
 		_, err := out.Write(scanner.Message().BodyBytes())
 		internal.LogError(err)
 		_, err = out.Write([]byte("\n"))
 		internal.LogError(err)
+		n++
+		if n > conf.Limit {
+			break
+		}
 	}
 
 	return nil

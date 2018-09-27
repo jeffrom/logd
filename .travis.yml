@@ -1,5 +1,9 @@
 language: go
 go:
     - "1.10"
+    - "1.11"
 script: make ci
-cache: vendor
+cache:
+    directories:
+        - $GOPATH/github.com/jeffrom/logd/vendor
+        - $GOPATH/bin

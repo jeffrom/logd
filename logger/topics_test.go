@@ -1,7 +1,6 @@
 package logger
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/jeffrom/logd/testhelper"
@@ -32,7 +31,6 @@ func TestTopics(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		fmt.Println(l)
 		if len(l) < i+1 {
 			t.Fatalf("expected > %d partitions, but got %v", i, l)
 		}
@@ -47,7 +45,6 @@ func TestTopics(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		fmt.Println(l, len(names)-(i+1))
 		if len(l) > len(names)-(i+1) {
 			t.Fatalf("expected > %d partitions, but got %v", i, l)
 		}

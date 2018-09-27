@@ -33,21 +33,34 @@ type Scanner struct {
 	curr              uint64
 	err               error
 	done              chan struct{}
+	usetail           bool
+	startoff          uint64
+	limit             int
 }
 
 // NewScanner returns a new instance of *Scanner
-func NewScanner(conf *Config) *Scanner {
-	return &Scanner{
+func NewScanner(conf *Config, topic string) *Scanner {
+	s := &Scanner{
 		conf:     conf,
 		batchBuf: &bytes.Buffer{},
 		msg:      protocol.NewMessage(conf.ToGeneralConfig()),
 		done:     make(chan struct{}),
+		usetail:  conf.UseTail,
+		startoff: conf.Offset,
+		limit:    conf.Limit,
 	}
+
+	if topic != "" {
+		s.Client = New(conf)
+		s.topic = []byte(topic)
+	}
+
+	return s
 }
 
 // ScannerForClient returns a new scanner from a Client
 func ScannerForClient(c *Client) *Scanner {
-	s := NewScanner(c.conf)
+	s := NewScanner(c.conf, "")
 	s.Client = c
 	return s
 }
@@ -75,7 +88,9 @@ func (s *Scanner) Reset() {
 	s.curr = 0
 	s.messagesRead = 0
 	s.totalMessagesRead = 0
-	s.batch.Reset()
+	if s.batch != nil {
+		s.batch.Reset()
+	}
 	s.batchBuf.Reset()
 	s.batchBufBr = bufio.NewReader(s.batchBuf)
 	s.msg.Reset()
@@ -83,6 +98,9 @@ func (s *Scanner) Reset() {
 	s.batchesRead = 0
 	s.nbatches = 0
 	s.s = nil
+	s.usetail = s.conf.UseTail
+	s.startoff = s.conf.Offset
+	s.limit = s.conf.Limit
 
 	select {
 	case <-s.done:
@@ -106,9 +124,28 @@ func (s *Scanner) Topic() string {
 	return string(s.topic)
 }
 
+func (s *Scanner) UseTail() {
+	if s.messagesRead > 0 {
+		panic("attempted to set offset while already scanning")
+	}
+	s.usetail = true
+}
+
+func (s *Scanner) SetOffset(off uint64) {
+	if s.messagesRead > 0 {
+		panic("attempted to set offset while already scanning")
+	}
+	s.usetail = false
+	s.startoff = off
+}
+
+func (s *Scanner) SetLimit(n int) {
+	s.limit = n
+}
+
 // Scan reads the next message. If it encounters an error, it returns false.
 func (s *Scanner) Scan() bool {
-	if !s.conf.ReadForever && s.totalMessagesRead >= s.conf.Limit {
+	if !s.conf.ReadForever && s.totalMessagesRead >= s.limit {
 		return s.scanErr(nil)
 	}
 
@@ -168,7 +205,7 @@ func (s *Scanner) doInitialRead() error {
 		}
 	}
 
-	if s.conf.UseTail { // offset was not explicitly set
+	if s.usetail { // offset was not explicitly set
 		if hasState {
 			off, delt, err := s.statem.Get()
 			delta = delt
@@ -177,16 +214,18 @@ func (s *Scanner) doInitialRead() error {
 			}
 			s.curr = off
 			internal.Debugf(s.gconf, "starting from previous state: offset %d, delta %d", off, delta)
-			nbatches, bs, err = s.Client.ReadOffset(s.topic, s.curr, s.conf.Limit)
+			nbatches, bs, err = s.Client.ReadOffset(s.topic, s.curr, s.limit)
 			if err != nil {
 				return err
 			}
 		} else {
-			s.curr, nbatches, bs, err = s.Client.Tail(s.topic, s.conf.Limit)
+			s.curr, nbatches, bs, err = s.Client.Tail(s.topic, s.limit)
+			internal.Debugf(s.gconf, "starting with %d batches from log tail at %d (err: %+v)", nbatches, s.curr, err)
 		}
 	} else {
-		s.curr = s.conf.Offset
-		nbatches, bs, err = s.Client.ReadOffset(s.topic, s.curr, s.conf.Limit)
+		s.curr = s.startoff
+		nbatches, bs, err = s.Client.ReadOffset(s.topic, s.curr, s.limit)
+		internal.Debugf(s.gconf, "starting with %d batches from offset %d (err: %+v)", nbatches, s.curr, err)
 	}
 	if err != nil {
 		return err
@@ -212,13 +251,13 @@ func (s *Scanner) doInitialRead() error {
 }
 
 func (s *Scanner) scanNextBatch() error {
-	if s.messagesRead >= s.batch.Messages || s.batchRead >= int(s.batch.Size) {
-		if !s.conf.ReadForever && s.totalMessagesRead >= s.conf.Limit {
-			return nil
-		}
-
+	if s.batchRead >= int(s.batch.Size) {
 		if s.batchesRead >= s.nbatches {
-			if err := s.requestMoreBatches(false); err == protocol.ErrNotFound {
+			err := s.requestMoreBatches(false)
+			if err == protocol.ErrNotFound {
+				if !s.conf.ReadForever {
+					return protocol.ErrNotFound
+				}
 				if perr := s.pollBatch(); perr != nil {
 					return perr
 				}
@@ -257,7 +296,10 @@ func (s *Scanner) requestMoreBatches(poll bool) error {
 	if !poll {
 		s.curr += uint64(s.bs.Scanned())
 	}
-	nbatches, bs, err := s.Client.ReadOffset(s.topic, s.curr, s.conf.Limit)
+	nbatches, bs, err := s.Client.ReadOffset(s.topic, s.curr, s.limit)
+	internal.Debugf(s.gconf,
+		"requested more batches from %d. read %d messages (%d/%d bytes) (err: %+v)",
+		s.curr, s.messagesRead, s.batchRead, s.batch.Size, err)
 	if err != nil {
 		return err
 	}
@@ -280,9 +322,6 @@ func (s *Scanner) setNextBatch() error {
 }
 
 func (s *Scanner) pollBatch() error {
-	if !s.conf.ReadForever {
-		return protocol.ErrNotFound
-	}
 	for {
 		time.Sleep(s.conf.WaitInterval)
 		err := s.requestMoreBatches(true)
