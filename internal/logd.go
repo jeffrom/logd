@@ -88,7 +88,7 @@ func LogAndReturnError(err error) error {
 
 // IgnoreError logs the error if one occurred
 func IgnoreError(verbose bool, err error) {
-	if verbose && err != nil {
+	if false && verbose && err != nil {
 		stdlog(os.Stderr, 2, "error ignored: %+v", err)
 	}
 }
