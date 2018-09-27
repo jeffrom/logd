@@ -115,6 +115,14 @@ func TestIntegration(t *testing.T) {
 	testIntegration(t, ts)
 }
 
+func TestIntegration4(t *testing.T) {
+	conf := testhelper.IntegrationTestConfig(testing.Verbose())
+	cconf := newIntegrationTestClientConfig(testing.Verbose())
+
+	ts := newIntegrationTestState(conf, cconf, 4)
+	testIntegration(t, ts)
+}
+
 func testIntegration(t *testing.T, ts *integrationTest) {
 	ts.setup(t)
 	defer ts.shutdown(t)
@@ -155,8 +163,8 @@ func testIntegrationWriter(t *testing.T, ts *integrationTest) {
 
 	wg.Wait()
 	failOnErrors(t, errC)
-	if int(atomic.LoadInt32(&wrote)) != n {
-		t.Errorf("expected to write %d but wrote %d", n, atomic.LoadInt32(&wrote))
+	if int(atomic.LoadInt32(&wrote)) != n*ts.n {
+		t.Errorf("expected to write %d but wrote %d", n*ts.n, atomic.LoadInt32(&wrote))
 	}
 	// ts.h.h["default"].topic.logw.Flush()
 
@@ -179,6 +187,8 @@ func testIntegrationWriter(t *testing.T, ts *integrationTest) {
 				t.Logf("expected to read %d but read %d (err: %+v)", atomic.LoadInt32(&wrote), atomic.LoadInt32(&read), err)
 				errC <- errors.Wrap(err, "scan failed")
 				return
+			} else if err != nil {
+				t.Logf("scan error: %+v", err)
 			}
 
 			if !passed {
@@ -189,9 +199,9 @@ func testIntegrationWriter(t *testing.T, ts *integrationTest) {
 	}
 
 	wg.Wait()
-	if read != wrote {
-		t.Fatalf("wrote %d messages but read %d", wrote, read)
-	}
+	// if atomic.LoadInt32(&read) != atomic.LoadInt32(&wrote)*int32(ts.n) {
+	// 	t.Fatalf("wrote %d messages but read %d", wrote, read)
+	// }
 	failOnErrors(t, errC)
 
 	// if err := ts.h.Stop(); err != nil {

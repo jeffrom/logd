@@ -108,8 +108,8 @@ func NewResponse() *Response {
 
 func (r *Response) WithConfig(conf *config.Config) *Response {
 	r.conf = conf
-	if len(r.readers) < conf.MaxPartitions+1 {
-		r.readers = make([]io.ReadCloser, conf.MaxPartitions+1)
+	if len(r.readers) < conf.MaxPartitions+2 {
+		r.readers = make([]io.ReadCloser, conf.MaxPartitions+2)
 	}
 	r.ClientResponse.WithConfig(conf)
 	return r
