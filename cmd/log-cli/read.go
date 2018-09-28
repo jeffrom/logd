@@ -28,9 +28,13 @@ var ReadCmd = &cobra.Command{
 }
 
 func doRead(conf *client.Config, c *cobra.Command) error {
-	conf.UseTail = !c.PersistentFlags().Lookup("offset").Changed
 	done := make(chan struct{})
 	handleKills(done)
+
+	conf.UseTail = !c.PersistentFlags().Lookup("offset").Changed
+	if conf.ReadForever {
+		conf.Limit = 1000
+	}
 
 	out, err := getFile(conf.OutputPath, false)
 	if err != nil {
@@ -66,7 +70,7 @@ func doRead(conf *client.Config, c *cobra.Command) error {
 		_, err = out.Write([]byte("\n"))
 		internal.LogError(err)
 		n++
-		if n > conf.Limit {
+		if !conf.ReadForever && n > conf.Limit {
 			break
 		}
 	}
