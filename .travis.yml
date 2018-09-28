@@ -5,5 +5,5 @@ go:
 script: make ci
 cache:
     directories:
-        - $GOPATH/github.com/jeffrom/logd/vendor
+        # - $GOPATH/github.com/jeffrom/logd/vendor
         - $GOPATH/bin
