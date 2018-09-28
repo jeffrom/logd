@@ -353,7 +353,7 @@ func (s *Scanner) Error() error {
 }
 
 func (s *Scanner) Close() error {
-	internal.LogError(s.Client.Close())
+	internal.IgnoreError(s.conf.Verbose, s.Client.Close())
 	if m, ok := s.statem.(internal.LifecycleManager); ok {
 		internal.LogError(m.Shutdown())
 	}

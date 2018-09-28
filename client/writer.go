@@ -278,6 +278,8 @@ func (w *Writer) handleFlush() error {
 	off, err := w.Batch(batch)
 	internal.Debugf(w.gconf, "flush complete, err: %+v", err)
 	if serr := w.setErr(err); serr != nil {
+		defer w.startReconnect()
+
 		if w.stateManager != nil {
 			perr := w.stateManager.Push(off, serr, batch.Copy())
 			batch.Reset()

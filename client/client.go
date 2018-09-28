@@ -8,6 +8,7 @@ import (
 	"log"
 	"math"
 	"net"
+	"syscall"
 	"time"
 
 	"github.com/jeffrom/logd/config"
@@ -296,7 +297,7 @@ func (c *Client) ReadOffset(topic []byte, offset uint64, limit int) (int, *proto
 	}
 	c.batchbr.Reset(c.batchbuf)
 	c.bs.Reset(c.batchbr)
-	internal.LogError(c.SetReadDeadline(time.Now().Add(c.readTimeout)))
+	internal.IgnoreError(c.conf.Verbose, c.SetReadDeadline(time.Now().Add(c.readTimeout)))
 	return nbatches, c.bs, nil
 }
 
@@ -319,7 +320,7 @@ func (c *Client) Tail(topic []byte, limit int) (uint64, int, *protocol.BatchScan
 	}
 
 	c.bs.Reset(c.br)
-	internal.LogError(c.SetReadDeadline(time.Now().Add(c.readTimeout)))
+	internal.IgnoreError(c.conf.Verbose, c.SetReadDeadline(time.Now().Add(c.readTimeout)))
 	return respOff, nbatches, c.bs, nil
 }
 
@@ -327,7 +328,7 @@ func (c *Client) Tail(topic []byte, limit int) (uint64, int, *protocol.BatchScan
 func (c *Client) Close() error {
 	defer func() {
 		if c.closer != nil {
-			internal.LogError(c.closer.Close())
+			internal.IgnoreError(c.conf.Verbose, c.closer.Close())
 		}
 	}()
 
@@ -372,9 +373,9 @@ func (c *Client) do(wt io.WriterTo) (int64, int64, error) {
 		return 0, 0, err
 	}
 
-	internal.LogError(c.SetWriteDeadline(time.Now().Add(c.writeTimeout)))
+	internal.IgnoreError(c.conf.Verbose, c.SetWriteDeadline(time.Now().Add(c.writeTimeout)))
 	sent, err := wt.WriteTo(c.bw)
-	internal.LogError(c.SetWriteDeadline(time.Time{}))
+	internal.IgnoreError(c.conf.Verbose, c.SetWriteDeadline(time.Time{}))
 	if err != nil {
 		return sent, 0, err
 	}
@@ -414,15 +415,7 @@ func (c *Client) retryRequest(wt io.WriterTo, origSent, origRecv int64, err erro
 			break
 		}
 		c.retries++
-		if c.retryInterval == 0 {
-			c.retryInterval = c.conf.ConnRetryInterval
-		} else {
-			next := int(math.Round(float64(c.retryInterval) * c.conf.ConnRetryMultiplier))
-			c.retryInterval = time.Duration(next)
-		}
-		if c.retryInterval > c.conf.ConnRetryMaxInterval {
-			c.retryInterval = c.conf.ConnRetryMaxInterval
-		}
+		c.setNextInterval()
 
 		select {
 		case <-time.After(c.retryInterval):
@@ -454,14 +447,26 @@ func (c *Client) retryRequest(wt io.WriterTo, origSent, origRecv int64, err erro
 	return sent, recv, err
 }
 
+func (c *Client) setNextInterval() {
+	if c.retryInterval == 0 {
+		c.retryInterval = c.conf.ConnRetryInterval
+	} else {
+		next := int(math.Round(float64(c.retryInterval) * c.conf.ConnRetryMultiplier))
+		c.retryInterval = time.Duration(next)
+	}
+	if c.retryInterval > c.conf.ConnRetryMaxInterval {
+		c.retryInterval = c.conf.ConnRetryMaxInterval
+	}
+}
+
 // flush flushes all pending data to the server
 func (c *Client) flush() error {
 	if c.bw.Buffered() > 0 {
 		internal.Debugf(c.gconf, "client.Flush() initiated (%d bytes)", c.bw.Buffered())
-		internal.LogError(c.SetWriteDeadline(time.Now().Add(c.writeTimeout)))
+		internal.IgnoreError(c.conf.Verbose, c.SetWriteDeadline(time.Now().Add(c.writeTimeout)))
 		err := c.bw.Flush()
 		internal.Debugf(c.gconf, "client.Flush() complete (err: %v)", err)
-		internal.LogError(c.SetWriteDeadline(time.Time{}))
+		internal.IgnoreError(c.conf.Verbose, c.SetWriteDeadline(time.Time{}))
 		return err
 	}
 	return nil
@@ -469,9 +474,9 @@ func (c *Client) flush() error {
 
 func (c *Client) readClientResponse() (int64, error) {
 	c.cr.Reset()
-	internal.LogError(c.SetReadDeadline(time.Now().Add(c.readTimeout)))
+	internal.IgnoreError(c.conf.Verbose, c.SetReadDeadline(time.Now().Add(c.readTimeout)))
 	n, err := c.cr.ReadFrom(c.br)
-	internal.LogError(c.SetReadDeadline(time.Time{}))
+	internal.IgnoreError(c.conf.Verbose, c.SetReadDeadline(time.Time{}))
 	internal.Debugf(c.gconf, "read %d bytes from %s: %+v (err: %v)", n, c.RemoteAddr(), c.cr, err)
 	return n, c.handleErr(err)
 }
@@ -512,8 +517,16 @@ func isRetryable(err error) bool {
 	if err == nil || err == io.EOF || err == io.ErrClosedPipe {
 		return true
 	}
-	if nerr, ok := err.(net.Error); ok && nerr.Timeout() || nerr.Temporary() {
+
+	// fmt.Printf("%#v\n", err)
+	switch t := err.(type) {
+	case *net.OpError:
 		return true
+	case syscall.Errno:
+		if t == syscall.ECONNREFUSED {
+			return true
+		}
+	default:
 	}
 	return false
 }

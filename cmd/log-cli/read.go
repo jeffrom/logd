@@ -7,11 +7,19 @@ import (
 )
 
 func init() {
-	ReadCmd.PersistentFlags().IntVar(&tmpConfig.Limit, "limit", client.DefaultConfig.Limit, "limit minimum number of messages per read to `MESSAGES`")
-	ReadCmd.PersistentFlags().Uint64Var(&tmpConfig.Offset, "offset", client.DefaultConfig.Offset, "start reading messages from `OFFSET`")
+	pflags := ReadCmd.PersistentFlags()
+	dconf := client.DefaultConfig
 
-	ReadCmd.PersistentFlags().BoolVarP(&tmpConfig.ReadForever, "read-forever", "F", client.DefaultConfig.WriteForever, "Keep reading input until the program is killed")
-	ReadCmd.PersistentFlags().StringVar(&topicFlag, "topic", "default", "a `TOPIC` for the read")
+	pflags.IntVar(&tmpConfig.Limit, "limit", dconf.Limit, "limit minimum number of messages per read to `MESSAGES`")
+	pflags.Uint64Var(&tmpConfig.Offset, "offset", dconf.Offset, "start reading messages from `OFFSET`")
+
+	pflags.BoolVarP(&tmpConfig.ReadForever, "read-forever", "F", dconf.WriteForever, "Keep reading input until the program is killed")
+	pflags.StringVar(&topicFlag, "topic", "default", "a `TOPIC` for the read")
+
+	pflags.IntVar(&tmpConfig.ConnRetries, "retries", dconf.ConnRetries, "total number of connection retries")
+	pflags.DurationVar(&tmpConfig.ConnRetryInterval, "retry-interval", dconf.ConnRetryInterval, "initial retry interval duration")
+	pflags.Float64Var(&tmpConfig.ConnRetryMultiplier, "retry-multiplier", dconf.ConnRetryMultiplier, "retry interval multiplier")
+	pflags.DurationVar(&tmpConfig.ConnRetryMaxInterval, "retry-max-interval", dconf.ConnRetryMaxInterval, "maximum retry interval")
 }
 
 var ReadCmd = &cobra.Command{
