@@ -59,9 +59,13 @@ func IntegrationTestConfig(verbose bool) *config.Config {
 		MaxPartitions:   5,
 	}
 
-	if !testing.Short() && IsCI() {
-		*c = *config.Default
-	}
+	// if !testing.Short() && IsCI() {
+	// 	*c = *config.Default
+
+	// 	c.Timeout = 10 * time.Second
+	// 	c.IdleTimeout = 10 * time.Second
+	// 	c.ShutdownTimeout = 15 * time.Second
+	// }
 
 	return c
 }

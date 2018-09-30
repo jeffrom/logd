@@ -66,7 +66,7 @@ func (ts *integrationTest) setup(t *testing.T) {
 	}
 
 	ts.conf.Host = ":0"
-	ts.conf.HttpHost = ":0"
+	ts.conf.HttpHost = ""
 	ts.h = NewHandlers(ts.conf)
 	doStartHandler(t, ts.h)
 
@@ -119,28 +119,44 @@ func (ts *integrationTest) Close() error {
 	return nil
 }
 
-func TestIntegration(t *testing.T) {
+func TestIntegrationWriteRead(t *testing.T) {
 	conf := testhelper.IntegrationTestConfig(testing.Verbose())
 	cconf := newIntegrationTestClientConfig(testing.Verbose())
 
 	ts := newIntegrationTestState(conf, cconf, 1)
-	testIntegration(t, ts)
+	ts.setup(t)
+	defer ts.shutdown(t)
+	testIntegrationWriter(t, ts)
 }
 
-func TestIntegration4(t *testing.T) {
+func TestIntegrationWriteRead4(t *testing.T) {
 	conf := testhelper.IntegrationTestConfig(testing.Verbose())
 	cconf := newIntegrationTestClientConfig(testing.Verbose())
 
 	ts := newIntegrationTestState(conf, cconf, 4)
-	testIntegration(t, ts)
-}
-
-func testIntegration(t *testing.T, ts *integrationTest) {
 	ts.setup(t)
 	defer ts.shutdown(t)
+	testIntegrationWriter(t, ts)
+}
 
-	t.Run("write then read", func(t *testing.T) { testIntegrationWriter(t, ts) })
-	t.Run("reconnects", func(t *testing.T) { testIntegrationReconnect(t, ts) })
+func TestIntegrationReconnect(t *testing.T) {
+	conf := testhelper.IntegrationTestConfig(testing.Verbose())
+	cconf := newIntegrationTestClientConfig(testing.Verbose())
+
+	ts := newIntegrationTestState(conf, cconf, 1)
+	ts.setup(t)
+	defer ts.shutdown(t)
+	testIntegrationReconnect(t, ts)
+}
+
+func TestIntegrationReconnect4(t *testing.T) {
+	conf := testhelper.IntegrationTestConfig(testing.Verbose())
+	cconf := newIntegrationTestClientConfig(testing.Verbose())
+
+	ts := newIntegrationTestState(conf, cconf, 4)
+	ts.setup(t)
+	defer ts.shutdown(t)
+	testIntegrationReconnect(t, ts)
 }
 
 func testIntegrationWriter(t *testing.T, ts *integrationTest) {
