@@ -66,6 +66,7 @@ func (ts *integrationTest) setup(t *testing.T) {
 	}
 
 	ts.conf.Host = ":0"
+	ts.conf.HttpHost = ":0"
 	ts.h = NewHandlers(ts.conf)
 	doStartHandler(t, ts.h)
 
