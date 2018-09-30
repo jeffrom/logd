@@ -59,9 +59,5 @@ func IntegrationTestConfig(verbose bool) *config.Config {
 		MaxPartitions:   5,
 	}
 
-	if !testing.Short() && IsCI() {
-		*c = *config.Default
-	}
-
 	return c
 }

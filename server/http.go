@@ -24,18 +24,19 @@ type Http struct {
 // NewHttp returns a new instance of *Http.
 func NewHttp(conf *config.Config) *Http {
 	mux := http.NewServeMux()
-	return &Http{
+	s := &Http{
 		conf: conf,
 		mux:  mux,
 		srv: &http.Server{
 			Handler: mux,
 		},
 	}
+	s.setupHandlers()
+	return s
 }
 
 // GoServe implements transport.Server interface.
 func (s *Http) GoServe() {
-	s.setupHandlers()
 	go func() {
 		listener, err := net.Listen("tcp", s.conf.HttpHost)
 		if err != nil {

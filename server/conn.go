@@ -206,7 +206,7 @@ func (c *Conn) setWaitForCmdDeadline() error {
 		return cerr
 	}
 
-	c.state = connStateActive
+	// c.state = connStateActive
 
 	return nil
 }

@@ -100,8 +100,20 @@ func TestHandlerFileLogger(t *testing.T) {
 			// goal is to test every rotation case
 			runs := conf.MaxBatchSize
 			for i := 0; i < runs; i++ {
-				conf.PartitionSize--
+				conf.PartitionSize -= i % 10
+				if i%10 == 9 {
+					conf.PartitionSize /= 2
+				}
+
+				if conf.PartitionSize < conf.MaxBatchSize {
+					break
+				}
+
 				testHandlerFileLogger(t, conf)
+
+				if conf.PartitionSize <= 1 {
+					break
+				}
 			}
 		})
 	}

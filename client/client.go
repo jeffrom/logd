@@ -403,7 +403,7 @@ func (c *Client) retryRequest(wt io.WriterTo, origSent, origRecv int64, err erro
 	if c.conf.ConnRetries == 0 {
 		return origSent, origRecv, err
 	}
-	if !isRetryable(err) {
+	if !IsRetryable(err) {
 		return origSent, origRecv, err
 	}
 
@@ -411,7 +411,7 @@ func (c *Client) retryRequest(wt io.WriterTo, origSent, origRecv int64, err erro
 	var sent int64
 	var recv int64
 	for c.conf.ConnRetries < 0 || c.retries < c.conf.ConnRetries {
-		if retryErr != nil && !isRetryable(retryErr) {
+		if retryErr != nil && !IsRetryable(retryErr) {
 			break
 		}
 		c.retries++
@@ -461,7 +461,7 @@ func (c *Client) setNextInterval() {
 
 // flush flushes all pending data to the server
 func (c *Client) flush() error {
-	if c.bw.Buffered() > 0 {
+	if c.bw != nil && c.bw.Buffered() > 0 {
 		internal.Debugf(c.gconf, "client.Flush() initiated (%d bytes)", c.bw.Buffered())
 		internal.IgnoreError(c.conf.Verbose, c.SetWriteDeadline(time.Now().Add(c.writeTimeout)))
 		err := c.bw.Flush()
@@ -513,7 +513,8 @@ func (c *Client) handleErr(err error) error {
 	return err
 }
 
-func isRetryable(err error) bool {
+// IsRetryable returns true if an error can be recovered from.
+func IsRetryable(err error) bool {
 	if err == nil || err == io.EOF || err == io.ErrClosedPipe {
 		return true
 	}
