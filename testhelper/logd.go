@@ -89,7 +89,7 @@ func Repeat(s string, n int) string {
 }
 
 func IsCI() bool {
-	return os.Getenv("CI") == "true"
+	return os.Getenv("CI") != ""
 }
 
 // FailingWriter fails the first call to Write, then the second, then third,
