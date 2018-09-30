@@ -126,6 +126,7 @@ func TestIntegrationWriteRead(t *testing.T) {
 	ts := newIntegrationTestState(conf, cconf, 1)
 	ts.setup(t)
 	defer ts.shutdown(t)
+
 	testIntegrationWriter(t, ts)
 }
 
@@ -136,6 +137,7 @@ func TestIntegrationWriteRead4(t *testing.T) {
 	ts := newIntegrationTestState(conf, cconf, 4)
 	ts.setup(t)
 	defer ts.shutdown(t)
+
 	testIntegrationWriter(t, ts)
 }
 
@@ -146,6 +148,7 @@ func TestIntegrationReconnect(t *testing.T) {
 	ts := newIntegrationTestState(conf, cconf, 1)
 	ts.setup(t)
 	defer ts.shutdown(t)
+
 	testIntegrationReconnect(t, ts)
 }
 
@@ -156,6 +159,7 @@ func TestIntegrationReconnect4(t *testing.T) {
 	ts := newIntegrationTestState(conf, cconf, 4)
 	ts.setup(t)
 	defer ts.shutdown(t)
+
 	testIntegrationReconnect(t, ts)
 }
 
