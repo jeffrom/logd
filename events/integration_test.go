@@ -1,9 +1,11 @@
 package events
 
 import (
+	"math/rand"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/jeffrom/logd/client"
 	"github.com/jeffrom/logd/config"
@@ -34,6 +36,8 @@ type integrationTest struct {
 	h        *Handlers
 	writers  []*client.Writer
 	scanners []*client.Scanner
+
+	failed []*protocol.Batch
 }
 
 func newIntegrationTestState(conf *config.Config, cconf *client.Config, n int) *integrationTest {
@@ -44,6 +48,7 @@ func newIntegrationTestState(conf *config.Config, cconf *client.Config, n int) *
 		offs:     []uint64{},
 		writers:  make([]*client.Writer, 0),
 		scanners: make([]*client.Scanner, 0),
+		failed:   make([]*protocol.Batch, 0),
 	}
 }
 
@@ -85,7 +90,11 @@ func (ts *integrationTest) shutdown(t *testing.T) {
 	}
 	for _, w := range ts.writers {
 		if err := w.Close(); err != nil {
-			t.Error(err)
+			if !client.IsRetryable(err) {
+				t.Error(err)
+			} else {
+				t.Logf("error closing writer ignored: %+v", err)
+			}
 		}
 	}
 }
@@ -93,7 +102,9 @@ func (ts *integrationTest) shutdown(t *testing.T) {
 // Push implements client.StatePusher.
 func (ts *integrationTest) Push(off uint64, err error, batch *protocol.Batch) error {
 	if err != nil {
-		// TODO add failed batches to the test state
+		ts.mu.Lock()
+		ts.failed = append(ts.failed, batch)
+		ts.mu.Unlock()
 		return err
 	}
 
@@ -127,9 +138,8 @@ func testIntegration(t *testing.T, ts *integrationTest) {
 	ts.setup(t)
 	defer ts.shutdown(t)
 
-	t.Run("write then read", func(t *testing.T) {
-		testIntegrationWriter(t, ts)
-	})
+	t.Run("write then read", func(t *testing.T) { testIntegrationWriter(t, ts) })
+	t.Run("reconnects", func(t *testing.T) { testIntegrationReconnect(t, ts) })
 }
 
 func testIntegrationWriter(t *testing.T, ts *integrationTest) {
@@ -203,15 +213,98 @@ func testIntegrationWriter(t *testing.T, ts *integrationTest) {
 	// 	t.Fatalf("wrote %d messages but read %d", wrote, read)
 	// }
 	failOnErrors(t, errC)
+}
 
-	// if err := ts.h.Stop(); err != nil {
-	// 	errC <- errors.Wrap(err, "shutdown failed")
-	// 	return
-	// }
-	// if err := ts.h.GoStart(); err != nil {
-	// 	errC <- errors.Wrap(err, "restart failed")
-	// 	return
-	// }
+func testIntegrationReconnect(t *testing.T, ts *integrationTest) {
+	n := 50
+	runs := 1
+	if !testing.Short() {
+		runs = 100
+	}
+	for i := 0; i < runs; i++ {
+		errC := make(chan error, ts.n)
+		wg := sync.WaitGroup{}
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			for i := 0; i < 10; i++ {
+				time.Sleep(time.Duration(rand.Intn(10)) * time.Millisecond)
+				if err := ts.h.Stop(); err != nil {
+					errC <- errors.Wrap(err, "shutdown failed")
+				}
+				if err := ts.h.GoStart(); err != nil {
+					errC <- errors.Wrap(err, "shutdown failed")
+				}
+			}
+		}()
+
+		var wrote int32
+		failed := make([][]byte, 0)
+		mu := sync.Mutex{}
+		for _, w := range ts.writers {
+			// s := ts.scanners[n]
+			wg.Add(1)
+
+			go func(w *client.Writer) {
+				defer wg.Done()
+				for i := 0; i < n; i++ {
+					time.Sleep(time.Duration(rand.Intn(3)) * time.Millisecond)
+
+					msg := []byte("oh dang sup")
+					_, err := w.Write(msg)
+					if err != nil {
+						if !client.IsRetryable(err) {
+							errC <- errors.Wrap(err, "write failed")
+							return
+						}
+
+						mu.Lock()
+						failed = append(failed, msg)
+						mu.Unlock()
+						continue
+					}
+					atomic.AddInt32(&wrote, 1)
+				}
+
+				if err := w.Flush(); err != nil && !client.IsRetryable(err) {
+					errC <- errors.Wrap(err, "flush failed")
+					return
+				}
+			}(w)
+		}
+
+		wg.Wait()
+		failOnErrors(t, errC)
+
+		c, err := client.DialConfig(ts.cconf.Hostport, ts.cconf)
+		if err != nil {
+			t.Fatalf("failed to connect for recovering batches: %+v", err)
+		}
+		for _, batch := range ts.failed {
+			if _, err := c.Batch(batch); err != nil {
+				t.Fatalf("failed to write previously failed batch: %+v", err)
+			}
+		}
+		c.Close()
+
+		w := client.NewWriter(ts.cconf, "default")
+		for _, msg := range failed {
+			if _, err := w.Write(msg); err != nil {
+				t.Fatalf("failed to write previously failed message: %+v", err)
+			}
+			atomic.AddInt32(&wrote, 1)
+		}
+		if err := w.Flush(); err != nil {
+			t.Fatalf("failed to flush previously failed messages: %+v", err)
+		}
+		w.Close()
+
+		if atomic.LoadInt32(&wrote) != int32(n*ts.n) {
+			t.Fatalf("expected to write %d messages but only wrote %d", n*ts.n, wrote)
+		}
+	}
 }
 
 func failOnErrors(t *testing.T, errC chan error) {

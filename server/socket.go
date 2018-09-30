@@ -287,11 +287,13 @@ func (s *Socket) handleConnection(conn *Conn) {
 func (s *Socket) doRequest(ctx context.Context, conn *Conn) error {
 	if err := conn.setWaitForCmdDeadline(); err != nil {
 		log.Printf("%s error: %+v", conn.RemoteAddr(), err)
+		conn.setState(connStateFailed)
 		return err
 	}
 
 	req := reqPool.Get().(*protocol.Request).WithConfig(s.conf)
 	req.Reset()
+	// defer s.finishRequest(req)
 
 	internal.Debugf(s.conf, "%s: waiting for request", conn.RemoteAddr())
 	readn, rerr := req.ReadFrom(conn.br)
@@ -302,9 +304,11 @@ func (s *Socket) doRequest(ctx context.Context, conn *Conn) error {
 			log.Printf("%s read error: %+v", conn.RemoteAddr(), rerr)
 		}
 
+		conn.setState(connStateFailed)
 		s.finishRequest(req)
 		return rerr
 	}
+	conn.setState(connStateActive)
 
 	// start := s.startInstrumentation(req)
 
@@ -324,6 +328,7 @@ func (s *Socket) doRequest(ctx context.Context, conn *Conn) error {
 	if reqerr != nil {
 		internal.LogError(conn.Flush())
 		log.Printf("%s: response error: %+v", conn.RemoteAddr(), reqerr)
+		conn.setState(connStateFailed)
 		s.finishRequest(req)
 		return reqerr
 	}
@@ -331,9 +336,12 @@ func (s *Socket) doRequest(ctx context.Context, conn *Conn) error {
 
 	if ferr := conn.Flush(); ferr != nil || req.Name == protocol.CmdClose {
 		internal.Debugf(s.conf, "%s: closing", conn.RemoteAddr())
+		conn.setState(connStateFailed)
 		s.finishRequest(req)
 		return ferr
 	}
+
+	conn.setState(connStateInactive)
 	s.finishRequest(req)
 	return nil
 }
