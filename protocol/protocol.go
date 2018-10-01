@@ -50,7 +50,8 @@ var errCrcChecksumMismatch = stderrors.New("crc checksum mismatch")
 
 // TODO maybe Castagnoli is faster? try benchmarking on a decent machine
 // var crcTable = crc32.MakeTable(crc32.Castagnoli)
-var crcTable = crc32.MakeTable(crc32.Koopman)
+// var crcTable = crc32.MakeTable(crc32.Koopman)
+var crcTable = crc32.MakeTable(crc32.IEEE)
 
 var bnewLine = []byte("\r\n")
 var bspace = []byte(" ")

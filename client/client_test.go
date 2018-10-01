@@ -40,7 +40,7 @@ func TestBatchWrite(t *testing.T) {
 
 	server.Expect(func(p []byte) io.WriterTo {
 		if !bytes.Equal(fixture, p) {
-			t.Fatalf("expected:\n\n\t%q\n\nbut got:\n\n\t%q\n", fixture, p)
+			log.Panicf("expected:\n\n\t%q\n\nbut got:\n\n\t%q\n", fixture, p)
 		}
 		return protocol.NewClientBatchResponse(gconf, expectedID, 1)
 	})
@@ -55,7 +55,7 @@ func TestBatchWrite(t *testing.T) {
 
 	server.Expect(func(p []byte) io.WriterTo {
 		if !bytes.Equal(fixture, p) {
-			t.Fatalf("expected:\n\n\t%q\n\nbut got:\n\n\t%q\n", fixture, p)
+			log.Panicf("expected:\n\n\t%q\n\nbut got:\n\n\t%q\n", fixture, p)
 		}
 		return protocol.NewClientErrResponse(gconf, errors.New("this should be an internal server error"))
 	})
