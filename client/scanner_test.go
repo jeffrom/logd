@@ -219,7 +219,7 @@ func TestScannerState(t *testing.T) {
 	c := New(conf).SetConn(clientConn)
 	sm := NewMemoryStatePuller(conf)
 	s := ScannerForClient(c).
-		WithStatePuller(sm)
+		WithStateHandler(sm)
 	defer s.Close()
 	defer expectServerClose(t, gconf, server)
 	s.SetTopic("default")

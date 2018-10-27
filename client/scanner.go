@@ -109,7 +109,7 @@ func (s *Scanner) Reset() {
 }
 
 // WithSetStatePuller sets the StatePuller on the Scanner
-func (s *Scanner) WithStatePuller(statem StatePuller) *Scanner {
+func (s *Scanner) WithStateHandler(statem StatePuller) *Scanner {
 	s.statem = statem
 	return s
 }
@@ -162,6 +162,12 @@ func (s *Scanner) Scan() bool {
 		return s.scanErr(err)
 	}
 	return true
+}
+
+// Start marks the current message as processing. It will return ErrProcessing
+// if the message is already being processed.
+func (s *Scanner) Start() error {
+	return s.statem.Start(s.curr, uint64(s.batchRead))
 }
 
 // Complete marks the current message processing completed. It will panic if no

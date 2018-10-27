@@ -8,6 +8,8 @@ import (
 	"github.com/jeffrom/logd/protocol"
 )
 
+var ErrProcessing = errors.New("message already being processed")
+
 // StatePusher saves recently written offsets for later processing.
 type StatePusher interface {
 	Push(off uint64) error
@@ -19,6 +21,10 @@ type StatePuller interface {
 	// Get returns the oldest message offset and delta that isn't already being
 	// processed.
 	Get() (uint64, uint64, error)
+
+	// Start marks a message as being processed. It should return
+	// ErrProcessing if the message is already being processed.
+	Start(off, delta uint64) error
 
 	// Complete marks a message as completed or failed. Failure is written when
 	// err is not nil.
@@ -149,6 +155,10 @@ func (m *FileStatePuller) Get() (uint64, uint64, error) {
 	return 0, 0, nil
 }
 
+func (m *FileStatePuller) Start(off, delta uint64) error {
+	return nil
+}
+
 // Complete implements StatePuller interface.
 func (m *FileStatePuller) Complete(off, delta uint64) error {
 	return nil
@@ -174,6 +184,10 @@ func (m *MemoryStatePuller) Get() (uint64, uint64, error) {
 		return 0, 0, errNoState
 	}
 	return m.off, m.delta, nil
+}
+
+func (m *MemoryStatePuller) Start(off, delta uint64) error {
+	return nil
 }
 
 // Complete implements StatePuller interface
