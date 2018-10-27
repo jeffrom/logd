@@ -39,10 +39,16 @@ the possible states for a Writer are as follows:
 ### Caller API
 
 ```go
-NewWriter(conf *Config, topic string) *Writer
+NewConfig(topic string, conf *Config) *Writer
 ```
 
-- returns a new instance assigned to a topic
+- returns a new instance assigned to a topic.
+
+```go
+New(topic string) *Writer
+```
+
+- returns a new instance assigned to a topic and the default configuration.
 
 ```go
 Write(p []byte) (int, error)
@@ -53,6 +59,14 @@ Write(p []byte) (int, error)
 - if sending the batch fails, returns an error
 - other calls while the request is failing return an error
 - checks the connection to the server is created, returns an error if not
+
+```go
+WriteThen(p []byte) (chan <-*SentMessage, error)
+```
+
+- does a Write but returns a channel which receives the message, its offset,
+  and delta.
+- if an error is returned, the channel will be closed
 
 ```go
 Flush() error

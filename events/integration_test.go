@@ -101,13 +101,13 @@ func (ts *integrationTest) shutdown(t *testing.T) {
 }
 
 // Push implements client.StatePusher.
-func (ts *integrationTest) Push(off uint64, err error, batch *protocol.Batch) error {
-	if err != nil {
-		ts.mu.Lock()
-		ts.failed = append(ts.failed, batch)
-		ts.mu.Unlock()
-		return err
-	}
+func (ts *integrationTest) Push(off uint64) error {
+	// if err != nil {
+	// 	ts.mu.Lock()
+	// 	ts.failed = append(ts.failed, batch)
+	// 	ts.mu.Unlock()
+	// 	return err
+	// }
 
 	ts.addOff(off)
 

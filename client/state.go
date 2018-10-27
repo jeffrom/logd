@@ -8,9 +8,21 @@ import (
 	"github.com/jeffrom/logd/protocol"
 )
 
-// StatePusher saves recently used offsets so they can be retrieved
+// StatePusher saves recently written offsets for later processing.
 type StatePusher interface {
-	Push(off uint64, err error, batch *protocol.Batch) error
+	Push(off uint64) error
+}
+
+// StatePuller pulls messages from the state and marks them completed or
+// failed.
+type StatePuller interface {
+	// Get returns the oldest message offset and delta that isn't already being
+	// processed.
+	Get() (uint64, uint64, error)
+
+	// Complete marks a message as completed or failed. Failure is written when
+	// err is not nil.
+	Complete(off, delta uint64, err error) error
 }
 
 // NoopStatePusher discards input
@@ -18,7 +30,7 @@ type NoopStatePusher struct {
 }
 
 // Push implements StatePusher
-func (m *NoopStatePusher) Push(off uint64, err error, batch *protocol.Batch) error {
+func (m *NoopStatePusher) Push(off uint64) error {
 	return nil
 }
 
@@ -41,7 +53,7 @@ func NewStateOutputter(f *os.File) *StateOutputter {
 }
 
 // Push implements StatePusher
-func (m *StateOutputter) Push(off uint64, oerr error, batch *protocol.Batch) error {
+func (m *StateOutputter) Push(off uint64) error {
 	_, err := fmt.Fprintf(m.f, "%d\n", off)
 	return err
 }
@@ -70,10 +82,10 @@ func NewMockStatePusher() *MockStatePusher {
 }
 
 // Push implements StatePusher
-func (m *MockStatePusher) Push(off uint64, oerr error, batch *protocol.Batch) error {
+func (m *MockStatePusher) Push(off uint64) error {
 	m.offs = append(m.offs, off)
-	m.errs = append(m.errs, oerr)
-	m.batches = append(m.batches, batch)
+	// m.errs = append(m.errs, oerr)
+	// m.batches = append(m.batches, batch)
 	return m.serr
 }
 
@@ -84,24 +96,18 @@ func (m *MockStatePusher) SetError(err error) {
 
 // Next returns the next offset, error, and batch, starting from the first. if
 // there are no more pushed states, the last return value will be false
-func (m *MockStatePusher) Next() (uint64, error, *protocol.Batch, bool) {
+func (m *MockStatePusher) Next() (uint64, bool) {
 	if m.n >= len(m.offs) {
-		return 0, nil, nil, false
+		return 0, false
 	}
-	off, err, batch := m.offs[m.n], m.errs[m.n], m.batches[m.n]
+	off := m.offs[m.n]
 	m.n++
-	return off, err, batch, true
+	return off, true
 }
 
 // errNoState should be returned by StatePullers when the state hasn't
 // stored any offset information yet.
 var errNoState = errors.New("state uninitialized")
-
-// StatePuller keeps track of the last scanned message
-type StatePuller interface {
-	Get() (uint64, uint64, error)
-	Complete(off, delta uint64) error
-}
 
 // FileStatePuller tracks offset state in a file.
 type FileStatePuller struct {
@@ -153,6 +159,7 @@ type MemoryStatePuller struct {
 	off         uint64
 	delta       uint64
 	initialized bool
+	err         error
 }
 
 func NewMemoryStatePuller(conf *Config) *MemoryStatePuller {
@@ -170,9 +177,10 @@ func (m *MemoryStatePuller) Get() (uint64, uint64, error) {
 }
 
 // Complete implements StatePuller interface
-func (m *MemoryStatePuller) Complete(off, delta uint64) error {
+func (m *MemoryStatePuller) Complete(off, delta uint64, err error) error {
 	m.initialized = true
 	m.off = off
 	m.delta = delta
+	m.err = err
 	return nil
 }

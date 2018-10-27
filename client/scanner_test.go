@@ -225,7 +225,7 @@ func TestScannerState(t *testing.T) {
 	s.SetTopic("default")
 
 	// ensure state is initialized
-	if err := s.Complete(); err != nil {
+	if err := s.Complete(nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -288,6 +288,8 @@ func TestScannerUseTail(t *testing.T) {
 }
 
 func mustScan(t *testing.T, s *Scanner, expected string) {
+	t.Helper()
+
 	if !s.Scan() {
 		t.Fatal("failed to scan:", s.Error())
 	}
@@ -299,7 +301,9 @@ func mustScan(t *testing.T, s *Scanner, expected string) {
 }
 
 func mustComplete(t *testing.T, s *Scanner) {
-	if err := s.Complete(); err != nil {
+	t.Helper()
+
+	if err := s.Complete(nil); err != nil {
 		t.Fatal(err)
 	}
 }

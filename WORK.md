@@ -15,6 +15,7 @@
   - should have a json protocol
   - logd protocol is working
     | curl -X POST -d $'READ default 0 3\r\n' -H 'Content-type: application/logd' http://localhost:1775/log
+- [ ] a writer backpressure config that sets the buffer size on the writers channel
 
 # maybe later
 

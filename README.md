@@ -119,9 +119,33 @@ readers.
 
 Other goals are to minimize hot-path memory allocations and copying of bytes.
 
-On my old Thinkpad, by piping 1000 bytes per line via the yes program to
-`log-cli write`, which is pointed a server on localhost, one connection can
-write ~42k messages (about 40 megabytes) per second.
+Here are some benchmarks on a 12-core, 16gb memory linux machine, using a
+loopback device for networking:
+
+```
+pkg: github.com/jeffrom/logd/events
+BenchmarkBatchFile-12                    1000000              3192 ns/op              70 B/op          1 allocs/op
+BenchmarkLifecycle-12                      20000            131053 ns/op           90164 B/op        205 allocs/op
+BenchmarkBatchFull-12                    1000000              2852 ns/op              88 B/op          6 allocs/op
+BenchmarkBatchFullLarge-12                 20000            149112 ns/op            1086 B/op          8 allocs/op
+BenchmarkBatchFullTopics8-12             1000000              3010 ns/op              82 B/op          6 allocs/op
+BenchmarkReadHead-12                      200000             10275 ns/op            4398 B/op         25 allocs/op
+BenchmarkReadTail-12                      200000             11437 ns/op            4716 B/op         25 allocs/op
+BenchmarkReadAll-12                       200000             13197 ns/op            5512 B/op         29 allocs/op
+
+jeff$ log-cli bench --conns 16 --topics 4 --duration 60s
+batch size: 65500b, topics: 4, duration: 1m0s, connections: 16
+
+bytes out :             50.56Gb                 863.53Mb/s
+batches   :             828.61K                 13.82K/s
+timing    :
+        min 626.93μ
+        p50 626.93μ
+        p90 626.93μ
+        p95 626.93μ
+        p99 21.92ms
+        max 1.25s
+```
 
 ## planned
 

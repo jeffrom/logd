@@ -77,6 +77,16 @@ var cmdPool = sync.Pool{
 	},
 }
 
+type WriterErrorHandler interface {
+	Push(batch *protocol.Batch, err error) error
+}
+
+type NoopWriterErrorHandler int
+
+func (h NoopWriterErrorHandler) Push(batch *protocol.Batch, err error) error {
+	return nil
+}
+
 // Writer writes message batches to the log server
 type Writer struct {
 	*Client
@@ -86,6 +96,7 @@ type Writer struct {
 	state        writerState
 	resC         chan error
 	stateManager StatePusher
+	errHandler   WriterErrorHandler
 
 	retries      int
 	timer        *time.Timer
@@ -100,16 +111,18 @@ type Writer struct {
 func NewWriter(conf *Config, topic string) *Writer {
 	gconf := conf.ToGeneralConfig()
 	w := &Writer{
-		Client: New(conf),
-		conf:   conf,
-		gconf:  gconf,
-		topic:  []byte(topic),
-		state:  stateClosed,
-		timer:  time.NewTimer(-1),
-		batch:  protocol.NewBatch(gconf),
-		inC:    make(chan *writerCmd),
-		resC:   make(chan error),
-		stopC:  make(chan struct{}),
+		Client:       New(conf),
+		conf:         conf,
+		gconf:        gconf,
+		topic:        []byte(topic),
+		state:        stateClosed,
+		timer:        time.NewTimer(-1),
+		batch:        protocol.NewBatch(gconf),
+		inC:          make(chan *writerCmd),
+		resC:         make(chan error),
+		stopC:        make(chan struct{}, 1),
+		stateManager: &NoopStatePusher{},
+		errHandler:   NoopWriterErrorHandler(0),
 	}
 
 	w.stopTimer()
@@ -122,6 +135,11 @@ func NewWriter(conf *Config, topic string) *Writer {
 // part of initialization.
 func (w *Writer) WithStateHandler(m StatePusher) *Writer {
 	w.stateManager = m
+	return w
+}
+
+func (w *Writer) WithErrorHandler(h WriterErrorHandler) *Writer {
+	w.errHandler = h
 	return w
 }
 
@@ -185,6 +203,7 @@ func (w *Writer) loop() {
 		case <-w.stopC:
 			internal.Debugf(w.gconf, "<-stopC")
 			close(w.inC)
+			close(w.stopC)
 			return
 
 		case cmd := <-w.inC:
@@ -280,11 +299,10 @@ func (w *Writer) handleFlush() error {
 	if serr := w.setErr(err); serr != nil {
 		defer w.startReconnect()
 
-		if w.stateManager != nil {
-			perr := w.stateManager.Push(off, serr, batch.Copy())
-			batch.Reset()
-			if perr != nil {
-				return perr
+		if w.errHandler != nil {
+			if err := w.errHandler.Push(batch.Copy(), serr); err != nil {
+				batch.Reset()
+				return err
 			}
 		}
 		batch.Reset()
@@ -294,7 +312,7 @@ func (w *Writer) handleFlush() error {
 	w.state = stateConnected
 
 	if w.stateManager != nil {
-		if perr := w.stateManager.Push(off, nil, nil); perr != nil {
+		if perr := w.stateManager.Push(off); perr != nil {
 			return perr
 		}
 	}

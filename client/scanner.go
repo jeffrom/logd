@@ -165,9 +165,8 @@ func (s *Scanner) Scan() bool {
 }
 
 // Complete marks the current message processing completed. It will panic if no
-// StatePuller exists on the scanner. It will pass the error back from the
-// StatePuller.
-func (s *Scanner) Complete() error {
+// StatePuller exists on the scanner.
+func (s *Scanner) Complete(err error) error {
 	off := s.curr
 	delta := s.batchRead
 	if s.batch != nil && uint64(s.batchRead) >= s.batch.Size {
@@ -175,8 +174,11 @@ func (s *Scanner) Complete() error {
 		off = s.curr + uint64(fullsize)
 		delta = 0
 	}
-	internal.Debugf(s.gconf, "completing to offset %d, delta %d", off, delta)
-	return s.statem.Complete(off, uint64(delta))
+	if err == nil {
+		err = s.Error()
+	}
+	internal.Debugf(s.gconf, "completing to offset %d, delta %d (err: %+v)", off, delta, err)
+	return s.statem.Complete(off, uint64(delta), err)
 }
 
 func (s *Scanner) readMessage() error {
