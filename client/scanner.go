@@ -48,6 +48,7 @@ func NewScanner(conf *Config, topic string) *Scanner {
 		usetail:  conf.UseTail,
 		startoff: conf.Offset,
 		limit:    conf.Limit,
+		statem:   NoopStatePuller(0),
 	}
 
 	if topic != "" {

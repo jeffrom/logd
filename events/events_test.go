@@ -25,6 +25,7 @@ func init() {
 }
 
 func startHandlerConfig(t testing.TB, conf *config.Config) *Handlers {
+	t.Helper()
 	h := NewHandlers(conf)
 	t.Logf("starting event queue with config: %+v", conf)
 	if err := h.GoStart(); err != nil {
@@ -35,10 +36,12 @@ func startHandlerConfig(t testing.TB, conf *config.Config) *Handlers {
 }
 
 func startHandler(t *testing.T) *Handlers {
+	t.Helper()
 	return startHandlerConfig(t, testhelper.DefaultConfig(testing.Verbose()))
 }
 
 func stopHandler(t testing.TB, h *Handlers) {
+	t.Helper()
 	if err := h.Stop(); err != nil {
 		t.Logf("%s", debug.Stack())
 		t.Fatalf("error stopping queue: %+v", err)
@@ -158,6 +161,7 @@ func addReadRespEnvelope(off uint64, batches int, b []byte) []byte {
 }
 
 func checkBatch(t *testing.T, h *Handlers, fixture []byte, off uint64, batches int) {
+	t.Helper()
 	respb := pushRead(t, h, off, 3)
 	expect := addReadRespEnvelope(off, batches, fixture)
 	if !bytes.Equal(respb, expect) {
@@ -167,6 +171,7 @@ func checkBatch(t *testing.T, h *Handlers, fixture []byte, off uint64, batches i
 }
 
 func checkReadMultipleBatches(t *testing.T, h *Handlers, fixture []byte, offs []uint64) {
+	t.Helper()
 	if len(offs) <= 1 {
 		return
 	}
@@ -263,12 +268,14 @@ func TestUnknownCommand(t *testing.T) {
 }
 
 func checkNotFound(t testing.TB, conf *config.Config, b []byte) {
+	t.Helper()
 	if !bytes.HasPrefix(b, []byte("ERR")) {
 		log.Panicf("response was not an error: %q", b)
 	}
 }
 
 func newRequest(t testing.TB, conf *config.Config, p []byte) *protocol.Request {
+	t.Helper()
 	req := protocol.NewRequestConfig(conf)
 
 	_, err := req.ReadFrom(bufio.NewReader(bytes.NewBuffer(p)))
@@ -279,6 +286,7 @@ func newRequest(t testing.TB, conf *config.Config, p []byte) *protocol.Request {
 }
 
 func requestSet(t testing.TB, conf *config.Config, req *protocol.Request, buf []byte, b *bytes.Buffer, br *bufio.Reader) {
+	t.Helper()
 	b.Reset()
 	// fmt.Printf("%q\n", buf)
 	if _, err := b.Write(buf); err != nil {
@@ -295,6 +303,7 @@ func requestSet(t testing.TB, conf *config.Config, req *protocol.Request, buf []
 }
 
 func checkBatchResp(t testing.TB, conf *config.Config, resp *protocol.Response) *protocol.ClientResponse {
+	t.Helper()
 	if resp.NumReaders() != 1 {
 		log.Panicf("expected 1 reader but got %d", resp.NumReaders())
 	}
@@ -313,6 +322,7 @@ func checkBatchResp(t testing.TB, conf *config.Config, resp *protocol.Response) 
 }
 
 func checkReadResp(t testing.TB, conf *config.Config, resp *protocol.Response) []byte {
+	t.Helper()
 	b := &bytes.Buffer{}
 	for {
 		r, err := resp.ScanReader()
@@ -333,6 +343,7 @@ func checkReadResp(t testing.TB, conf *config.Config, resp *protocol.Response) [
 }
 
 func doStartHandler(b testing.TB, h *Handlers) {
+	b.Helper()
 	dir, _ := filepath.Split(h.conf.WorkDir)
 	log.Printf("starting log dir: %s", dir)
 	if err := h.GoStart(); err != nil {
@@ -341,6 +352,7 @@ func doStartHandler(b testing.TB, h *Handlers) {
 }
 
 func doShutdownHandler(t testing.TB, h *Handlers) {
+	t.Helper()
 	if t.Failed() {
 		t.Logf("failed: not removing files in %s", h.conf.WorkDir)
 		return
@@ -352,6 +364,7 @@ func doShutdownHandler(t testing.TB, h *Handlers) {
 
 // writes a partition worth of batch requests into the h
 func fillPartition(t testing.TB, h *Handlers) []uint64 {
+	t.Helper()
 	var offs []uint64
 	fixture := testhelper.LoadFixture("batch.small")
 	n := 0
@@ -364,6 +377,7 @@ func fillPartition(t testing.TB, h *Handlers) []uint64 {
 }
 
 func pushBatch(t testing.TB, h *Handlers, fixture []byte) *protocol.ClientResponse {
+	t.Helper()
 	ctx := context.Background()
 	req := newRequest(t, h.conf, fixture)
 	resp, err := h.PushRequest(ctx, req)
@@ -374,6 +388,7 @@ func pushBatch(t testing.TB, h *Handlers, fixture []byte) *protocol.ClientRespon
 }
 
 func pushReadTopic(t testing.TB, h *Handlers, topic string, off uint64, limit int) []byte {
+	t.Helper()
 	ctx := context.Background()
 	fixture := []byte(fmt.Sprintf("READ %s %d %d\r\n", topic, off, limit))
 	req := newRequest(t, h.conf, fixture)
@@ -385,6 +400,7 @@ func pushReadTopic(t testing.TB, h *Handlers, topic string, off uint64, limit in
 }
 
 func pushRead(t testing.TB, h *Handlers, off uint64, limit int) []byte {
+	t.Helper()
 	return pushReadTopic(t, h, "default", off, limit)
 }
 

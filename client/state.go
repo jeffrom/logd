@@ -111,9 +111,26 @@ func (m *MockStatePusher) Next() (uint64, bool) {
 	return off, true
 }
 
-// errNoState should be returned by StatePullers when the state hasn't
+// ErrNoState should be returned by StatePullers when the state hasn't
 // stored any offset information yet.
-var errNoState = errors.New("state uninitialized")
+var ErrNoState = errors.New("state uninitialized")
+
+type NoopStatePuller int
+
+// Get implements StatePuller interface.
+func (h NoopStatePuller) Get() (uint64, uint64, error) {
+	return 0, 0, ErrNoState
+}
+
+// Start implements StatePuller interface.
+func (h NoopStatePuller) Start(off, delta uint64) error {
+	return nil
+}
+
+// Complete implements StatePuller interface.
+func (h NoopStatePuller) Complete(off, delta uint64, err error) error {
+	return nil
+}
 
 // FileStatePuller tracks offset state in a file.
 type FileStatePuller struct {
@@ -181,7 +198,7 @@ func NewMemoryStatePuller(conf *Config) *MemoryStatePuller {
 // Get implements StatePuller interface
 func (m *MemoryStatePuller) Get() (uint64, uint64, error) {
 	if !m.initialized {
-		return 0, 0, errNoState
+		return 0, 0, ErrNoState
 	}
 	return m.off, m.delta, nil
 }
