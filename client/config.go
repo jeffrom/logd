@@ -14,6 +14,7 @@ type Config struct {
 	Verbose              bool          `json:"verbose"`
 	Hostport             string        `json:"host"`
 	Timeout              time.Duration `json:"timeout"`
+	ConnectTimeout       time.Duration `json:"connect-timeout"`
 	WriteTimeout         time.Duration `json:"write-timeout"`
 	ReadTimeout          time.Duration `json:"read-timeout"`
 	Count                bool          `json:"count"`
@@ -41,6 +42,7 @@ var DefaultConfig = &Config{
 	Verbose:              false,
 	Hostport:             "127.0.0.1:1774",
 	Timeout:              10 * time.Second,
+	ConnectTimeout:       -1,
 	WriteTimeout:         -1,
 	ReadTimeout:          -1,
 	Count:                false,
@@ -75,6 +77,13 @@ func (c *Config) Validate() error {
 
 func (c *Config) String() string {
 	return fmt.Sprintf("%+v", *c)
+}
+
+func (c *Config) getConnectTimeout() time.Duration {
+	if c.ConnectTimeout >= 0 {
+		return c.ConnectTimeout
+	}
+	return c.Timeout
 }
 
 func (c *Config) getReadTimeout() time.Duration {

@@ -131,7 +131,7 @@ func (c *Client) resetRetries() {
 
 func (c *Client) connect(addr string) error {
 	internal.Debugf(c.gconf, "connecting to %s", addr)
-	conn, err := c.dialer.DialTimeout("tcp", addr, c.conf.Timeout)
+	conn, err := c.dialer.DialTimeout("tcp", addr, c.conf.getConnectTimeout())
 	if err != nil {
 		if conn != nil {
 			internal.IgnoreError(c.conf.Verbose, conn.Close())

@@ -83,6 +83,8 @@ func (ts *integrationTest) setup(t *testing.T) {
 }
 
 func (ts *integrationTest) shutdown(t *testing.T) {
+	t.Helper()
+
 	defer doShutdownHandler(t, ts.h)
 	for _, s := range ts.scanners {
 		if err := s.Close(); err != nil {
@@ -144,6 +146,7 @@ func TestIntegrationWriteRead4(t *testing.T) {
 func TestIntegrationReconnect(t *testing.T) {
 	conf := testhelper.IntegrationTestConfig(testing.Verbose())
 	cconf := newIntegrationTestClientConfig(testing.Verbose())
+	cconf.ConnectTimeout = 100 * time.Millisecond
 
 	ts := newIntegrationTestState(conf, cconf, 1)
 	ts.setup(t)
@@ -155,6 +158,7 @@ func TestIntegrationReconnect(t *testing.T) {
 func TestIntegrationReconnect4(t *testing.T) {
 	conf := testhelper.IntegrationTestConfig(testing.Verbose())
 	cconf := newIntegrationTestClientConfig(testing.Verbose())
+	cconf.ConnectTimeout = 100 * time.Millisecond
 
 	ts := newIntegrationTestState(conf, cconf, 4)
 	ts.setup(t)
@@ -255,8 +259,9 @@ func testIntegrationReconnect(t *testing.T, ts *integrationTest) {
 				if err := ts.h.Stop(); err != nil {
 					errC <- errors.Wrap(err, "shutdown failed")
 				}
+				// time.Sleep(time.Duration(rand.Intn(4)*50) * time.Millisecond)
 				if err := ts.h.GoStart(); err != nil {
-					errC <- errors.Wrap(err, "shutdown failed")
+					errC <- errors.Wrap(err, "startup failed")
 				}
 			}
 		}()
@@ -329,6 +334,8 @@ func testIntegrationReconnect(t *testing.T, ts *integrationTest) {
 }
 
 func failOnErrors(t *testing.T, errC chan error) {
+	t.Helper()
+
 	for {
 		select {
 		case err := <-errC:
