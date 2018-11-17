@@ -194,6 +194,9 @@ func (s *Scanner) readMessage() error {
 	if err != nil {
 		return err
 	}
+	s.msg.Offset = s.curr
+	s.msg.Delta = uint64(s.batchRead)
+
 	s.batchRead += int(n)
 	s.messagesRead++
 	s.totalMessagesRead++

@@ -13,6 +13,7 @@ import (
 type Message struct {
 	conf          *config.Config
 	Offset        uint64 // firstOffset + offsetDelta
+	Delta         uint64
 	Body          []byte
 	Size          int // size of the message, not including \r\n
 	fullSize      int
@@ -36,6 +37,7 @@ func NewMessage(conf *config.Config) *Message {
 // Reset sets the message to its initial value so i can be reused
 func (m *Message) Reset() {
 	m.Offset = 0
+	m.Delta = 0
 	m.Size = 0
 	m.fullSize = 0
 	m.firstOffset = 0

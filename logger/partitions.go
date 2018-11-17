@@ -319,7 +319,7 @@ func (p *Partitions) removeFile(off uint64) error {
 
 	if _, err := os.Stat(fullpath); err != nil {
 		if os.IsNotExist(err) {
-			internal.IgnoreError(p.conf.Verbose, err)
+			internal.DiscardError(err)
 			return nil
 		}
 		return err
