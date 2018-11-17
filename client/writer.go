@@ -137,6 +137,11 @@ func (w *Writer) WithBacklog(bl Backlogger) *Writer {
 	return w
 }
 
+func (w *Writer) WithErrorHandler(eh ErrorHandler) *Writer {
+	w.errh = eh
+	return w
+}
+
 // Reset sets the writer to its initial values
 func (w *Writer) Reset(topic string) {
 	w.topic = []byte(topic)
