@@ -77,16 +77,6 @@ var cmdPool = sync.Pool{
 	},
 }
 
-type WriterErrorHandler interface {
-	Push(batch *protocol.Batch, err error) error
-}
-
-type NoopWriterErrorHandler int
-
-func (h NoopWriterErrorHandler) Push(batch *protocol.Batch, err error) error {
-	return nil
-}
-
 // Writer writes message batches to the log server
 type Writer struct {
 	*Client
@@ -96,7 +86,9 @@ type Writer struct {
 	state        writerState
 	resC         chan error
 	stateManager StatePusher
-	errHandler   WriterErrorHandler
+	backlog      Backlogger
+	backlogC     chan *Backlog
+	errh         ErrorHandler
 
 	retries      int
 	timer        *time.Timer
@@ -122,10 +114,12 @@ func NewWriter(conf *Config, topic string) *Writer {
 		resC:         make(chan error),
 		stopC:        make(chan struct{}, 1),
 		stateManager: &NoopStatePusher{},
-		errHandler:   NoopWriterErrorHandler(0),
+		backlog:      &NoopBacklogger{},
+		errh:         &NoopErrorHandler{},
 	}
 
 	w.stopTimer()
+	w.backlogC = w.backlog.Backlog()
 
 	go w.loop()
 	return w
@@ -138,8 +132,13 @@ func (w *Writer) WithStateHandler(m StatePusher) *Writer {
 	return w
 }
 
-func (w *Writer) WithErrorHandler(h WriterErrorHandler) *Writer {
-	w.errHandler = h
+func (w *Writer) WithBacklog(bl Backlogger) *Writer {
+	w.backlog = bl
+	return w
+}
+
+func (w *Writer) WithErrorHandler(eh ErrorHandler) *Writer {
+	w.errh = eh
 	return w
 }
 
@@ -299,12 +298,15 @@ func (w *Writer) handleFlush() error {
 	if serr := w.setErr(err); serr != nil {
 		defer w.startReconnect()
 
-		if w.errHandler != nil {
-			if err := w.errHandler.Push(batch.Copy(), serr); err != nil {
-				batch.Reset()
-				return err
+		if w.backlogC != nil {
+			select {
+			case w.backlogC <- &Backlog{Batch: batch.Copy(), Err: serr}:
+			default:
+				log.Print("batch discarded because backlog channel was full")
 			}
 		}
+		w.errh.HandleError(serr)
+
 		batch.Reset()
 		return err
 	}
