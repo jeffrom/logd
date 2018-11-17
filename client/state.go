@@ -15,6 +15,20 @@ type StatePusher interface {
 	Push(off uint64) error
 }
 
+// Backlogger saves failed batch writes so they can be attempted later.
+type Backlogger interface {
+	// Backlog() should return a channel with the desired backfill size. The client
+	// should attempt to write failed batches to the channel, but if the channel is
+	// full, it will log the error and continue.
+	Backlog() chan *Backlog
+	// GetBacklog() (*protocol.Batch, error)
+}
+
+type Backlog struct {
+	Batch *protocol.Batch
+	Err   error
+}
+
 // StatePuller pulls messages from the state and marks them completed or
 // failed.
 type StatePuller interface {
@@ -44,6 +58,14 @@ func (m *NoopStatePusher) Push(off uint64) error {
 func (m *NoopStatePusher) Close() error {
 	return nil
 }
+
+type NoopBacklogger struct{}
+
+func (bl *NoopBacklogger) Backlog() chan *Backlog { return nil }
+
+// func (bl *NoopBacklogger) GetBacklog() (*protocol.Batch, error) {
+// 	return nil, nil
+// }
 
 // StateOutputter writes offsets to a file. Intended for use by command line
 // applications.

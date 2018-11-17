@@ -2,6 +2,12 @@
 
 # TODO
 
+- [ ] writer backfill (see interface in client/state.go). there's already a
+      simple implementation.
+- [ ] test client scanner message offset/delta is correct
+- [ ] more tests for client scanner restarts from offsets+delta cases
+- [ ] test case where scanner state has a single message in a batch, with all
+      others in subsequent batches, and other such cases
 - [ ] audit / fix int types, such as batch size (should be int, not uint64)
 - [ ] simple replication, scanner failover
 - [ ] config validation
