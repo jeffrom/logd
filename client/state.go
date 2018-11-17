@@ -21,12 +21,15 @@ type Backlogger interface {
 	// should attempt to write failed batches to the channel, but if the channel is
 	// full, it will log the error and continue.
 	Backlog() chan *Backlog
-	// GetBacklog() (*protocol.Batch, error)
 }
 
 type Backlog struct {
 	Batch *protocol.Batch
 	Err   error
+}
+
+type ErrorHandler interface {
+	HandleError(err error)
 }
 
 // StatePuller pulls messages from the state and marks them completed or
@@ -62,6 +65,10 @@ func (m *NoopStatePusher) Close() error {
 type NoopBacklogger struct{}
 
 func (bl *NoopBacklogger) Backlog() chan *Backlog { return nil }
+
+type NoopErrorHandler struct{}
+
+func (eh *NoopErrorHandler) HandleError(err error) {}
 
 // func (bl *NoopBacklogger) GetBacklog() (*protocol.Batch, error) {
 // 	return nil, nil

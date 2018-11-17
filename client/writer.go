@@ -88,6 +88,7 @@ type Writer struct {
 	stateManager StatePusher
 	backlog      Backlogger
 	backlogC     chan *Backlog
+	errh         ErrorHandler
 
 	retries      int
 	timer        *time.Timer
@@ -114,6 +115,7 @@ func NewWriter(conf *Config, topic string) *Writer {
 		stopC:        make(chan struct{}, 1),
 		stateManager: &NoopStatePusher{},
 		backlog:      &NoopBacklogger{},
+		errh:         &NoopErrorHandler{},
 	}
 
 	w.stopTimer()
@@ -293,11 +295,12 @@ func (w *Writer) handleFlush() error {
 
 		if w.backlogC != nil {
 			select {
-			case w.backlogC <- &Backlog{Batch: batch.Copy(), Err: err}:
+			case w.backlogC <- &Backlog{Batch: batch.Copy(), Err: serr}:
 			default:
 				log.Print("batch discarded because backlog channel was full")
 			}
 		}
+		w.errh.HandleError(serr)
 		batch.Reset()
 		return err
 	}
