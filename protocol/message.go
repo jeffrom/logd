@@ -47,6 +47,18 @@ func (m *Message) Reset() {
 	m.completedRead = false
 }
 
+// Copy returns a copy of the message. Convenient for clients.
+func (m *Message) Copy() *Message {
+	b := make([]byte, len(m.Body))
+	copy(b, m.Body)
+	return &Message{
+		Offset: m.Offset,
+		Delta:  m.Delta,
+		Size:   m.Size,
+		Body:   b,
+	}
+}
+
 func (m *Message) String() string {
 	return string(m.BodyBytes())
 }
