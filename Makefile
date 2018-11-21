@@ -62,7 +62,7 @@ doc.serve:
 
 .PHONY: build.container
 build.container:
-	./script/build_container.sh
+	docker build -f Dockerfile -t logd:latest .
 
 .PHONY: test
 test: test.cover test.race

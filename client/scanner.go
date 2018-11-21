@@ -361,7 +361,7 @@ func (s *Scanner) pollBatch() error {
 				s.pollC <- nil
 				return
 			case <-s.done:
-				s.pollC <- nil
+				s.pollC <- ErrStopped
 				return
 			}
 		}
