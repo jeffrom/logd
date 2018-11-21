@@ -33,6 +33,7 @@ type Scanner struct {
 	curr              uint64
 	err               error
 	done              chan struct{}
+	pollC             chan error
 	usetail           bool
 	startoff          uint64
 	limit             int
@@ -45,6 +46,7 @@ func NewScanner(conf *Config, topic string) *Scanner {
 		batchBuf: &bytes.Buffer{},
 		msg:      protocol.NewMessage(conf.ToGeneralConfig()),
 		done:     make(chan struct{}),
+		pollC:    make(chan error),
 		usetail:  conf.UseTail,
 		startoff: conf.Offset,
 		limit:    conf.Limit,
@@ -109,6 +111,14 @@ func (s *Scanner) Reset() {
 	}
 }
 
+func (s *Scanner) resetDoneC() {
+	select {
+	case <-s.done: // if it's closed, this will recreate it
+		s.done = make(chan struct{})
+	default:
+	}
+}
+
 // WithSetStatePuller sets the StatePuller on the Scanner
 func (s *Scanner) WithStateHandler(statem StatePuller) *Scanner {
 	s.statem = statem
@@ -151,6 +161,7 @@ func (s *Scanner) Scan() bool {
 	}
 
 	if s.s == nil { // initial state
+		s.resetDoneC()
 		if err := s.doInitialRead(); err != nil {
 			return s.scanErr(err)
 		}
@@ -295,7 +306,8 @@ func (s *Scanner) scanNextBatch() error {
 
 // Stop causes the scanner to stop making requests and returns ErrStopped
 func (s *Scanner) Stop() {
-	s.done <- struct{}{}
+	close(s.done)
+	s.s = nil
 }
 
 func (s *Scanner) requestMoreBatches(poll bool) error {
@@ -334,17 +346,28 @@ func (s *Scanner) setNextBatch() error {
 }
 
 func (s *Scanner) pollBatch() error {
-	for {
-		time.Sleep(s.conf.WaitInterval)
-		err := s.requestMoreBatches(true)
-		if err != nil {
-			if err == protocol.ErrNotFound {
-				continue
+	go func() {
+		for {
+			select {
+			case <-time.After(s.conf.WaitInterval):
+				err := s.requestMoreBatches(true)
+				if err != nil {
+					if err == protocol.ErrNotFound {
+						continue
+					}
+					s.pollC <- err
+					return
+				}
+				s.pollC <- nil
+				return
+			case <-s.done:
+				s.pollC <- nil
+				return
 			}
-			return err
 		}
-		return nil
-	}
+	}()
+
+	return <-s.pollC
 }
 
 func (s *Scanner) scanErr(err error) bool {
