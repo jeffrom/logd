@@ -48,7 +48,6 @@ var errInvalidProtocolLine = stderrors.New("invalid protocol line")
 var errInvalidBodyLength = stderrors.New("invalid body length")
 var errCrcChecksumMismatch = stderrors.New("crc checksum mismatch")
 
-// TODO maybe Castagnoli is faster? try benchmarking on a decent machine
 var crcTable = crc32.MakeTable(crc32.IEEE)
 
 var bnewLine = []byte("\r\n")

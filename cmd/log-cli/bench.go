@@ -122,7 +122,7 @@ func (bc *benchConn) start() {
 }
 
 func (bc *benchConn) stop() {
-	bc.done <- struct{}{}
+	close(bc.done)
 }
 
 var BenchCmd = &cobra.Command{

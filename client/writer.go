@@ -202,7 +202,6 @@ func (w *Writer) loop() {
 		case <-w.stopC:
 			internal.Debugf(w.gconf, "<-stopC")
 			close(w.inC)
-			close(w.stopC)
 			return
 
 		case cmd := <-w.inC:
@@ -382,5 +381,5 @@ func (w *Writer) setErr(err error) error {
 }
 
 func (w *Writer) stop() {
-	w.stopC <- struct{}{}
+	close(w.stopC)
 }

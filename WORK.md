@@ -6,6 +6,10 @@
       simple implementation.
 - [ ] test client scanner message offset/delta is correct
 - [ ] more tests for client scanner restarts from offsets+delta cases
+- [ ] have client periodically send a PING to server to keep connection alive
+  - OR(/AND) try to reconnect syncronously when an io.EOF is returned. if the
+    reconnection fails, go back to async reconnect attempts.
+  - could also just be an issue w/ sequencing & error handling in the writer
 - [ ] test case where scanner state has a single message in a batch, with all
       others in subsequent batches, and other such cases
 - [ ] audit / fix int types, such as batch size (should be int, not uint64)
