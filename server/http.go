@@ -65,7 +65,9 @@ func (s *Http) setupHandlers() {
 
 // Stop implements transport.Server interface.
 func (s *Http) Stop() error {
-	log.Printf("Shutting down server at %s", s.ln.Addr())
+	if s.ln != nil {
+		log.Printf("Shutting down server at %s", s.ln.Addr())
+	}
 	// TODO use a ctx with timeout to do a graceful shutdown
 	return s.srv.Shutdown(context.Background())
 }
