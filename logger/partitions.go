@@ -17,6 +17,7 @@ import (
 
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/internal"
+	"github.com/jeffrom/logd/protocol"
 )
 
 // ErrNotFound is returned when a partition could not be found
@@ -176,6 +177,10 @@ func (p *Partitions) Get(off uint64, delta, limit int) (Partitioner, error) {
 	info, err := os.Stat(fname)
 	if err != nil {
 		return nil, err
+	}
+
+	if size := info.Size(); size > 0 && size <= int64(delta) {
+		return nil, protocol.ErrNotFound
 	}
 
 	if _, err := f.Seek(int64(delta), io.SeekStart); err != nil {

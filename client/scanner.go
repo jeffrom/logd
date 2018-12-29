@@ -3,16 +3,17 @@ package client
 import (
 	"bufio"
 	"bytes"
-	"errors"
+	stderrors "errors"
 	"io"
 	"time"
 
 	"github.com/jeffrom/logd/internal"
 	"github.com/jeffrom/logd/protocol"
+	"github.com/pkg/errors"
 )
 
 // ErrStopped indicates the scanner was stopped
-var ErrStopped = errors.New("stopped")
+var ErrStopped = stderrors.New("stopped")
 
 // Scanner is used to read batches from the log, scanning message by message
 type Scanner struct {
@@ -372,7 +373,11 @@ func (s *Scanner) pollBatch() error {
 
 func (s *Scanner) scanErr(err error) bool {
 	if err != nil {
-		internal.Logf("scan: %+v", err)
+		if errors.Cause(err) == protocol.ErrNotFound {
+			internal.Debugf(s.gconf, "scan: %+v", err)
+		} else {
+			internal.Logf("scan: %+v", err)
+		}
 	}
 	s.err = err
 	return false

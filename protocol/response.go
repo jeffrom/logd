@@ -43,6 +43,10 @@ var (
 	// ErrInvalid refers to an invalid request.
 	ErrInvalid = errors.New("invalid request")
 
+	// ErrInvalidOffset is returned when a read is attempted from a batch
+	// offset that doesn't point to the beginning of a batch protocol message.
+	ErrInvalidOffset = errors.New("invalid offset")
+
 	// errTooLarge is returned when the batch size is larger than the
 	// configured max batch size.
 	errTooLarge = errors.New("too large")

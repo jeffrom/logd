@@ -455,7 +455,7 @@ Loop:
 		} else if serr == io.EOF {
 			return nil, io.ErrUnexpectedEOF
 		} else if serr != nil {
-			return nil, serr
+			return nil, errors.Wrap(protocol.ErrInvalidOffset, serr.Error())
 		}
 	}
 

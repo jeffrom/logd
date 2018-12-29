@@ -43,6 +43,9 @@ func (s *BatchScanner) Scan() bool {
 	s.batch.Reset()
 	n, err := s.batch.ReadFrom(s.br)
 	s.scanned += int(n)
+	// if err != nil {
+	// 	err = errors.Wrap(ErrInvalidOffset, err.Error())
+	// }
 	s.err = err
 	return err == nil
 }
