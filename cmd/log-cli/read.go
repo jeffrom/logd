@@ -1,8 +1,12 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/jeffrom/logd/client"
 	"github.com/jeffrom/logd/internal"
+	"github.com/jeffrom/logd/protocol"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -74,6 +78,9 @@ func doRead(conf *client.Config, c *cobra.Command) error {
 	n := 0
 	for scanner.Scan() {
 		_, err := out.Write(scanner.Message().BodyBytes())
+		if err != nil && errors.Cause(err) == protocol.ErrNotFound {
+			break
+		}
 		internal.LogError(err)
 		_, err = out.Write([]byte("\n"))
 		internal.LogError(err)
@@ -83,5 +90,8 @@ func doRead(conf *client.Config, c *cobra.Command) error {
 		}
 	}
 
+	if n == 0 {
+		fmt.Println(t, "topic is empty")
+	}
 	return nil
 }
