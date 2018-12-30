@@ -118,6 +118,7 @@ func (c *Client) reset() {
 	// c.batch.Reset()
 	// c.batchbuf.Reset()
 	// c.rawbatchbuf.Reset()
+
 	select {
 	case <-c.done:
 	default:
@@ -139,6 +140,7 @@ func (c *Client) connect(addr string) error {
 		return err
 	}
 	c.reset()
+	c.resetRetries()
 	c.SetConn(conn)
 	return nil
 }
