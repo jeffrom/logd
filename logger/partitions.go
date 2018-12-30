@@ -169,11 +169,6 @@ func (p *Partitions) filePath(workdir string, off uint64) string {
 // Get implements PartitionManager
 func (p *Partitions) Get(off uint64, delta, limit int) (Partitioner, error) {
 	fname := p.filePath(p.conf.WorkDir, off)
-	f, err := os.Open(fname)
-	if err != nil {
-		return nil, err
-	}
-
 	info, err := os.Stat(fname)
 	if err != nil {
 		return nil, err
@@ -181,6 +176,11 @@ func (p *Partitions) Get(off uint64, delta, limit int) (Partitioner, error) {
 
 	if size := info.Size(); size > 0 && size <= int64(delta) {
 		return nil, protocol.ErrNotFound
+	}
+
+	f, err := os.Open(fname)
+	if err != nil {
+		return nil, err
 	}
 
 	if _, err := f.Seek(int64(delta), io.SeekStart); err != nil {
@@ -194,6 +194,7 @@ func (p *Partitions) Get(off uint64, delta, limit int) (Partitioner, error) {
 
 	r := NewPartition(p.conf, off, size).withTmpDir(p.tempDir)
 	if err := r.setFile(f); err != nil {
+		internal.IgnoreError(p.conf.Verbose, f.Close())
 		return nil, err
 	}
 	r.wrapCloser(func(closer io.Closer) error {
