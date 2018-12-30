@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"runtime/pprof"
 	"runtime/trace"
 	"strings"
 	"syscall"
@@ -19,6 +20,7 @@ import (
 var cfgFile string
 var tmpConfig = config.New()
 var traceFile = ""
+var cpuProfile = ""
 
 func init() {
 	cobra.OnInitialize(initConfig)
@@ -70,6 +72,7 @@ func init() {
 	viper.BindPFlag("flush-interval", pflags.Lookup("flush-interval"))
 
 	pflags.StringVar(&traceFile, "trace", "", "save execution trace data")
+	pflags.StringVar(&cpuProfile, "cpuprofile", "", "save cpu profiling data")
 }
 
 func initConfig() {
@@ -105,6 +108,17 @@ var RootCmd = &cobra.Command{
 			trace.Start(f)
 			defer trace.Stop()
 		}
+		if cpuProfile != "" {
+			f, err := os.Create(cpuProfile)
+			if err != nil {
+				panic(err)
+			}
+			if err := pprof.StartCPUProfile(f); err != nil {
+				panic(err)
+			}
+			defer pprof.StopCPUProfile()
+		}
+
 		conf := tmpConfig
 		h := events.NewHandlers(conf)
 

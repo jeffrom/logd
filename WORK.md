@@ -20,7 +20,7 @@
 - [ ] verify batches in the connection goroutine to better leverage multiple
       processors for the expensive checksum
   - option to disable checksum verification would also be good
-- [ ] verify topics concurrently during startup
+- [X] verify topics concurrently during startup
 - [ ] http server
   - should have a json protocol
   - logd protocol is working

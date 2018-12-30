@@ -51,17 +51,32 @@ func (t *topics) Setup() error {
 		return err
 	}
 
+	wg := sync.WaitGroup{}
+	errC := make(chan error, len(topics))
 	for _, topic := range topics {
 		if topic == "default" {
 			continue
 		}
-		if _, aerr := t.add(topic); aerr != nil {
-			return aerr
-		}
+
+		wg.Add(1)
+		go func(topic string) {
+			defer wg.Done()
+			if _, err := t.add(topic); err != nil {
+				errC <- err
+			}
+		}(topic)
 	}
 	// fmt.Println(t.m)
 
-	return err
+	wg.Wait()
+
+	// TODO log any additional errors
+	select {
+	case err := <-errC:
+		return err
+	default:
+	}
+	return nil
 }
 
 // Shutdown implements LifecycleManager
