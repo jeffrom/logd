@@ -151,6 +151,17 @@ func (w *Writer) Reset(topic string) {
 	w.stopTimer()
 	w.timerStarted = false
 	w.state = stateClosed
+
+	// drain backlog channel
+	if w.backlogC != nil {
+		for {
+			select {
+			case <-w.backlogC:
+			default:
+				return
+			}
+		}
+	}
 }
 
 func (w *Writer) Write(p []byte) (int, error) {
