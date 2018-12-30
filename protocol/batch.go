@@ -20,7 +20,7 @@ const MaxTopicSize = 255
 // NOTE no trailing newline after the data
 type Batch struct {
 	conf     *config.Config
-	Size     uint64
+	Size     int
 	Checksum uint32
 	Messages int
 	topic    []byte
@@ -104,7 +104,7 @@ func (b *Batch) FromRequest(req *Request) (*Batch, error) {
 	if err != nil {
 		return b, err
 	}
-	b.Size = n
+	b.Size = int(n)
 
 	b.SetTopic(req.args[1])
 
@@ -134,7 +134,7 @@ func (b *Batch) FromRequest(req *Request) (*Batch, error) {
 // check them here, maybe?
 func (b *Batch) Validate() error {
 	// if size > MaxBatchSize || crc doesn't match
-	if b.Size > uint64(b.conf.MaxBatchSize) {
+	if b.Size > b.conf.MaxBatchSize {
 		return errors.New("batch too large")
 	}
 	if b.Checksum != b.calculateChecksum() {
@@ -168,7 +168,7 @@ func (b *Batch) Append(p []byte) error {
 	msg.Size = len(p)
 
 	b.Messages++
-	b.Size += uint64(msg.calcSize())
+	b.Size += msg.calcSize()
 	return nil
 }
 
@@ -194,16 +194,16 @@ func (b *Batch) SetChecksum() {
 // we're assuming the crc is the longest possible uint32 for now to save
 // calculating the crc for every message
 func (b *Batch) CalcSize() int {
-	l := len(bbatchStart)       // `BATCH `
-	l += asciiSize(int(b.Size)) // <size>
-	l += len(bspace)            // ` `
-	l += b.ntopic               // `<topic>`
-	l += len(bspace)            // ` `
-	l += maxCRCSize             // <crc>
-	l += len(bspace)            // ` `
-	l += asciiSize(b.Messages)  // <messages>
-	l += termLen                // `\r\n`
-	l += int(b.Size)            // <data>
+	l := len(bbatchStart)      // `BATCH `
+	l += asciiSize(b.Size)     // <size>
+	l += len(bspace)           // ` `
+	l += b.ntopic              // `<topic>`
+	l += len(bspace)           // ` `
+	l += maxCRCSize            // <crc>
+	l += len(bspace)           // ` `
+	l += asciiSize(b.Messages) // <messages>
+	l += termLen               // `\r\n`
+	l += b.Size                // <data>
 	return l
 }
 
@@ -224,7 +224,7 @@ func (b *Batch) buildBodyBytes() error {
 	}
 
 	l := b.msgBuf.Len()
-	b.Size = uint64(l)
+	b.Size = l
 	b.ensureBuf()
 	// fmt.Printf("buildBodyBytes: %q\n", b.msgBuf.Bytes())
 	// fmt.Println(len(b.body), b.msgBuf.Len())
@@ -381,7 +381,7 @@ func (b *Batch) readEnvelope(r *bufio.Reader) (int64, error) {
 	if err != nil {
 		return total, err
 	}
-	b.Size = n
+	b.Size = int(n)
 
 	word, err = r.ReadSlice(' ')
 	total += int64(len(word))
@@ -421,7 +421,7 @@ func (b *Batch) readData(r *bufio.Reader) (int64, error) {
 	var total int64
 
 	// TODO this check is redundant, should check the total batch size above this
-	if b.Size > uint64(b.conf.MaxBatchSize) {
+	if b.Size > b.conf.MaxBatchSize {
 		return total, errTooLarge
 	}
 	b.ensureBuf()
@@ -433,7 +433,7 @@ func (b *Batch) readData(r *bufio.Reader) (int64, error) {
 
 func (b *Batch) calculateFirstOffset() uint64 {
 	n := uint64(len(bbatchStart) +
-		uintToASCII(b.Size, &b.digitbuf) +
+		uintToASCII(uint64(b.Size), &b.digitbuf) +
 		len(bspace) +
 		uintToASCII(uint64(b.Messages), &b.digitbuf) +
 		termLen +

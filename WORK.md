@@ -12,7 +12,7 @@
   - could also just be an issue w/ sequencing & error handling in the writer
 - [ ] test case where scanner state has a single message in a batch, with all
       others in subsequent batches, and other such cases
-- [ ] audit / fix int types, such as batch size (should be int, not uint64)
+- [X] audit / fix int types, such as batch size (should be int, not uint64)
 - [ ] simple replication, scanner failover
 - [ ] config validation
 - [ ] `testhelper/mock_server.go` has some race condition problems. probably

@@ -188,7 +188,7 @@ func (s *Scanner) Start() error {
 func (s *Scanner) Complete(err error) error {
 	off := s.curr
 	delta := s.batchRead
-	if s.batch != nil && uint64(s.batchRead) >= s.batch.Size {
+	if s.batch != nil && s.batchRead >= s.batch.Size {
 		fullsize, _ := s.batch.FullSize()
 		off = s.curr + uint64(fullsize)
 		delta = 0
@@ -275,7 +275,7 @@ func (s *Scanner) doInitialRead() error {
 }
 
 func (s *Scanner) scanNextBatch() error {
-	if s.batchRead >= int(s.batch.Size) {
+	if s.batchRead >= s.batch.Size {
 		if s.batchesRead >= s.nbatches {
 			err := s.requestMoreBatches(false)
 			if err == protocol.ErrNotFound {
