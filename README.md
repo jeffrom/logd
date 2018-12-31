@@ -58,14 +58,14 @@ jeff $ log-cli read --offset 10240
 
 ```go
 // safe for concurrent calls
-w := client.NewWriter(conf, "mytopic").WithStateHandler(myhandler)
+w := logd.NewWriter(conf, "mytopic").WithStateHandler(myhandler)
 log.SetOutput(w)
 ```
 
 `Scanner` can be used to read messages back from the log.
 
 ```go
-s, _ := client.DialScanner("myserver:1774")
+s, _ := logd.DialScanner("myserver:1774")
 for s.Scan() {
     msg := s.Message()
     fmt.Println(msg)
@@ -82,7 +82,7 @@ validated, and then written without modification directly to partitions
 (represented as files) on disk. Topics are just directories which hold
 partitions. A text protocol is used and logd can be operated pretty easily
 using `telnet` if desired. The client library attempts to follow go
-conventions. For example, usage of `client.Scanner` should be predictable to
+conventions. For example, usage of `logd.Scanner` should be predictable to
 someone familiar with scanners in the go standard library. The server attempts
 to model itself closely to the OS such that tuning OS disk, network, and
 scheduling parameters can have significant benefits.

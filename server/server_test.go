@@ -6,8 +6,8 @@ import (
 	"flag"
 	"testing"
 
-	"github.com/jeffrom/logd/client"
 	"github.com/jeffrom/logd/config"
+	"github.com/jeffrom/logd/logd"
 	"github.com/jeffrom/logd/protocol"
 	"github.com/jeffrom/logd/testhelper"
 	"github.com/jeffrom/logd/transport"
@@ -72,7 +72,7 @@ func TestClose(t *testing.T) {
 	srv.SetHandler(rh)
 	srv.GoServe()
 
-	c, err := client.Dial(srv.ListenAddr().String())
+	c, err := logd.Dial(srv.ListenAddr().String())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +93,7 @@ func TestBatch(t *testing.T) {
 	srv.GoServe()
 	defer CloseTestServer(t, srv, rh)
 
-	c, err := client.Dial(srv.ListenAddr().String())
+	c, err := logd.Dial(srv.ListenAddr().String())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +127,7 @@ func TestFailedRequest(t *testing.T) {
 	srv.GoServe()
 	defer CloseTestServer(t, srv, rh)
 
-	c, err := client.Dial(srv.ListenAddr().String())
+	c, err := logd.Dial(srv.ListenAddr().String())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,7 +159,7 @@ func TestFailedRequest(t *testing.T) {
 	}
 }
 
-func expectServerClientClose(t testing.TB, rh *transport.MockRequestHandler, c *client.Client) {
+func expectServerClientClose(t testing.TB, rh *transport.MockRequestHandler, c *logd.Client) {
 	expectClose(rh)
 	if err := c.Close(); err != nil {
 		t.Fatal(err)

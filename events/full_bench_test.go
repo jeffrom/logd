@@ -7,8 +7,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/jeffrom/logd/client"
 	"github.com/jeffrom/logd/config"
+	"github.com/jeffrom/logd/logd"
 	"github.com/jeffrom/logd/protocol"
 	"github.com/jeffrom/logd/testhelper"
 )
@@ -111,7 +111,7 @@ func benchmarkBatchFull(b *testing.B, conf *config.Config, fixturename string, t
 			panic(err)
 		}
 
-		c, err := client.Dial(addr)
+		c, err := logd.Dial(addr)
 		if err != nil {
 			panic(err)
 		}
@@ -137,7 +137,7 @@ func benchmarkReadFull(b *testing.B, conf *config.Config) {
 
 	b.ResetTimer()
 	b.RunParallel(func(b *testing.PB) {
-		c, err := client.Dial(addr)
+		c, err := logd.Dial(addr)
 		if err != nil {
 			panic(err)
 		}
@@ -161,16 +161,16 @@ func benchmarkReadFull(b *testing.B, conf *config.Config) {
 }
 
 func fillTopic(b *testing.B, conf *config.Config, h *Handlers, data []byte) {
-	// c, err := client.Dial(h.servers[0].ListenAddr().String())
+	// c, err := logd.Dial(h.servers[0].ListenAddr().String())
 	// if err != nil {
 	// 	b.Fatal(err)
 	// }
 
 	s := bufio.NewScanner(bytes.NewBuffer(data))
 	s.Split(bufio.ScanLines)
-	cconf := client.DefaultConfig.FromGeneralConfig(conf)
+	cconf := logd.DefaultConfig.FromGeneralConfig(conf)
 	cconf.Hostport = h.servers[0].ListenAddr().String()
-	w := client.NewWriter(cconf, "default")
+	w := logd.NewWriter(cconf, "default")
 	defer w.Close()
 	// read := 0
 

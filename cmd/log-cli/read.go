@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/jeffrom/logd/client"
 	"github.com/jeffrom/logd/internal"
+	"github.com/jeffrom/logd/logd"
 	"github.com/jeffrom/logd/protocol"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -12,7 +12,7 @@ import (
 
 func init() {
 	pflags := ReadCmd.PersistentFlags()
-	dconf := client.DefaultConfig
+	dconf := logd.DefaultConfig
 
 	pflags.IntVar(&tmpConfig.Limit, "limit", dconf.Limit, "limit minimum number of messages per read to `MESSAGES`")
 	pflags.Uint64Var(&tmpConfig.Offset, "offset", dconf.Offset, "start reading messages from `OFFSET`")
@@ -39,7 +39,7 @@ var ReadCmd = &cobra.Command{
 	},
 }
 
-func doRead(conf *client.Config, c *cobra.Command) error {
+func doRead(conf *logd.Config, c *cobra.Command) error {
 	done := make(chan struct{})
 	handleKills(done)
 
@@ -56,7 +56,7 @@ func doRead(conf *client.Config, c *cobra.Command) error {
 		defer out.Close()
 	}
 
-	scanner, err := client.DialScannerConfig(conf.Hostport, conf)
+	scanner, err := logd.DialScannerConfig(conf.Hostport, conf)
 	if err != nil {
 		return err
 	}

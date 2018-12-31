@@ -7,7 +7,7 @@ import (
 	"log"
 	"testing"
 
-	"github.com/jeffrom/logd/client"
+	"github.com/jeffrom/logd/logd"
 	"github.com/jeffrom/logd/protocol"
 	"github.com/jeffrom/logd/testhelper"
 	"github.com/jeffrom/logd/transport"
@@ -44,7 +44,7 @@ func BenchmarkClientBatch(b *testing.B) {
 			panic(err)
 		}
 
-		c, err := client.Dial(srv.ListenAddr().String())
+		c, err := logd.Dial(srv.ListenAddr().String())
 		if err != nil {
 			panic(err)
 		}

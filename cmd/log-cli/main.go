@@ -8,25 +8,25 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jeffrom/logd/client"
+	"github.com/jeffrom/logd/logd"
 	"github.com/spf13/cobra"
 )
 
-var tmpConfig = &client.Config{}
+var tmpConfig = &logd.Config{}
 var topicFlag string
 
 func init() {
 	pflags := RootCmd.PersistentFlags()
 
-	pflags.BoolVarP(&tmpConfig.Verbose, "verbose", "v", client.DefaultConfig.Verbose, "print debug output")
-	pflags.StringVar(&tmpConfig.Hostport, "host", client.DefaultConfig.Hostport, "a `HOST:PORT` combination to listen on")
-	pflags.DurationVar(&tmpConfig.Timeout, "timeout", client.DefaultConfig.Timeout, "duration to wait for requests to complete")
-	pflags.DurationVar(&tmpConfig.ConnectTimeout, "connect-timeout", client.DefaultConfig.ConnectTimeout, "duration to wait for connection to establish. Overrides 'timeout' if set")
-	pflags.DurationVar(&tmpConfig.WriteTimeout, "write-timeout", client.DefaultConfig.WriteTimeout, "duration to wait for writes to the server to complete. Overrides 'timeout' if set")
-	pflags.DurationVar(&tmpConfig.ReadTimeout, "read-timeout", client.DefaultConfig.ReadTimeout, "duration to wait for reads from the server to complete. Overrides 'timeout' if set")
-	pflags.IntVar(&tmpConfig.BatchSize, "batch-size", client.DefaultConfig.BatchSize, "maximum size of batch in bytes")
-	pflags.DurationVar(&tmpConfig.WaitInterval, "wait-interval", client.DefaultConfig.WaitInterval, "duration to wait after the last write to flush the current batch")
-	pflags.BoolVarP(&tmpConfig.Count, "count", "c", client.DefaultConfig.Count, "Print counts before exiting")
+	pflags.BoolVarP(&tmpConfig.Verbose, "verbose", "v", logd.DefaultConfig.Verbose, "print debug output")
+	pflags.StringVar(&tmpConfig.Hostport, "host", logd.DefaultConfig.Hostport, "a `HOST:PORT` combination to listen on")
+	pflags.DurationVar(&tmpConfig.Timeout, "timeout", logd.DefaultConfig.Timeout, "duration to wait for requests to complete")
+	pflags.DurationVar(&tmpConfig.ConnectTimeout, "connect-timeout", logd.DefaultConfig.ConnectTimeout, "duration to wait for connection to establish. Overrides 'timeout' if set")
+	pflags.DurationVar(&tmpConfig.WriteTimeout, "write-timeout", logd.DefaultConfig.WriteTimeout, "duration to wait for writes to the server to complete. Overrides 'timeout' if set")
+	pflags.DurationVar(&tmpConfig.ReadTimeout, "read-timeout", logd.DefaultConfig.ReadTimeout, "duration to wait for reads from the server to complete. Overrides 'timeout' if set")
+	pflags.IntVar(&tmpConfig.BatchSize, "batch-size", logd.DefaultConfig.BatchSize, "maximum size of batch in bytes")
+	pflags.DurationVar(&tmpConfig.WaitInterval, "wait-interval", logd.DefaultConfig.WaitInterval, "duration to wait after the last write to flush the current batch")
+	pflags.BoolVarP(&tmpConfig.Count, "count", "c", logd.DefaultConfig.Count, "Print counts before exiting")
 }
 
 var RootCmd = &cobra.Command{

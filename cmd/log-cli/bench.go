@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/jeffrom/logd/client"
+	"github.com/jeffrom/logd/logd"
 	"github.com/jeffrom/logd/protocol"
 	"github.com/jeffrom/logd/stats"
 	"github.com/spf13/cobra"
@@ -38,7 +38,7 @@ func init() {
 }
 
 type benchConfig struct {
-	conf      *client.Config
+	conf      *logd.Config
 	conns     int
 	batchSize int
 	topics    int
@@ -115,12 +115,12 @@ func (c *benchCounts) String() string {
 type benchConn struct {
 	input  []byte
 	topic  []byte
-	c      *client.Client
+	c      *logd.Client
 	counts *benchCounts
 	done   chan struct{}
 }
 
-func newBenchConn(c *client.Client, counts *benchCounts, input []byte, topic []byte) *benchConn {
+func newBenchConn(c *logd.Client, counts *benchCounts, input []byte, topic []byte) *benchConn {
 	return &benchConn{
 		c:      c,
 		counts: counts,
@@ -307,7 +307,7 @@ func generateConns(bconf *benchConfig, counts *benchCounts, inputs [][]byte) ([]
 	}
 	var conns []*benchConn
 	for i := 0; i < bconf.conns; i++ {
-		c, err := client.DialConfig(bconf.conf.Hostport, bconf.conf)
+		c, err := logd.DialConfig(bconf.conf.Hostport, bconf.conf)
 		if err != nil {
 			return conns, err
 		}

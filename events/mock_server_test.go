@@ -7,8 +7,8 @@ import (
 	"io"
 	"testing"
 
-	"github.com/jeffrom/logd/client"
 	"github.com/jeffrom/logd/config"
+	"github.com/jeffrom/logd/logd"
 	"github.com/jeffrom/logd/protocol"
 	"github.com/jeffrom/logd/server"
 	"github.com/jeffrom/logd/testhelper"
@@ -27,7 +27,7 @@ func TestMockServerClose(t *testing.T) {
 	q, s, shutdown := newMockServerQ(t, conf)
 	doStartHandler(t, q)
 	defer shutdown()
-	cconf := client.DefaultTestConfig(testing.Verbose())
+	cconf := logd.DefaultTestConfig(testing.Verbose())
 	_, clientShutdown := newMockServerClient(t, cconf, s)
 	clientShutdown()
 }
@@ -37,7 +37,7 @@ func TestMockServerBatchAndRead(t *testing.T) {
 	q, s, shutdown := newMockServerQ(t, conf)
 	doStartHandler(t, q)
 	defer shutdown()
-	cconf := client.DefaultTestConfig(testing.Verbose())
+	cconf := logd.DefaultTestConfig(testing.Verbose())
 	client, clientShutdown := newMockServerClient(t, cconf, s)
 	defer clientShutdown()
 
@@ -70,7 +70,7 @@ func TestMockServerBatchAndRead(t *testing.T) {
 		t.Fatal(serr)
 	}
 
-	// 	off, err = client.Batch(batch)
+	// 	off, err = logd.Batch(batch)
 	// 	if err != nil {
 	// 		t.Fatal(err)
 	// 	}
@@ -91,12 +91,12 @@ func newMockServerQ(t testing.TB, conf *config.Config) (*Handlers, *server.MockS
 	}
 }
 
-func newMockServerClient(t testing.TB, conf *client.Config, s *server.MockSocket) (*client.Client, func()) {
+func newMockServerClient(t testing.TB, conf *logd.Config, s *server.MockSocket) (*logd.Client, func()) {
 	c, err := s.Dial()
 	if err != nil {
 		t.Fatal(err)
 	}
-	client := client.New(client.DefaultTestConfig(testing.Verbose())).SetConn(c)
+	client := logd.New(logd.DefaultTestConfig(testing.Verbose())).SetConn(c)
 	return client, func() {
 		if err := client.Close(); err != nil {
 			t.Fatal(err)

@@ -7,16 +7,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jeffrom/logd/client"
 	"github.com/jeffrom/logd/config"
+	"github.com/jeffrom/logd/logd"
 	"github.com/jeffrom/logd/protocol"
 	"github.com/jeffrom/logd/testhelper"
 	"github.com/pkg/errors"
 )
 
-func newIntegrationTestClientConfig(verbose bool) *client.Config {
-	c := client.NewConfig()
-	*c = *client.DefaultConfig
+func newIntegrationTestClientConfig(verbose bool) *logd.Config {
+	c := logd.NewConfig()
+	*c = *logd.DefaultConfig
 
 	c.Verbose = verbose
 	c.BatchSize = 1024 * 20
@@ -28,26 +28,26 @@ func newIntegrationTestClientConfig(verbose bool) *client.Config {
 
 type integrationTest struct {
 	conf  *config.Config
-	cconf *client.Config
+	cconf *logd.Config
 	offs  []uint64
 	mu    sync.Mutex
 
 	n        int
 	h        *Handlers
-	writers  []*client.Writer
-	scanners []*client.Scanner
+	writers  []*logd.Writer
+	scanners []*logd.Scanner
 
 	failed []*protocol.Batch
 }
 
-func newIntegrationTestState(conf *config.Config, cconf *client.Config, n int) *integrationTest {
+func newIntegrationTestState(conf *config.Config, cconf *logd.Config, n int) *integrationTest {
 	return &integrationTest{
 		conf:     conf,
 		cconf:    cconf,
 		n:        n,
 		offs:     []uint64{},
-		writers:  make([]*client.Writer, 0),
-		scanners: make([]*client.Scanner, 0),
+		writers:  make([]*logd.Writer, 0),
+		scanners: make([]*logd.Scanner, 0),
 		failed:   make([]*protocol.Batch, 0),
 	}
 }
@@ -72,10 +72,10 @@ func (ts *integrationTest) setup(t *testing.T) {
 
 	ts.cconf.Hostport = ts.h.servers[0].ListenAddr().String()
 	for i := 0; i < ts.n; i++ {
-		w := client.NewWriter(ts.cconf, "default")
+		w := logd.NewWriter(ts.cconf, "default")
 		w.WithStateHandler(ts)
 
-		s := client.NewScanner(ts.cconf, "default")
+		s := logd.NewScanner(ts.cconf, "default")
 
 		ts.writers = append(ts.writers, w)
 		ts.scanners = append(ts.scanners, s)
@@ -93,7 +93,7 @@ func (ts *integrationTest) shutdown(t *testing.T) {
 	}
 	for _, w := range ts.writers {
 		if err := w.Close(); err != nil {
-			if !client.IsRetryable(err) {
+			if !logd.IsRetryable(err) {
 				t.Error(err)
 			} else {
 				t.Logf("error closing writer ignored: %+v", err)
@@ -102,7 +102,7 @@ func (ts *integrationTest) shutdown(t *testing.T) {
 	}
 }
 
-// Push implements client.StatePusher.
+// Push implements logd.StatePusher.
 func (ts *integrationTest) Push(off uint64) error {
 	// if err != nil {
 	// 	ts.mu.Lock()
@@ -116,7 +116,7 @@ func (ts *integrationTest) Push(off uint64) error {
 	return nil
 }
 
-// Close implements client.StatePusher.
+// Close implements logd.StatePusher.
 func (ts *integrationTest) Close() error {
 	return nil
 }
@@ -177,7 +177,7 @@ func testIntegrationWriter(t *testing.T, ts *integrationTest) {
 		// s := ts.scanners[n]
 		wg.Add(1)
 
-		go func(w *client.Writer) {
+		go func(w *logd.Writer) {
 			defer wg.Done()
 			for i := 0; i < n; i++ {
 				_, err := w.Write([]byte("oh dang sup"))
@@ -207,7 +207,7 @@ func testIntegrationWriter(t *testing.T, ts *integrationTest) {
 	for _, s := range ts.scanners {
 		wg.Add(1)
 
-		go func(s *client.Scanner) {
+		go func(s *logd.Scanner) {
 			defer wg.Done()
 
 			s.Reset()
@@ -273,7 +273,7 @@ func testIntegrationReconnect(t *testing.T, ts *integrationTest) {
 			// s := ts.scanners[n]
 			wg.Add(1)
 
-			go func(w *client.Writer) {
+			go func(w *logd.Writer) {
 				defer wg.Done()
 				for i := 0; i < n; i++ {
 					time.Sleep(time.Duration(rand.Intn(3)) * time.Millisecond)
@@ -281,7 +281,7 @@ func testIntegrationReconnect(t *testing.T, ts *integrationTest) {
 					msg := []byte("oh dang sup")
 					_, err := w.Write(msg)
 					if err != nil {
-						if !client.IsRetryable(err) {
+						if !logd.IsRetryable(err) {
 							errC <- errors.Wrap(err, "write failed")
 							return
 						}
@@ -294,7 +294,7 @@ func testIntegrationReconnect(t *testing.T, ts *integrationTest) {
 					atomic.AddInt32(&wrote, 1)
 				}
 
-				if err := w.Flush(); err != nil && !client.IsRetryable(err) {
+				if err := w.Flush(); err != nil && !logd.IsRetryable(err) {
 					errC <- errors.Wrap(err, "flush failed")
 					return
 				}
@@ -304,7 +304,7 @@ func testIntegrationReconnect(t *testing.T, ts *integrationTest) {
 		wg.Wait()
 		failOnErrors(t, errC)
 
-		c, err := client.DialConfig(ts.cconf.Hostport, ts.cconf)
+		c, err := logd.DialConfig(ts.cconf.Hostport, ts.cconf)
 		if err != nil {
 			t.Fatalf("failed to connect for recovering batches: %+v", err)
 		}
@@ -315,7 +315,7 @@ func testIntegrationReconnect(t *testing.T, ts *integrationTest) {
 		}
 		c.Close()
 
-		w := client.NewWriter(ts.cconf, "default")
+		w := logd.NewWriter(ts.cconf, "default")
 		for _, msg := range failed {
 			if _, err := w.Write(msg); err != nil {
 				t.Fatalf("failed to write previously failed message: %+v", err)

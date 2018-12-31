@@ -6,14 +6,14 @@ import (
 	"os"
 	"time"
 
-	"github.com/jeffrom/logd/client"
 	"github.com/jeffrom/logd/internal"
+	"github.com/jeffrom/logd/logd"
 	"github.com/spf13/cobra"
 )
 
 func init() {
 	pflags := WriteCmd.PersistentFlags()
-	dconf := client.DefaultConfig
+	dconf := logd.DefaultConfig
 
 	pflags.Uint64Var(&tmpConfig.Offset, "offset", dconf.Offset,
 		"start reading messages from `OFFSET`")
@@ -41,7 +41,7 @@ var WriteCmd = &cobra.Command{
 	},
 }
 
-func doWrite(conf *client.Config, c *cobra.Command, args []string) error {
+func doWrite(conf *logd.Config, c *cobra.Command, args []string) error {
 	done := make(chan struct{})
 	handleKills(done)
 
@@ -68,14 +68,14 @@ func doWrite(conf *client.Config, c *cobra.Command, args []string) error {
 		panic(err)
 	}
 
-	var m client.StatePusher
+	var m logd.StatePusher
 	if out == nil {
-		m = &client.NoopStatePusher{}
+		m = &logd.NoopStatePusher{}
 	} else {
-		m = client.NewStateOutputter(out)
+		m = logd.NewStateOutputter(out)
 	}
 
-	w := client.NewWriter(conf, t).WithStateHandler(m)
+	w := logd.NewWriter(conf, t).WithStateHandler(m)
 	defer w.Close()
 
 	for _, arg := range args {

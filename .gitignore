@@ -32,4 +32,4 @@ server.test
 logger.test
 events.test
 protocol.test
-client.test
+logd.test
