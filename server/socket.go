@@ -311,6 +311,16 @@ func (s *Socket) doRequest(ctx context.Context, conn *Conn) error {
 	conn.setState(connStateActive)
 
 	// start := s.startInstrumentation(req)
+	if req.Name == protocol.CmdBatch {
+		batch, err := newBatch(s.conf).FromRequest(req)
+		defer finishBatch(batch)
+		if err != nil {
+			// TODO need to send the error response back to the client here
+			s.finishRequest(req)
+			return err
+		}
+		req.SetCommand(batch)
+	}
 
 	internal.Debugf(s.conf, "%s: read request %v", conn.RemoteAddr(), req)
 	resp, rerr := s.h.PushRequest(ctx, req)

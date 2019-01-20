@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 )
 
 const maxArgs = 4
@@ -113,4 +114,9 @@ var argLens = map[CmdType]int{
 	CmdClose:  0,
 	CmdConfig: 0,
 	// CmdShutdown: 0,
+}
+
+type Command interface {
+	// io.ReaderFrom
+	io.WriterTo
 }

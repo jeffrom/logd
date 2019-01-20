@@ -217,11 +217,12 @@ func (q *eventQ) Stop() error {
 
 func (q *eventQ) handleBatch(req *protocol.Request) (*protocol.Response, error) {
 	resp := req.Response
-	q.tmpBatch.Reset()
-	batch, err := q.tmpBatch.FromRequest(req)
-	if err != nil {
-		return errResponse(q.conf, req, resp, err)
-	}
+	batch := req.Command().(*protocol.Batch)
+	// q.tmpBatch.Reset()
+	// batch, err := q.tmpBatch.FromRequest(req)
+	// if err != nil {
+	// 	return errResponse(q.conf, req, resp, err)
+	// }
 
 	topic := q.topic
 	if topic == nil {
@@ -236,7 +237,7 @@ func (q *eventQ) handleBatch(req *protocol.Request) (*protocol.Response, error) 
 		}
 	}
 	// write the log
-	_, err = topic.logw.Write(req.Bytes())
+	_, err := topic.logw.Write(req.Bytes())
 	if err != nil {
 		return errResponse(q.conf, req, resp, err)
 	}

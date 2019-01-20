@@ -380,6 +380,14 @@ func pushBatch(t testing.TB, h *Handlers, fixture []byte) *protocol.ClientRespon
 	t.Helper()
 	ctx := context.Background()
 	req := newRequest(t, h.conf, fixture)
+
+	batch := protocol.NewBatch(h.conf)
+	br := bufio.NewReader(bytes.NewBuffer(fixture))
+	if _, err := batch.ReadFrom(br); err != nil {
+		t.Fatal(err)
+	}
+	req.SetCommand(batch)
+
 	resp, err := h.PushRequest(ctx, req)
 	if err != nil {
 		t.Fatalf("%+v", err)

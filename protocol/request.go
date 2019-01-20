@@ -25,6 +25,9 @@ type Request struct {
 	nargs    int      //
 	body     []byte   // slice of raw pointing to the body, if it exists
 	bodysize int      //
+
+	// command holds the parsed command
+	command Command
 }
 
 // NewRequest returns a new, unconfigured instance of *Request
@@ -60,6 +63,7 @@ func (req *Request) Reset() {
 	req.nargs = 0
 	req.body = nil
 	req.bodysize = 0
+	req.command = nil
 	req.respBuf.Reset()
 	req.Response.Reset()
 
@@ -73,6 +77,12 @@ func (req *Request) String() string {
 	// return fmt.Sprintf("%q", req.raw[:req.read])
 	return req.Name.String()
 }
+
+func (req *Request) SetCommand(command Command) {
+	req.command = command
+}
+
+func (req *Request) Command() Command { return req.command }
 
 // Bytes returns the raw byte representation of the request
 func (req *Request) Bytes() []byte {
@@ -202,8 +212,32 @@ func (req *Request) readFromBuf(r *bufio.Reader) (int64, error) {
 		}
 	}
 
+	// if err := req.parseCommand(); err == nil {
+	// 	return total, err
+	// }
+
 	return total, err
 }
+
+// func (req *Request) parseCommand() error {
+// 	var command Command
+// 	var err error
+// 	switch req.Name {
+// 	case CmdBatch:
+// 		command, err = NewBatch(req.conf).FromRequest(req)
+// 	case CmdRead:
+// 		command, err = NewRead(req.conf).FromRequest(req)
+// 	case CmdTail:
+// 		command, err = NewTail(req.conf).FromRequest(req)
+// 	case CmdClose:
+// 		command, err = NewCloseRequest(req.conf).FromRequest(req)
+// 	}
+// 	if err != nil {
+// 		return err
+// 	}
+// 	req.command = command
+// 	return nil
+// }
 
 // WriteResponse is used by the event loop to write a single response. Should
 // be used for all commands except READ. It can be used for the READ response

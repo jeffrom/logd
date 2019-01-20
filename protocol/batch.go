@@ -47,7 +47,12 @@ func NewBatch(conf *config.Config) *Batch {
 }
 
 func (b *Batch) String() string {
-	return fmt.Sprintf("Batch<%p Messages: %d, Size: %d>", b, b.Messages, b.Size)
+	return fmt.Sprintf("Batch<%p Messages: %d, Size: %d, Checksum: %d>", b, b.Messages, b.Size, b.Checksum)
+}
+
+func (b *Batch) WithConfig(conf *config.Config) *Batch {
+	b.conf = conf
+	return b
 }
 
 // Reset puts a batch in an initial state so it can be reused
