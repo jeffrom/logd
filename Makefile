@@ -54,7 +54,7 @@ deps.dep:
 
 .PHONY: build
 build:
-	go install -x -v ./...
+	GO111MODULE=on go install -x -v ./...
 
 .PHONY: doc.serve
 doc.serve:
