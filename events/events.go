@@ -90,7 +90,7 @@ func newEventQ(conf *config.Config) *eventQ {
 	q := &eventQ{
 		conf:         conf,
 		Stats:        internal.NewStats(),
-		in:           make(chan *protocol.Request, 1000),
+		in:           make(chan *protocol.Request, 4),
 		stopC:        make(chan error),
 		shutdownC:    make(chan error, 1),
 		partArgBuf:   newPartitionArgList(conf), // partition arguments buffer
