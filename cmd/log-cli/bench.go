@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -221,6 +222,7 @@ var BenchCmd = &cobra.Command{
 }
 
 func doBench(bconf *benchConfig, cmd *cobra.Command) error {
+	printSysInfo()
 	if !bconf.onlyRead {
 		counts, err := benchWriteLoop(bconf)
 		if err != nil {
@@ -343,4 +345,11 @@ func generateBatch(bconf *benchConfig, topic string) []byte {
 	}
 
 	return b.Bytes()
+}
+
+func printSysInfo() {
+	fmt.Println("cpus:", runtime.NumCPU())
+	// ms := &runtime.MemStats{}
+	// runtime.ReadMemStats(ms)
+	// fmt.Printf("%+v\n", ms)
 }
