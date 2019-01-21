@@ -315,7 +315,12 @@ func (s *Socket) doRequest(ctx context.Context, conn *Conn) error {
 		batch, err := newBatch(s.conf).FromRequest(req)
 		defer finishBatch(batch)
 		if err != nil {
-			// TODO need to send the error response back to the client here
+			clientResp := req.Response.ClientResponse
+			clientResp.SetError(err)
+			_, werr := req.WriteResponse(req.Response, clientResp)
+			internal.LogError(werr)
+			_, respErr := s.sendResponse(conn, req.Response)
+			internal.LogError(respErr)
 			s.finishRequest(req)
 			return err
 		}
