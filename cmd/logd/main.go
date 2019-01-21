@@ -18,6 +18,7 @@ import (
 )
 
 var cfgFile string
+var version bool
 var tmpConfig = config.New()
 var traceFile = ""
 var cpuProfile = ""
@@ -32,6 +33,7 @@ func init() {
 	pflags := RootCmd.PersistentFlags()
 	pflags.StringVar(&cfgFile, "config", config.Default.File, "config `FILE`")
 
+	pflags.BoolVar(&version, "version", false, "print version")
 	pflags.BoolVarP(&tmpConfig.Verbose, "verbose", "v", config.Default.Verbose, "print debug output")
 	viper.BindPFlag("verbose", pflags.Lookup("verbose"))
 
@@ -98,6 +100,10 @@ var RootCmd = &cobra.Command{
 	Short: "logd - networked log transport",
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
+		if version {
+			fmt.Println(internal.Version)
+			return
+		}
 		if traceFile != "" {
 			f, err := os.Create(traceFile)
 			if err != nil {
