@@ -14,7 +14,7 @@ var respBytes = map[error][]byte{
 	ErrInvalid:             ErrRespInvalid,
 	errTooLarge:            []byte(errTooLarge.Error()),
 	errInvalidProtocolLine: []byte("invalid protocol"),
-	errCrcChecksumMismatch: []byte("checksum mismatch"),
+	errCrcMismatch:         []byte("checksum mismatch"),
 	errNoTopic:             []byte("request missing topic"),
 }
 
@@ -31,8 +31,8 @@ func parseError(p []byte) error {
 	if bytes.Equal(p, respBytes[errInvalidProtocolLine]) {
 		return errInvalidProtocolLine
 	}
-	if bytes.Equal(p, respBytes[errCrcChecksumMismatch]) {
-		return errCrcChecksumMismatch
+	if bytes.Equal(p, respBytes[errCrcMismatch]) {
+		return errCrcMismatch
 	}
 	if bytes.Equal(p, respBytes[errNoTopic]) {
 		return errNoTopic

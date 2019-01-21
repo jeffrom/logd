@@ -138,7 +138,7 @@ func (b *Batch) Validate() error {
 		return errors.New("batch too large")
 	}
 	if b.Checksum != b.calculateChecksum() {
-		return errors.New("checksum didn't match")
+		return errCrcMismatch
 	}
 	return nil
 }

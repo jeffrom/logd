@@ -46,7 +46,7 @@ var errInvalidNumArgs = stderrors.New("invalid number of arguments")
 var errReadStopped = stderrors.New("read stopped by other side")
 var errInvalidProtocolLine = stderrors.New("invalid protocol line")
 var errInvalidBodyLength = stderrors.New("invalid body length")
-var errCrcChecksumMismatch = stderrors.New("crc checksum mismatch")
+var errCrcMismatch = stderrors.New("crc checksum mismatch")
 
 var crcTable = crc32.MakeTable(crc32.IEEE)
 
