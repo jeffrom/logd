@@ -7,8 +7,9 @@
 - [ ] test client scanner message offset/delta is correct
 - [ ] more tests for client scanner restarts from offsets+delta cases
 - [ ] have client periodically send a PING to server to keep connection alive
-  - OR(/AND) try to reconnect syncronously when an io.EOF is returned. if the
-    reconnection fails, go back to async reconnect attempts.
+  - OR(/AND) try to reconnect synchronously once, maybe with a separate config
+    for the timeout, when an io.EOF is returned. if the reconnection fails, go
+    back to async reconnect attempts.
   - could also just be an issue w/ sequencing & error handling in the writer
 - [ ] test case where scanner state has a single message in a batch, with all
       others in subsequent batches, and other such cases
@@ -19,6 +20,8 @@
       has to do with the closing connection stuff
 - [ ] verify batches in the connection goroutine to better leverage multiple
       processors for the expensive checksum
+  - XXX maybe not actually, benchmarks show this to be slower. at least the
+    strategy of using a sync.Pool of batches that get attached to the request.
   - option to disable checksum verification would also be good
 - [X] verify topics concurrently during startup
 - [ ] http server
