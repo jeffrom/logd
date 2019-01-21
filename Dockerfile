@@ -8,7 +8,10 @@ COPY . /build
 RUN CGO_ENABLED=0 go build -o logd.bin ./cmd/logd
 
 FROM alpine
-RUN addgroup loguser && adduser -S -D -H -h /logd -G loguser loguser && mkdir /logd && chown loguser:loguser /logd
+RUN addgroup loguser && \
+    adduser -S -D -H -h /logd -G loguser loguser && \
+    mkdir /logd && \
+    chown loguser:loguser /logd
 USER loguser
 COPY --from=builder /build/logd.bin /logd/logd
 WORKDIR /logd
