@@ -217,12 +217,17 @@ func (q *eventQ) Stop() error {
 
 func (q *eventQ) handleBatch(req *protocol.Request) (*protocol.Response, error) {
 	resp := req.Response
-	batch := req.Command().(*protocol.Batch)
-	// q.tmpBatch.Reset()
-	// batch, err := q.tmpBatch.FromRequest(req)
-	// if err != nil {
-	// 	return errResponse(q.conf, req, resp, err)
-	// }
+	batch, ok := req.Command().(*protocol.Batch)
+	if !ok {
+		// NOTE this branch shouldn't happen outside of tests, maybe it should
+		// just be removed
+		q.tmpBatch.Reset()
+		b, err := q.tmpBatch.FromRequest(req)
+		if err != nil {
+			return errResponse(q.conf, req, resp, err)
+		}
+		batch = b
+	}
 
 	topic := q.topic
 	if topic == nil {
