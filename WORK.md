@@ -23,6 +23,7 @@
   - XXX maybe not actually, benchmarks show this to be slower. at least the
     strategy of using a sync.Pool of batches that get attached to the request.
   - option to disable checksum verification would also be good
+- server side limit on number of messages returned for reads
 - [X] verify topics concurrently during startup
 - [ ] http server
   - should have a json protocol

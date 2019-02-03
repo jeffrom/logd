@@ -458,7 +458,7 @@ func (b *Batch) Copy() *Batch {
 // FullSize returns the full size of the batch if it was previously read. The
 // second return value indicates whether the batch was read or not.
 func (b *Batch) FullSize() (int, bool) {
-	if b.wasRead {
+	if b != nil && b.wasRead {
 		return b.nread, true
 	}
 	return 0, false
