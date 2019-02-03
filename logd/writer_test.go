@@ -29,7 +29,7 @@ func TestWriter(t *testing.T) {
 	w.Client.dialer = server
 	// TODO this prevents a race but would be better to do connections in a
 	// separate goroutine from expectations
-	w.ensureConn()
+	w.Client.ensureConn()
 	defer w.Close()
 	defer expectServerClose(t, gconf, server)
 
@@ -53,7 +53,7 @@ func TestWriterConcurrent(t *testing.T) {
 	defer server.Close()
 	w := NewWriter(conf, "default")
 	w.Client.dialer = server
-	w.ensureConn()
+	w.Client.ensureConn()
 	defer w.Close()
 	defer expectServerClose(t, gconf, server)
 
@@ -74,7 +74,7 @@ func TestWriterConcurrent(t *testing.T) {
 
 		wg := sync.WaitGroup{}
 		errs := make(chan error, par)
-		// w.ensureConn()
+		// w.Client.ensureConn()
 
 		for j := 0; j < par; j++ {
 			wg.Add(1)
@@ -104,7 +104,7 @@ func TestWriterFillBatch(t *testing.T) {
 	defer server.Close()
 	w := NewWriter(conf, "default")
 	w.Client.dialer = server
-	w.ensureConn()
+	w.Client.ensureConn()
 	defer w.Close()
 	defer expectServerClose(t, gconf, server)
 	msg := []byte("pretty cool message!")
@@ -140,7 +140,7 @@ func TestWriterTwoBatches(t *testing.T) {
 	defer server.Close()
 	w := NewWriter(conf, "default")
 	w.Client.dialer = server
-	w.ensureConn()
+	w.Client.ensureConn()
 	defer w.Close()
 	defer expectServerClose(t, gconf, server)
 	buf := newLockedBuffer()
@@ -225,7 +225,7 @@ func TestWriterStatePusher(t *testing.T) {
 	w.Client.dialer = server
 	// TODO this prevents a race but would be better to do connections in a
 	// separate goroutine from expectations
-	w.ensureConn()
+	w.Client.ensureConn()
 	defer w.Close()
 
 	server.Expect(func(p []byte) io.WriterTo {
