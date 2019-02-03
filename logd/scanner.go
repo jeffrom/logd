@@ -337,7 +337,11 @@ func (s *Scanner) requestMoreBatches(poll bool) error {
 }
 
 func (s *Scanner) setNextBatch() error {
+	if size, ok := s.batch.FullSize(); ok {
+		s.curr += uint64(size)
+	}
 	s.batch = s.s.Batch()
+	s.s.Scanned()
 	s.batchRead = 0
 	s.batchesRead++
 	s.batchBuf.Reset()
