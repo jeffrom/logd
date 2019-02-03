@@ -31,7 +31,8 @@ type Scanner struct {
 	messagesRead      int
 	totalMessagesRead int
 	statem            StatePuller
-	curr              uint64
+	currLocal         uint64
+	currRemote        uint64
 	err               error
 	done              chan struct{}
 	pollC             chan error
@@ -89,7 +90,8 @@ func DialScanner(addr string) (*Scanner, error) {
 // Reset sets the scanner to it's initial values so it can be reused.
 func (s *Scanner) Reset() {
 	s.msg.Reset()
-	s.curr = 0
+	s.currLocal = 0
+	s.currRemote = 0
 	s.messagesRead = 0
 	s.totalMessagesRead = 0
 	if s.batch != nil {
@@ -180,17 +182,17 @@ func (s *Scanner) Scan() bool {
 // Start marks the current message as processing. It will return ErrProcessing
 // if the message is already being processed.
 func (s *Scanner) Start() error {
-	return s.statem.Start(s.curr, uint64(s.batchRead))
+	return s.statem.Start(s.currRemote, uint64(s.batchRead))
 }
 
 // Complete marks the current message processing completed. It will panic if no
 // StatePuller exists on the scanner.
 func (s *Scanner) Complete(err error) error {
-	off := s.curr
+	off := s.currRemote
 	delta := s.batchRead
 	if s.batch != nil && s.batchRead >= s.batch.Size {
 		fullsize, _ := s.batch.FullSize()
-		off = s.curr + uint64(fullsize)
+		off = s.currRemote + uint64(fullsize)
 		delta = 0
 	}
 	if err == nil {
@@ -206,7 +208,7 @@ func (s *Scanner) readMessage() error {
 	if err != nil {
 		return err
 	}
-	s.msg.Offset = s.curr
+	s.msg.Offset = s.currLocal
 	s.msg.Delta = uint64(s.batchRead)
 
 	s.batchRead += int(n)
@@ -236,28 +238,29 @@ func (s *Scanner) doInitialRead() error {
 			if err != nil {
 				return err
 			}
-			s.curr = off
+			s.currRemote = off
 			internal.Debugf(s.Client.gconf, "starting from previous state: offset %d, delta %d", off, delta)
-			nbatches, bs, err = s.Client.ReadOffset(s.topic, s.curr, s.limit)
+			nbatches, bs, err = s.Client.ReadOffset(s.topic, s.currRemote, s.limit)
 			if err != nil {
 				return err
 			}
 		} else {
-			s.curr, nbatches, bs, err = s.Client.Tail(s.topic, s.limit)
-			internal.Debugf(s.Client.gconf, "starting with %d batches from log tail at %d (err: %+v)", nbatches, s.curr, err)
+			s.currRemote, nbatches, bs, err = s.Client.Tail(s.topic, s.limit)
+			internal.Debugf(s.Client.gconf, "starting with %d batches from log tail at %d (err: %+v)", nbatches, s.currRemote, err)
 		}
 	} else {
-		s.curr = s.startoff
-		nbatches, bs, err = s.Client.ReadOffset(s.topic, s.curr, s.limit)
-		internal.Debugf(s.Client.gconf, "starting with %d batches from offset %d (err: %+v)", nbatches, s.curr, err)
+		s.currRemote = s.startoff
+		nbatches, bs, err = s.Client.ReadOffset(s.topic, s.currRemote, s.limit)
+		internal.Debugf(s.Client.gconf, "starting with %d batches from offset %d (err: %+v)", nbatches, s.currRemote, err)
 	}
 	if err != nil {
 		return err
 	}
+	s.currLocal = s.currRemote
 
 	s.s = bs
 	s.nbatches = nbatches
-	internal.Debugf(s.Client.gconf, "started reading from %d", s.curr)
+	internal.Debugf(s.Client.gconf, "started reading from %d", s.currRemote)
 	if !s.s.Scan() {
 		return s.s.Error()
 	}
@@ -319,12 +322,12 @@ func (s *Scanner) requestMoreBatches(poll bool) error {
 	}
 
 	if !poll {
-		s.curr += uint64(s.Client.bs.Scanned())
+		s.currRemote += uint64(s.Client.bs.Scanned())
 	}
-	nbatches, bs, err := s.Client.ReadOffset(s.topic, s.curr, s.limit)
+	nbatches, bs, err := s.Client.ReadOffset(s.topic, s.currRemote, s.limit)
 	internal.Debugf(s.Client.gconf,
 		"requested more batches from %d. read %d messages (%d/%d bytes) (err: %+v)",
-		s.curr, s.messagesRead, s.batchRead, s.batch.Size, err)
+		s.currRemote, s.messagesRead, s.batchRead, s.batch.Size, err)
 	if err != nil {
 		return err
 	}
@@ -337,9 +340,10 @@ func (s *Scanner) requestMoreBatches(poll bool) error {
 }
 
 func (s *Scanner) setNextBatch() error {
-	// if size, ok := s.batch.FullSize(); ok {
-	// 	s.curr += uint64(size)
-	// }
+	if size, ok := s.batch.FullSize(); ok {
+		s.currLocal += uint64(size)
+	}
+
 	s.batch = s.s.Batch()
 	s.batchRead = 0
 	s.batchesRead++
