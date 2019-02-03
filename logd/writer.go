@@ -79,7 +79,7 @@ var cmdPool = sync.Pool{
 
 // Writer writes message batches to the log server
 type Writer struct {
-	*Client
+	Client       *Client
 	conf         *Config
 	gconf        *config.Config
 	topic        []byte
@@ -263,7 +263,7 @@ func (w *Writer) loop() {
 }
 
 func (w *Writer) handleMsg(p []byte) error {
-	if err := w.setErr(w.ensureConn()); err != nil {
+	if err := w.setErr(w.Client.ensureConn()); err != nil {
 		w.startReconnect()
 		return err
 	}
@@ -303,7 +303,7 @@ func (w *Writer) handleFlush() error {
 	}
 
 	w.state = stateFlushing
-	off, err := w.Batch(batch)
+	off, err := w.Client.Batch(batch)
 	internal.Debugf(w.gconf, "flush complete, err: %+v", err)
 	if serr := w.setErr(err); serr != nil {
 		defer w.startReconnect()
@@ -356,7 +356,7 @@ func (w *Writer) resetTimer(interval time.Duration) {
 
 func (w *Writer) handleReconnect() error {
 	internal.Debugf(w.gconf, "attempting reconnect, attempt: %d", w.retries+1)
-	if err := w.connect(w.conf.Hostport); err != nil {
+	if err := w.Client.connect(w.conf.Hostport); err != nil {
 		w.retries++
 		if w.conf.ConnRetries > 0 && w.retries >= w.conf.ConnRetries {
 			internal.Debugf(w.gconf, "giving up after %d attempts", w.retries+1)

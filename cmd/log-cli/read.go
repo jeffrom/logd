@@ -10,6 +10,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var showLineNumbers bool
+
 func init() {
 	pflags := ReadCmd.PersistentFlags()
 	dconf := logd.DefaultConfig
@@ -24,6 +26,8 @@ func init() {
 	pflags.DurationVar(&tmpConfig.ConnRetryInterval, "retry-interval", dconf.ConnRetryInterval, "initial retry interval duration")
 	pflags.Float64Var(&tmpConfig.ConnRetryMultiplier, "retry-multiplier", dconf.ConnRetryMultiplier, "retry interval multiplier")
 	pflags.DurationVar(&tmpConfig.ConnRetryMaxInterval, "retry-max-interval", dconf.ConnRetryMaxInterval, "maximum retry interval")
+
+	pflags.BoolVarP(&showLineNumbers, "numbers", "n", false, "print offset and delta with messages")
 }
 
 var ReadCmd = &cobra.Command{
@@ -77,6 +81,9 @@ func doRead(conf *logd.Config, c *cobra.Command) error {
 
 	n := 0
 	for scanner.Scan() {
+		if showLineNumbers {
+			fmt.Fprintf(out, "%d.%d  ", scanner.Message().Offset, scanner.Message().Delta)
+		}
 		_, err := out.Write(scanner.Message().BodyBytes())
 		if err != nil && errors.Cause(err) == protocol.ErrNotFound {
 			break
