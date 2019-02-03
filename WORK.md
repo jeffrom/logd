@@ -2,6 +2,8 @@
 
 # TODO
 
+- [ ] make offset an int64
+- [ ] configuration to limit the number of topics. whitelist
 - [ ] writer backfill (see interface in client/state.go). there's already a
       simple implementation.
 - [ ] test client scanner message offset/delta is correct
@@ -13,7 +15,17 @@
   - could also just be an issue w/ sequencing & error handling in the writer
 - [ ] test case where scanner state has a single message in a batch, with all
       others in subsequent batches, and other such cases
-- [X] audit / fix int types, such as batch size (should be int, not uint64)
+- [ ] scale reads better
+  - remove unneccessary io
+  - for many connections with the right config settings (limited topics,
+    partitions / topic that fits in memory), try mmap
+  - some combo of mmap and regular fs access
+  - currently 2 sets of fs reads per operation (1 to validate, 1 to stream to
+    client), and numerous calls to stat() that could be kept in app state
+  - also currently one goroutine accessing fs per topic so there's a lot of
+    blocking with many connections. would be better to have many goroutines
+    access fs with maybe some kind of limit on max open files.
+- [x] audit / fix int types, such as batch size (should be int, not uint64)
 - [ ] simple replication, scanner failover
 - [ ] config validation
 - [ ] `testhelper/mock_server.go` has some race condition problems. probably
@@ -24,7 +36,7 @@
     strategy of using a sync.Pool of batches that get attached to the request.
   - option to disable checksum verification would also be good
 - server side limit on number of messages returned for reads
-- [X] verify topics concurrently during startup
+- [x] verify topics concurrently during startup
 - [ ] http server
   - should have a json protocol
   - logd protocol is working
