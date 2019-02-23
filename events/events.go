@@ -93,7 +93,7 @@ func newEventQ(conf *config.Config) *eventQ {
 		in:           make(chan *protocol.Request, 1000),
 		stopC:        make(chan error),
 		shutdownC:    make(chan error, 1),
-		partArgBuf:   newPartitionArgList(conf), // partition arguments buffer
+		partArgBuf:   newPartitionArgList(conf.MaxPartitions),
 		batchScanner: protocol.NewBatchScanner(conf, nil),
 		tmpBatch:     protocol.NewBatch(conf),
 		flushState:   newFlushState(conf),
