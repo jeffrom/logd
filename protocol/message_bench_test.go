@@ -24,7 +24,7 @@ func BenchmarkMessageWrite(b *testing.B) {
 
 func BenchmarkMessageRead(b *testing.B) {
 	conf := protocolBenchConfig()
-	msg := NewMessage(conf)
+	msg := NewMessage(conf.MaxBatchSize)
 	fixture := testhelper.LoadFixture("msg.small")
 	buf := bytes.NewBuffer(fixture)
 	br := bufio.NewReaderSize(buf, buf.Len())

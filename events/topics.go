@@ -252,3 +252,9 @@ func (t *topic) check() error {
 	t.parts.head.size = int(read)
 	return nil
 }
+
+func (t *topic) Query(off uint64, messages int) (*partitionArgList, error) {
+	idx := queryIndexOldPool.Get().(*queryIndexOld).initialize(t, t.conf)
+	defer queryIndexOldPool.Put(idx)
+	return idx.Query(off, messages)
+}

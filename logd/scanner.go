@@ -46,7 +46,7 @@ func NewScanner(conf *Config, topic string) *Scanner {
 	s := &Scanner{
 		conf:     conf,
 		batchBuf: &bytes.Buffer{},
-		msg:      protocol.NewMessage(conf.ToGeneralConfig()),
+		msg:      protocol.NewMessage(conf.BatchSize),
 		done:     make(chan struct{}),
 		pollC:    make(chan error),
 		usetail:  conf.UseTail,
