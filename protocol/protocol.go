@@ -125,6 +125,22 @@ func asciiToInt(tok []byte) (int64, error) {
 	return n, nil
 }
 
+// XXX this is broken
+func intToASCII(n int64, b *[32]byte) int {
+	i := 31
+	for n > 9 {
+		digit := n % 10
+		n /= 10
+		b[i] = '0' + byte(digit)
+		i--
+	}
+	if n < 0 {
+		b[i] = '-'
+		i--
+	}
+	return i
+}
+
 func uintToASCII(n uint64, b *[32]byte) int {
 	i := 31
 	for n > 9 {
