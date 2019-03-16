@@ -100,6 +100,8 @@ func benchmarkBatchFull(b *testing.B, conf *config.Config, fixturename string, t
 		fixtures[i] = f
 	}
 
+	// TODO warm arglist sync.pool?
+
 	r := newRepeater(len(fixtures))
 
 	b.ResetTimer()
