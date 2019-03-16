@@ -124,6 +124,7 @@ type topic struct {
 	conf  *config.Config
 	name  string
 	parts *partitions
+	idx   *queryIndex
 	logp  logger.PartitionManager
 	logw  logger.LogWriter
 	logrp logger.LogRepairer
@@ -135,6 +136,7 @@ func newTopic(conf *config.Config, name string) *topic {
 		conf:  conf,
 		name:  name,
 		parts: newPartitions(conf, logp),
+		idx:   newQueryIndex(conf.MaxPartitions),
 		logp:  logp,
 		logw:  logger.NewWriter(conf, name),
 		logrp: logger.NewRepairer(conf, name),
@@ -265,5 +267,5 @@ func (t *topic) Query(off uint64, messages int) (*partitionArgList, error) {
 }
 
 func (t *topic) Push(off, part uint64, size, messages int) error {
-	return nil
+	return t.idx.Push(off, part, size, messages)
 }
