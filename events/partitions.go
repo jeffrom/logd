@@ -239,6 +239,22 @@ func newPartitionArgList(max int) *partitionArgList {
 	return pl
 }
 
+func (pl *partitionArgList) initialize(max int) *partitionArgList {
+	pl.reset()
+	pl.max = max
+	if max > len(pl.parts) {
+		pl.parts = make([]*partitionArgs, max)
+	}
+
+	for i := 0; i < max; i++ {
+		if pl.parts[i] == nil {
+			pl.parts[i] = &partitionArgs{}
+		}
+	}
+
+	return pl
+}
+
 func (pl *partitionArgList) reset() {
 	pl.nparts = 0
 	pl.nbatches = 0

@@ -12,6 +12,12 @@ import (
 	"github.com/jeffrom/logd/protocol"
 )
 
+var partitionArgListPool = sync.Pool{
+	New: func() interface{} {
+		return &partitionArgList{}
+	},
+}
+
 // topics manages the topic filesystem for the event queues.
 type topics struct {
 	conf    *config.Config

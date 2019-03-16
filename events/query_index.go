@@ -1,13 +1,16 @@
 package events
 
 import (
+	"fmt"
 	"sync"
+
+	"github.com/jeffrom/logd/protocol"
 )
 
-type readIndex interface {
-	Query(off uint64, messages int) (*partitionArgList, error)
-	Push(off, part uint64, size, messages int) error
-}
+// type readIndex interface {
+// 	Query(off uint64, messages int) (*partitionArgList, error)
+// 	Push(off, part uint64, size, messages int) error
+// }
 
 type queryIndex struct {
 	maxPartitions int
@@ -35,10 +38,47 @@ func (r *queryIndex) reset() {
 	r.batchesN = 0
 }
 
-func (r *queryIndex) Query(off uint64, messages int) (*partitionArgList, error) {
+func (r *queryIndex) Query(off uint64, messages int, res *partitionArgList) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return nil, nil
+
+	n, found := r.findStart(off)
+	if !found {
+		return protocol.ErrNotFound
+	}
+
+	batch := r.batches[n]
+	head := n + 1
+	collectedMessages := batch.messages
+	currPartOff := int(batch.offset - batch.partition)
+	currSize := batch.size
+	currPart := batch.partition
+
+	for collectedMessages < messages {
+		if head >= r.batchesN { // we're out of batches
+			break
+		}
+		batch = r.batches[head]
+
+		if batch.partition > currPart {
+			res.add(currPart, currPartOff, currSize)
+			currPart = batch.partition
+			currPartOff = 0
+			currSize = 0
+		}
+
+		currSize += batch.size
+		collectedMessages += batch.messages
+
+		head++
+	}
+
+	if currSize > 0 {
+		res.add(currPart, currPartOff, currSize)
+	}
+	fmt.Println(n, head)
+
+	return nil
 }
 
 func (r *queryIndex) Push(off, part uint64, size, messages int) error {
@@ -47,6 +87,20 @@ func (r *queryIndex) Push(off, part uint64, size, messages int) error {
 
 	r.pushBatch(off, part, size, messages)
 	return nil
+}
+
+func (r *queryIndex) findStart(off uint64) (int, bool) {
+	for i := 0; i < r.batchesN; i++ {
+		batch := r.batches[i]
+		if batch.offset > off {
+			break
+		}
+		if batch.offset == off {
+			return i, true
+		}
+	}
+
+	return -1, false
 }
 
 func (r *queryIndex) pushBatch(off, part uint64, size, messages int) {
