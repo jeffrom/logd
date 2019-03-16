@@ -1,7 +1,6 @@
 package events
 
 import (
-	"fmt"
 	"testing"
 )
 
@@ -48,5 +47,16 @@ func TestQueryIndex(t *testing.T) {
 	if err := qi.Query(off, 150, args); err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println(args)
+	if args.nparts != 1 {
+		t.Fatal("expected 1 partitions but got ", args.nparts)
+	}
+
+	off = qi.batches[0].offset
+	if err := qi.Query(off, 500, args); err != nil {
+		t.Fatal(err)
+	}
+	if args.nparts != 3 {
+		t.Fatal("expected 3 partitions but got ", args.nparts)
+	}
+	// fmt.Println(args)
 }

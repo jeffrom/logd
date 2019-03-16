@@ -1,7 +1,6 @@
 package events
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/jeffrom/logd/protocol"
@@ -76,7 +75,7 @@ func (r *queryIndex) Query(off uint64, messages int, res *partitionArgList) erro
 	if currSize > 0 {
 		res.add(currPart, currPartOff, currSize)
 	}
-	fmt.Println(n, head)
+	// fmt.Println(n, head, r.batchesN, len(r.batches))
 
 	return nil
 }
