@@ -135,9 +135,13 @@ func (h *Handlers) pushBlockingRequest(ctx context.Context, req *protocol.Reques
 	q, ok := h.h[name]
 	h.mu.Unlock()
 	if ok {
-		// if req.Name == protocol.CmdRead || req.Name == protocol.CmdTail {
-		// 	return q.handleRequest(req)
-		// }
+		if req.Name == protocol.CmdRead || req.Name == protocol.CmdTail {
+			resp, err := q.handleRequest(req)
+			if err == protocol.ErrNotFound {
+				err = nil
+			}
+			return resp, err
+		}
 		return q.PushRequest(ctx, req)
 	}
 

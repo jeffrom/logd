@@ -262,7 +262,7 @@ func (q *eventQ) handleRead(req *protocol.Request) (*protocol.Response, error) {
 		if err == io.ErrUnexpectedEOF {
 			return errResponse(q.conf, req, resp, protocol.ErrNotFound)
 		}
-		return errResponse(q.conf, req, resp, err)
+		return errResponse(q.conf, req, resp, protocol.ErrNotFound)
 	}
 
 	// respond OK
