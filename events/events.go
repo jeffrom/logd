@@ -207,10 +207,13 @@ func (q *eventQ) handleBatch(req *protocol.Request) (*protocol.Response, error) 
 		return errResponse(q.conf, req, resp, ferr)
 	}
 
-	// update log state
+	// get response offset and update log state
 	respOffset := topic.parts.nextOffset()
 	if aerr := topic.parts.addBatch(batch, req.FullSize()); aerr != nil {
 		return errResponse(q.conf, req, resp, aerr)
+	}
+	if err := topic.Push(respOffset, topic.parts.head.startOffset, req.FullSize(), batch.Messages); err != nil {
+		return errResponse(q.conf, req, resp, err)
 	}
 
 	// respond
