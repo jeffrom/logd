@@ -5,13 +5,12 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/jeffrom/logd/config"
 	"github.com/pkg/errors"
 )
 
 // Message is a new message type
 type Message struct {
-	conf          *config.Config
+	maxSize       int
 	Offset        uint64 // firstOffset + offsetDelta
 	Delta         uint64
 	Body          []byte
@@ -27,10 +26,10 @@ type Message struct {
 
 // NewMessage returns a Message
 // MSG <size>\r\n<body>\r\n
-func NewMessage(conf *config.Config) *Message {
+func NewMessage(maxSize int) *Message {
 	return &Message{
-		conf: conf,
-		Body: make([]byte, conf.MaxBatchSize), // TODO MaxMessageSize
+		maxSize: maxSize,
+		Body:    make([]byte, maxSize),
 	}
 }
 

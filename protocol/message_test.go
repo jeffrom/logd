@@ -10,7 +10,7 @@ import (
 )
 
 func newTestMessage(conf *config.Config, body string) *Message {
-	msg := NewMessage(conf)
+	msg := NewMessage(conf.MaxBatchSize)
 	msg.SetBody([]byte(body))
 	return msg
 }
@@ -33,7 +33,7 @@ func TestWriteMessage(t *testing.T) {
 
 func TestReadMessage(t *testing.T) {
 	conf := testhelper.DefaultConfig(testing.Verbose())
-	msg := NewMessage(conf)
+	msg := NewMessage(conf.MaxBatchSize)
 	fixture := testhelper.LoadFixture("msg.small")
 	buf := bytes.NewBuffer(fixture)
 	br := bufio.NewReaderSize(buf, buf.Len())

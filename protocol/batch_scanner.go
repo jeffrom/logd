@@ -9,7 +9,7 @@ import (
 
 // BatchScanner can be used to scan through a reader, iterating over batches
 type BatchScanner struct {
-	conf    *config.Config
+	maxSize int
 	r       io.Reader
 	br      *bufio.Reader
 	batch   *Batch
@@ -19,12 +19,16 @@ type BatchScanner struct {
 
 // NewBatchScanner returns a new instance of *BatchScanner
 func NewBatchScanner(conf *config.Config, r io.Reader) *BatchScanner {
-	return &BatchScanner{
-		conf:  conf,
+	bs := &BatchScanner{
 		r:     r,
 		br:    bufio.NewReader(r),
 		batch: NewBatch(conf),
 	}
+	if conf != nil {
+		bs.maxSize = conf.MaxBatchSize
+	}
+
+	return bs
 }
 
 // Reset sets *BatchScanner to its initial state
@@ -51,16 +55,12 @@ func (s *BatchScanner) Scan() bool {
 }
 
 // Batch returns the current *Batch
-func (s *BatchScanner) Batch() *Batch {
-	return s.batch
-}
+func (s *BatchScanner) Batch() *Batch { return s.batch }
 
 // Error returns the current error
-func (s *BatchScanner) Error() error {
-	return s.err
-}
+func (s *BatchScanner) Error() error { return s.err }
 
 // Scanned returns the number of bytes read
-func (s *BatchScanner) Scanned() int {
-	return s.scanned
-}
+func (s *BatchScanner) Scanned() int { return s.scanned }
+
+func (s *BatchScanner) MaxSize() int { return s.maxSize }

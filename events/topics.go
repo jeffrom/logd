@@ -237,6 +237,11 @@ func (t *topic) check() error {
 		if err != nil {
 			break
 		}
+		err = t.Push(partOff+uint64(read), partOff, int(n), batch.Messages)
+		if err != nil {
+			break
+		}
+
 		read += n
 	}
 
@@ -250,5 +255,15 @@ func (t *topic) check() error {
 	}
 
 	t.parts.head.size = int(read)
+	return nil
+}
+
+func (t *topic) Query(off uint64, messages int) (*partitionArgList, error) {
+	idx := queryIndexOldPool.Get().(*queryIndexOld).initialize(t, t.conf)
+	defer queryIndexOldPool.Put(idx)
+	return idx.Query(off, messages)
+}
+
+func (t *topic) Push(off, part uint64, size, messages int) error {
 	return nil
 }

@@ -93,7 +93,7 @@ func newEventQ(conf *config.Config) *eventQ {
 		in:           make(chan *protocol.Request, 1000),
 		stopC:        make(chan error),
 		shutdownC:    make(chan error, 1),
-		partArgBuf:   newPartitionArgList(conf), // partition arguments buffer
+		partArgBuf:   newPartitionArgList(conf.MaxPartitions),
 		batchScanner: protocol.NewBatchScanner(conf, nil),
 		tmpBatch:     protocol.NewBatch(conf),
 		flushState:   newFlushState(conf),
@@ -207,10 +207,13 @@ func (q *eventQ) handleBatch(req *protocol.Request) (*protocol.Response, error) 
 		return errResponse(q.conf, req, resp, ferr)
 	}
 
-	// update log state
+	// get response offset and update log state
 	respOffset := topic.parts.nextOffset()
 	if aerr := topic.parts.addBatch(batch, req.FullSize()); aerr != nil {
 		return errResponse(q.conf, req, resp, aerr)
+	}
+	if err := topic.Push(respOffset, topic.parts.head.startOffset, req.FullSize(), batch.Messages); err != nil {
+		return errResponse(q.conf, req, resp, err)
 	}
 
 	// respond
@@ -259,7 +262,7 @@ func (q *eventQ) handleRead(req *protocol.Request) (*protocol.Response, error) {
 		if err == io.ErrUnexpectedEOF {
 			return errResponse(q.conf, req, resp, protocol.ErrNotFound)
 		}
-		return errResponse(q.conf, req, resp, err)
+		return errResponse(q.conf, req, resp, protocol.ErrNotFound)
 	}
 
 	// respond OK
@@ -368,59 +371,7 @@ func (q *eventQ) handleConfig(req *protocol.Request) (*protocol.Response, error)
 }
 
 func (q *eventQ) gatherReadArgs(topic *topic, offset uint64, messages int) (*partitionArgList, error) {
-	soff, delta, err := topic.parts.lookup(offset)
-	// fmt.Printf("%v\ngatherReadArgs: offset: %d, partition: %d, delta: %d, err: %v\n", topic.parts, offset, soff, delta, err)
-	if err != nil {
-		return nil, err
-	}
-
-	q.partArgBuf.reset()
-	scanner := q.batchScanner
-	n := 0
-	currstart := soff
-Loop:
-	for n < messages {
-		p, gerr := topic.parts.logp.Get(currstart, delta, 0)
-		if gerr != nil {
-			// if we've successfully read anything, we've read the last
-			// partition by now
-			if q.partArgBuf.nparts > 0 {
-				// fmt.Println("all done", q.partArgBuf.nparts)
-				return q.partArgBuf, nil
-			}
-			return nil, gerr
-		}
-		defer p.Close()
-
-		scanner.Reset(p)
-		for scanner.Scan() {
-			q.partArgBuf.nbatches++
-			b := scanner.Batch()
-			n += b.Messages
-			if n >= messages {
-				q.partArgBuf.add(currstart, delta, scanner.Scanned())
-				// fmt.Println("scanned enough", currstart, q.partArgBuf.parts[:q.partArgBuf.nparts])
-				break Loop
-			}
-		}
-		// fmt.Println("finished part", currstart, q.partArgBuf.parts[:q.partArgBuf.nparts])
-
-		serr := scanner.Error()
-		// if we've read a partition and and we haven't read any messages, it's
-		// an error. probably an incorrect offset near the end of the partition
-		if serr == io.EOF && n > 0 {
-			q.partArgBuf.add(currstart, delta, p.Size()-delta)
-			currstart = p.Offset() + uint64(p.Size())
-			delta = 0
-			// fmt.Println("next part", currstart, q.partArgBuf.parts[:q.partArgBuf.nparts])
-		} else if serr == io.EOF {
-			return nil, io.ErrUnexpectedEOF
-		} else if serr != nil {
-			return nil, errors.Wrap(protocol.ErrInvalidOffset, serr.Error())
-		}
-	}
-
-	return q.partArgBuf, nil
+	return topic.Query(offset, messages)
 }
 
 // handleShutdown handles a shutdown request

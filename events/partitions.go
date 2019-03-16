@@ -206,7 +206,7 @@ func (b *batch) reset() {
 }
 
 type partitionArgList struct {
-	conf     *config.Config
+	max      int
 	parts    []*partitionArgs
 	nparts   int
 	nbatches int
@@ -226,13 +226,13 @@ func (pa *partitionArgs) String() string {
 	return fmt.Sprintf("partitionArgs<offset: %d, delta: %d, limit: %d>", pa.offset, pa.delta, pa.limit)
 }
 
-func newPartitionArgList(conf *config.Config) *partitionArgList {
+func newPartitionArgList(max int) *partitionArgList {
 	pl := &partitionArgList{
-		conf:  conf,
-		parts: make([]*partitionArgs, conf.MaxPartitions),
+		max:   max,
+		parts: make([]*partitionArgs, max),
 	}
 
-	for i := 0; i < conf.MaxPartitions; i++ {
+	for i := 0; i < max; i++ {
 		pl.parts[i] = &partitionArgs{}
 	}
 
@@ -245,7 +245,7 @@ func (pl *partitionArgList) reset() {
 }
 
 func (pl *partitionArgList) add(soff uint64, delta int, limit int) {
-	if pl.nparts >= pl.conf.MaxPartitions {
+	if pl.nparts >= pl.max {
 		panic("appended too many partitions")
 	}
 	pl.parts[pl.nparts].offset = soff

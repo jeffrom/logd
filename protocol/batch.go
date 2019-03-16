@@ -20,6 +20,7 @@ const MaxTopicSize = 255
 // NOTE no trailing newline after the data
 type Batch struct {
 	conf     *config.Config
+	maxSize  int
 	Size     int
 	Checksum uint32
 	Messages int
@@ -41,6 +42,10 @@ func NewBatch(conf *config.Config) *Batch {
 		msgBuf: &bytes.Buffer{},
 		topic:  make([]byte, MaxTopicSize),
 		msgs:   make([]*Message, 1000),
+	}
+
+	if conf != nil {
+		b.maxSize = conf.MaxBatchSize
 	}
 
 	return b
@@ -71,7 +76,7 @@ func (b *Batch) Empty() bool {
 
 func (b *Batch) ensureBuf() {
 	if b.body == nil {
-		b.body = make([]byte, b.conf.MaxBatchSize)
+		b.body = make([]byte, b.maxSize)
 	}
 }
 
@@ -133,8 +138,8 @@ func (b *Batch) FromRequest(req *Request) (*Batch, error) {
 // TODO should add config.MaxMessageSize and config.MaxMessagesPerBatch and
 // check them here, maybe?
 func (b *Batch) Validate() error {
-	// if size > MaxBatchSize || crc doesn't match
-	if b.Size > b.conf.MaxBatchSize {
+	// if size > maxSize || crc doesn't match
+	if b.Size > b.maxSize {
 		return errors.New("batch too large")
 	}
 	if b.Checksum != b.calculateChecksum() {
@@ -160,7 +165,7 @@ func (b *Batch) Append(p []byte) error {
 		b.msgs = msgs
 	}
 	if b.msgs[b.Messages] == nil {
-		b.msgs[b.Messages] = NewMessage(b.conf)
+		b.msgs[b.Messages] = NewMessage(b.maxSize)
 	}
 	msg := b.msgs[b.Messages]
 	msg.Reset()
@@ -421,7 +426,7 @@ func (b *Batch) readData(r *bufio.Reader) (int64, error) {
 	var total int64
 
 	// TODO this check is redundant, should check the total batch size above this
-	if b.Size > b.conf.MaxBatchSize {
+	if b.Size > b.maxSize {
 		return total, errTooLarge
 	}
 	b.ensureBuf()

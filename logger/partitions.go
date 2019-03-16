@@ -54,8 +54,9 @@ type Partitions struct {
 	refs map[uint64]int
 	mu   sync.Mutex
 
-	pathb     *bytes.Buffer
-	pathCache map[string]map[uint64]string
+	pathb       *bytes.Buffer
+	pathCache   map[string]map[uint64]string
+	pathCacheMu sync.Mutex
 }
 
 // NewPartitions returns an instance of Partitions, which implements
@@ -109,7 +110,9 @@ func (p *Partitions) ensureTempDir() error {
 		}
 
 		p.tempDir = tmpDir
+		p.pathCacheMu.Lock()
 		p.pathCache[p.tempDir] = make(map[uint64]string)
+		p.pathCacheMu.Unlock()
 	}
 	return nil
 }
@@ -134,17 +137,23 @@ func (p *Partitions) Remove(off uint64) error {
 		return p.removeFile(off)
 	}
 
+	p.pathCacheMu.Lock()
 	delete(p.pathCache[p.conf.WorkDir], off)
+	p.pathCacheMu.Unlock()
 	return nil
 }
 
 func (p *Partitions) lookup(workdir string, off uint64) (string, bool) {
+	p.pathCacheMu.Lock()
 	d, ok := p.pathCache[workdir]
+	p.pathCacheMu.Unlock()
 	if !ok {
 		panic("uncached working directory: " + workdir)
 	}
 
+	p.pathCacheMu.Lock()
 	s, ok := d[off]
+	p.pathCacheMu.Unlock()
 	return s, ok
 }
 
@@ -162,7 +171,9 @@ func (p *Partitions) filePath(workdir string, off uint64) string {
 	p.pathb.WriteString(".log")
 
 	s := p.pathb.String()
+	p.pathCacheMu.Lock()
 	p.pathCache[workdir][off] = s
+	p.pathCacheMu.Unlock()
 	return s
 }
 

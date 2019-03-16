@@ -309,7 +309,7 @@ func TestBatchReadTooLarge(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	conf.MaxBatchSize = 10
+	batch.maxSize = 10
 	if err := batch.Validate(); err == nil {
 		t.Fatal("expected error but got none")
 	}
