@@ -12,8 +12,8 @@ import (
 var queryIndexOldPool = sync.Pool{
 	New: func() interface{} {
 		return &queryIndexOld{
-			partArgBuf:   newPartitionArgList(1),
-			batchScanner: protocol.NewBatchScanner(nil, nil),
+			// partArgBuf:   newPartitionArgList(1),
+			// batchScanner: protocol.NewBatchScanner(nil, nil),
 		}
 	},
 }
