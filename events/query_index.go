@@ -198,19 +198,23 @@ func (r *queryIndex) writeIndex(part uint64) error {
 }
 
 func (r *queryIndex) partBounds(part uint64) (int, int) {
-	start, end := -1, -1
+	start, ok := r.parts[part]
+	if !ok {
+		return -1, -1
+	}
+	end := -1
+
 	for i := 0; i < r.batchesN; i++ {
 		batch := r.batches[i]
 		if batch.partition < part {
 			continue
 		}
-		if start < 0 {
-			start = i
-		}
-
 		if batch.partition > part {
 			end = i
 			break
+		}
+		if batch.partition != part {
+			return -1, -1
 		}
 	}
 	return start, end
