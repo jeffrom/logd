@@ -252,7 +252,9 @@ func (q *eventQ) handleRead(req *protocol.Request) (*protocol.Response, error) {
 		return errResponse(q.conf, req, resp, protocol.ErrNotFound)
 	}
 
-	partArgs, err := q.gatherReadArgs(topic, readreq.Offset, readreq.Messages)
+	args := partitionArgListPool.Get().(*partitionArgList).initialize(q.conf.MaxPartitions)
+	defer partitionArgListPool.Put(args)
+	partArgs, err := q.gatherReadArgs(topic, readreq.Offset, readreq.Messages, args)
 	if err != nil {
 		// fmt.Println("gatherReadArgs error:", err)
 
@@ -308,7 +310,9 @@ func (q *eventQ) handleTail(req *protocol.Request) (*protocol.Response, error) {
 	}
 	off := firstPart.startOffset
 
-	partArgs, err := q.gatherReadArgs(topic, off, tailreq.Messages)
+	args := partitionArgListPool.Get().(*partitionArgList).initialize(q.conf.MaxPartitions)
+	defer partitionArgListPool.Put(args)
+	partArgs, err := q.gatherReadArgs(topic, off, tailreq.Messages, args)
 	if err != nil {
 		return errResponse(q.conf, req, resp, err)
 	}
@@ -370,8 +374,22 @@ func (q *eventQ) handleConfig(req *protocol.Request) (*protocol.Response, error)
 	return resp, nil
 }
 
-func (q *eventQ) gatherReadArgs(topic *topic, offset uint64, messages int) (*partitionArgList, error) {
-	return topic.Query(offset, messages)
+func (q *eventQ) gatherReadArgs(topic *topic, offset uint64, messages int, newArgs *partitionArgList) (*partitionArgList, error) {
+	err := topic.idx.Query(offset, messages, newArgs)
+	if err != nil {
+		log.Printf("<%d, %d>: error w/ new query index: %+v", offset, messages, err)
+	}
+
+	// old way
+	args, err := topic.Query(offset, messages)
+	if err != nil {
+		return args, err
+	}
+
+	if !newArgs.equals(args) {
+		log.Printf("<%d, %d>: new args not equal to old:\n\n%+v\n\n%v\n", offset, messages, args, newArgs)
+	}
+	return args, err
 }
 
 // handleShutdown handles a shutdown request

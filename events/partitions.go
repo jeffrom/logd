@@ -270,3 +270,21 @@ func (pl *partitionArgList) add(soff uint64, delta int, limit int) {
 
 	pl.nparts++
 }
+
+func (pl *partitionArgList) equals(other *partitionArgList) bool {
+	if pl.nparts != other.nparts {
+		return false
+	}
+
+	for i := 0; i < pl.nparts; i++ {
+		a := pl.parts[i]
+		b := other.parts[i]
+		if a == nil || b == nil {
+			return false
+		}
+		if a.offset != b.offset || a.delta != b.delta || a.limit != b.limit {
+			return false
+		}
+	}
+	return true
+}
