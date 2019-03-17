@@ -1,8 +1,12 @@
 package events
 
 import (
+	"bufio"
+	"encoding/binary"
+	"io"
 	"sync"
 
+	"github.com/jeffrom/logd/logger"
 	"github.com/jeffrom/logd/protocol"
 )
 
@@ -13,6 +17,8 @@ import (
 
 type queryIndex struct {
 	maxPartitions int
+	topic         string
+	manager       logger.IndexManager
 	batches       []*queryIndexBatch
 	batchesN      int
 	parts         map[uint64]int
@@ -26,9 +32,11 @@ type queryIndexBatch struct {
 	messages  int
 }
 
-func newQueryIndex(maxPartitions int) *queryIndex {
+func newQueryIndex(workDir string, topic string, maxPartitions int) *queryIndex {
 	return &queryIndex{
 		maxPartitions: maxPartitions,
+		topic:         topic,
+		manager:       logger.NewFileIndex(workDir),
 		parts:         make(map[uint64]int),
 	}
 }
@@ -167,4 +175,127 @@ func (r *queryIndex) minPart() (uint64, int) {
 	}
 
 	return finaln, finalidx
+}
+
+func (r *queryIndex) writeIndex(part uint64) error {
+	w, err := r.manager.GetIndex(r.topic, part)
+	if err != nil {
+		return err
+	}
+	defer w.Close()
+
+	buf := make([]byte, 8)
+	bw := bufio.NewWriter(w)
+
+	start, end := r.partBounds(part)
+	for i := start; i < end; i++ {
+		if _, err := r.writeIndexBatch(bw, buf, r.batches[i]); err != nil {
+			return err
+		}
+	}
+
+	return bw.Flush()
+}
+
+func (r *queryIndex) partBounds(part uint64) (int, int) {
+	start, end := -1, -1
+	for i := 0; i < r.batchesN; i++ {
+		batch := r.batches[i]
+		if batch.partition < part {
+			continue
+		}
+		if start < 0 {
+			start = i
+		}
+
+		if batch.partition > part {
+			end = i
+			break
+		}
+	}
+	return start, end
+}
+
+func (r *queryIndex) readIndex(part uint64) error {
+	rdr, err := r.manager.GetIndex(r.topic, part)
+	if err != nil {
+		return err
+	}
+	defer rdr.Close()
+
+	br := bufio.NewReader(rdr)
+	r.batchesN = 0
+	for i := 0; i < r.maxPartitions; i++ {
+		if _, err := r.readIndexBatch(br, r.batches[i]); err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+		r.batchesN++
+	}
+	return nil
+}
+
+func (r *queryIndex) writeIndexBatch(w io.Writer, buf []byte, batch *queryIndexBatch) (int, error) {
+	var total int
+
+	n := binary.PutUvarint(buf, batch.offset)
+	total += n
+	if _, err := w.Write(buf[:n]); err != nil {
+		return total, err
+	}
+
+	n = binary.PutUvarint(buf, batch.partition)
+	total += n
+	if _, err := w.Write(buf[:n]); err != nil {
+		return total, err
+	}
+
+	n = binary.PutVarint(buf, int64(batch.size))
+	total += n
+	if _, err := w.Write(buf[:n]); err != nil {
+		return total, err
+	}
+
+	n = binary.PutVarint(buf, int64(batch.messages))
+	total += n
+	if _, err := w.Write(buf[:n]); err != nil {
+		return total, err
+	}
+	return total, nil
+}
+
+func (r *queryIndex) readIndexBatch(rdr io.ByteReader, batch *queryIndexBatch) (int, error) {
+	var total int
+
+	n, err := binary.ReadUvarint(rdr)
+	total += 8
+	if err != nil {
+		return total, err
+	}
+	batch.offset = n
+
+	n, err = binary.ReadUvarint(rdr)
+	total += 8
+	if err != nil {
+		return total, err
+	}
+	batch.partition = n
+
+	sn, err := binary.ReadVarint(rdr)
+	total += 8
+	if err != nil {
+		return total, err
+	}
+	batch.size = int(sn)
+
+	sn, err = binary.ReadVarint(rdr)
+	total += 8
+	if err != nil {
+		return total, err
+	}
+	batch.messages = int(sn)
+
+	return total, nil
 }

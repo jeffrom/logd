@@ -2,6 +2,7 @@ package events
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"log"
 	"sync"
@@ -138,11 +139,12 @@ type topic struct {
 
 func newTopic(conf *config.Config, name string) *topic {
 	logp := logger.NewPartitions(conf, name)
+
 	return &topic{
 		conf:  conf,
 		name:  name,
 		parts: newPartitions(conf, logp),
-		idx:   newQueryIndex(conf.MaxPartitions),
+		idx:   newQueryIndex(conf.WorkDir, name, conf.MaxPartitions),
 		logp:  logp,
 		logw:  logger.NewWriter(conf, name),
 		logrp: logger.NewRepairer(conf, name),
@@ -215,6 +217,12 @@ func (t *topic) setupPartitions() error {
 	if serr := t.logw.SetPartition(head.startOffset); serr != nil {
 		return serr
 	}
+
+	// load query index
+	for i := 0; i < t.parts.nparts-1; i++ {
+		fmt.Println("load query index at", t.parts.parts[i])
+	}
+
 	log.Printf("Topic %s starting at %d (partition %d, delta %d)", t.name, t.parts.headOffset(), head.startOffset, head.size)
 	return nil
 }

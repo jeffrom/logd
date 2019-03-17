@@ -1,12 +1,18 @@
 package events
 
 import (
+	"bufio"
+	"bytes"
 	"testing"
+
+	"github.com/jeffrom/logd/testhelper"
 )
 
 func TestQueryIndexPush(t *testing.T) {
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	maxParts := 4
-	qi := newQueryIndex(maxParts)
+	conf.MaxPartitions = maxParts
+	qi := newQueryIndex(conf.WorkDir, "default", maxParts)
 	testQueryIndexPush(t, qi, 1000)
 
 	if qi.batchesN >= 500 {
@@ -37,8 +43,10 @@ func testQueryIndexPush(t *testing.T, qi *queryIndex, iterations int) {
 }
 
 func TestQueryIndex(t *testing.T) {
+	conf := testhelper.DefaultConfig(testing.Verbose())
 	maxParts := 4
-	qi := newQueryIndex(maxParts)
+	conf.MaxPartitions = maxParts
+	qi := newQueryIndex(conf.WorkDir, "default", maxParts)
 	testQueryIndexPush(t, qi, 1000)
 	args := partitionArgListPool.Get().(*partitionArgList).initialize(maxParts)
 	defer partitionArgListPool.Put(args)
@@ -59,4 +67,32 @@ func TestQueryIndex(t *testing.T) {
 		t.Fatal("expected 3 partitions but got ", args.nparts)
 	}
 	// fmt.Println(args)
+}
+
+func TestQueryIndexReadWrite(t *testing.T) {
+	conf := testhelper.DefaultConfig(testing.Verbose())
+	maxParts := 4
+	conf.MaxPartitions = maxParts
+	qi := newQueryIndex(conf.WorkDir, "default", maxParts)
+	testQueryIndexPush(t, qi, 10)
+
+	b := &bytes.Buffer{}
+	buf := make([]byte, 8)
+	for i := 0; i < qi.batchesN; i++ {
+		if _, err := qi.writeIndexBatch(b, buf, qi.batches[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// fmt.Printf("%q\n", b.Bytes())
+
+	rdr := bufio.NewReader(b)
+	for i := 0; i < 10; i++ {
+		batch := qi.batches[i]
+		if _, err := qi.readIndexBatch(rdr, batch); err != nil {
+			t.Fatal(err)
+		}
+		// fmt.Println(batch)
+	}
+
+	// TODO assert the serialized batches match the unserialized version
 }
