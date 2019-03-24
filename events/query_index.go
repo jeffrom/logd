@@ -3,6 +3,7 @@ package events
 import (
 	"bufio"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"sync"
 
@@ -30,6 +31,10 @@ type queryIndexBatch struct {
 	partition uint64
 	size      int
 	messages  int
+}
+
+func (b *queryIndexBatch) String() string {
+	return fmt.Sprintf("queryIndexBatch<offset: %d, partition: %d, size: %d, messages %d>", b.offset, b.partition, b.size, b.messages)
 }
 
 func newQueryIndex(workDir string, topic string, maxPartitions int) *queryIndex {
@@ -92,8 +97,7 @@ func (r *queryIndex) Push(off, part uint64, size, messages int) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.pushBatch(off, part, size, messages)
-	return nil
+	return r.pushBatch(off, part, size, messages)
 }
 
 func (r *queryIndex) findStart(off uint64) (int, bool) {
@@ -110,10 +114,12 @@ func (r *queryIndex) findStart(off uint64) (int, bool) {
 	return -1, false
 }
 
-func (r *queryIndex) pushBatch(off, part uint64, size, messages int) {
+func (r *queryIndex) pushBatch(off, part uint64, size, messages int) error {
 	if _, ok := r.parts[part]; !ok {
 		if len(r.parts) >= r.maxPartitions {
-			r.rotate(part)
+			if err := r.rotate(part); err != nil {
+				return err
+			}
 		} else {
 			r.parts[part] = r.batchesN
 		}
@@ -142,9 +148,10 @@ func (r *queryIndex) pushBatch(off, part uint64, size, messages int) {
 	r.batches[i] = batch
 
 	r.batchesN++
+	return nil
 }
 
-func (r *queryIndex) rotate(newPart uint64) {
+func (r *queryIndex) rotate(newPart uint64) error {
 	minPart, minIdx := r.minPart()
 	copy(r.batches, r.batches[minIdx:])
 	for idx := range r.parts {
@@ -153,7 +160,12 @@ func (r *queryIndex) rotate(newPart uint64) {
 	r.batchesN -= minIdx
 	delete(r.parts, minPart)
 
+	if err := r.manager.RemoveIndex(r.topic, minPart); err != nil {
+		return err
+	}
+
 	r.parts[newPart] = r.batchesN
+	return nil
 }
 
 func (r *queryIndex) minPart() (uint64, int) {
@@ -188,6 +200,7 @@ func (r *queryIndex) writeIndex(part uint64) error {
 	bw := bufio.NewWriter(w)
 
 	start, end := r.partBounds(part)
+	// fmt.Println("writing index at", part, ", from", start, r.batches[start], "to", end, r.batches[end-1])
 	for i := start; i < end; i++ {
 		if _, err := r.writeIndexBatch(bw, buf, r.batches[i]); err != nil {
 			return err
@@ -217,6 +230,10 @@ func (r *queryIndex) partBounds(part uint64) (int, int) {
 			return -1, -1
 		}
 	}
+
+	if end < 0 {
+		end = r.batchesN
+	}
 	return start, end
 }
 
@@ -230,6 +247,10 @@ func (r *queryIndex) readIndex(part uint64) error {
 	br := bufio.NewReader(rdr)
 	r.batchesN = 0
 	for i := 0; i < r.maxPartitions; i++ {
+		if r.batches[i] == nil {
+			break
+		}
+		// fmt.Println("readIndex", r.batches[i])
 		if _, err := r.readIndexBatch(br, r.batches[i]); err != nil {
 			if err == io.EOF {
 				return nil

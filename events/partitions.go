@@ -42,13 +42,15 @@ func (p *partitions) reset() {
 }
 
 // add is used when loading the log from disk
-func (p *partitions) add(offset uint64, size int) error {
+func (p *partitions) add(offset uint64, size int) (bool, error) {
+	var rotated bool
 	last := p.parts[p.nparts]
 	if p.nparts == p.conf.MaxPartitions-1 && last.startOffset != 0 {
 		if err := p.logp.Remove(p.parts[0].startOffset); err != nil {
-			return err
+			return rotated, err
 		}
 		p.rotate()
+		rotated = true
 	}
 
 	part := p.parts[p.nparts]
@@ -60,7 +62,7 @@ func (p *partitions) add(offset uint64, size int) error {
 	if p.nparts < p.conf.MaxPartitions-1 {
 		p.nparts++
 	}
-	return nil
+	return rotated, nil
 }
 
 func (p *partitions) rotate() {
@@ -88,14 +90,17 @@ func (p *partitions) nextOffset() uint64 {
 	return next
 }
 
-func (p *partitions) addBatch(b *protocol.Batch, size int) error {
+func (p *partitions) addBatch(b *protocol.Batch, size int) (bool, error) {
+	var rotated bool
 	if p.shouldRotate(size) {
-		if err := p.add(p.nextOffset(), 0); err != nil {
-			return err
+		wasRotated, err := p.add(p.nextOffset(), 0)
+		if err != nil {
+			return rotated, err
 		}
+		rotated = wasRotated
 	}
 	p.head.addBatch(b, size)
-	return nil
+	return rotated, nil
 }
 
 func (p *partitions) headOffset() uint64 {

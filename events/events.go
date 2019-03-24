@@ -170,7 +170,7 @@ func (q *eventQ) Stop() error {
 	case q.stopC <- err:
 	case <-time.After(500 * time.Millisecond):
 		log.Printf("event queue failed to stop properly")
-		return errors.New("shutdown failed")
+		return errors.New("shutdown timed out")
 	}
 
 	return nil
@@ -191,6 +191,10 @@ func (q *eventQ) handleBatch(req *protocol.Request) (*protocol.Response, error) 
 
 	// set next write partition if needed
 	if topic.parts.shouldRotate(req.FullSize()) {
+		if err := topic.idx.writeIndex(topic.parts.head.startOffset); err != nil {
+			return errResponse(q.conf, req, resp, err)
+		}
+
 		nextStartOffset := topic.parts.nextOffset()
 		if sperr := topic.logw.SetPartition(nextStartOffset); sperr != nil {
 			return errResponse(q.conf, req, resp, sperr)
@@ -209,9 +213,12 @@ func (q *eventQ) handleBatch(req *protocol.Request) (*protocol.Response, error) 
 
 	// get response offset and update log state
 	respOffset := topic.parts.nextOffset()
-	if aerr := topic.parts.addBatch(batch, req.FullSize()); aerr != nil {
+	_, aerr := topic.parts.addBatch(batch, req.FullSize())
+	if aerr != nil {
 		return errResponse(q.conf, req, resp, aerr)
 	}
+
+	// update query index
 	if err := topic.Push(respOffset, topic.parts.head.startOffset, req.FullSize(), batch.Messages); err != nil {
 		return errResponse(q.conf, req, resp, err)
 	}
@@ -387,7 +394,7 @@ func (q *eventQ) gatherReadArgs(topic *topic, offset uint64, messages int, newAr
 	}
 
 	if !newArgs.equals(args) {
-		log.Printf("<%d, %d>: new args not equal to old:\n\n%+v\n\n%v\n", offset, messages, args, newArgs)
+		log.Printf("<%d, %d>: new args not equal to old:\n\nold: %+v\n\nnew: %v\n", offset, messages, args, newArgs)
 	}
 	return args, err
 }

@@ -3,6 +3,7 @@ package events
 import (
 	"bufio"
 	"bytes"
+	"os"
 	"testing"
 
 	"github.com/jeffrom/logd/testhelper"
@@ -27,7 +28,7 @@ func testQueryIndexPush(t *testing.T, qi *queryIndex, iterations int) {
 	messages := 3
 
 	for i := 0; i < iterations; i++ {
-		if err := qi.Push(off, part, size, messages); err != nil {
+		if err := qi.Push(off, part, size, messages); err != nil && !os.IsNotExist(err) {
 			t.Fatal(err)
 		}
 		if len(qi.parts) > qi.maxPartitions {
