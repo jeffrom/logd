@@ -25,6 +25,12 @@
   - also currently one goroutine accessing fs per topic so there's a lot of
     blocking with many connections. would be better to have many goroutines
     access fs with maybe some kind of limit on max open files.
+- [ ] run some integration tests against device mapper testing drivers (man dmsetup)
+    - some examples, maybe not possible depending on how device mapper targets work
+      - write some nonrandom text (like a book) some number of times, and assert
+        that all of it is read back
+      - write some nonrandom text, teeing it, with protocol, to a regular file,
+        then compare it to the logfiles logd writes
 - [x] audit / fix int types, such as batch size (should be int, not uint64)
 - [ ] simple replication, scanner failover
 - [ ] config validation
