@@ -139,7 +139,6 @@ func main() {
 	RootCmd.AddCommand(ReadCmd)
 	RootCmd.AddCommand(ConfigCmd)
 	RootCmd.AddCommand(BenchCmd)
-	RootCmd.AddCommand(CheckIndexCmd)
 	RootCmd.AddCommand(VersionCmd)
 
 	if err := RootCmd.Execute(); err != nil {
