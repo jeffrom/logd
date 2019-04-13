@@ -73,6 +73,9 @@ func (r *queryIndex) Query(off uint64, messages int, res *partitionArgList) erro
 	head := n + 1
 	collectedMessages := batch.messages
 	currPartOff := int(batch.offset - batch.partition)
+	if currPartOff < 0 {
+		currPartOff = 0
+	}
 	currSize := batch.size
 	currPart := batch.partition
 
@@ -113,10 +116,11 @@ func (r *queryIndex) Push(off, part uint64, size, messages int) error {
 func (r *queryIndex) findStart(off uint64) (int, bool) {
 	for i := 0; i < r.batchesN; i++ {
 		batch := r.batches[i]
-		if batch.offset > off {
+		queryOffset := batch.offset + uint64(batch.partition)
+		if queryOffset > off {
 			break
 		}
-		if batch.offset == off {
+		if queryOffset == off {
 			return i, true
 		}
 	}
@@ -140,7 +144,7 @@ func (r *queryIndex) ensureBatches() {
 
 func (r *queryIndex) pushBatch(off, part uint64, size, messages int) error {
 	if _, ok := r.parts[part]; !ok {
-		if len(r.parts) >= r.maxPartitions {
+		if len(r.parts) >= r.maxPartitions-1 {
 			if err := r.rotate(part); err != nil {
 				return err
 			}

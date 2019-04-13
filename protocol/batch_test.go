@@ -13,6 +13,26 @@ import (
 	"github.com/jeffrom/logd/testhelper"
 )
 
+func TestBatchEnvelopeSize(t *testing.T) {
+	conf := testhelper.DefaultConfig(testing.Verbose())
+	msg := []byte("cool message, yep")
+	protoMsg := []byte("MSG 17\r\ncool message, yep\r\n")
+	n := BatchEnvelopeSize("cool", protoMsg, 1)
+
+	batch := NewBatch(conf)
+	batch.SetTopic([]byte("cool"))
+	batch.Append(msg)
+
+	b := &bytes.Buffer{}
+	if _, err := batch.WriteTo(b); err != nil {
+		t.Fatal(err)
+	}
+
+	if n != b.Len() {
+		t.Fatal("expected", b.Len(), "but got envelope size of", n)
+	}
+}
+
 func TestWriteBatch(t *testing.T) {
 	conf := testhelper.DefaultConfig(testing.Verbose())
 	testWriteBatch(t, conf, "batch.small", []string{

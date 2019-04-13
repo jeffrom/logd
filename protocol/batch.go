@@ -6,14 +6,33 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
+	"strconv"
+
+	"github.com/pkg/errors"
 
 	"github.com/jeffrom/logd/config"
-	"github.com/pkg/errors"
 )
 
 // MaxTopicSize represents the maximum topic length. It is 255, as that is the
 // maximum directory length in linux.
 const MaxTopicSize = 255
+
+// BatchEnvelopeSize returns the size of a message body including its protocol
+// envelope.
+func BatchEnvelopeSize(topic string, body []byte, messages int) int {
+	crc := crc32.Checksum(body, crcTable)
+	l := len(bbatchStart)                         // `BATCH `
+	l += asciiSize(len(body))                     // <size>
+	l += len(bspace)                              // ` `
+	l += len(topic)                               // `<topic>`
+	l += len(bspace)                              // ` `
+	l += len(strconv.FormatUint(uint64(crc), 10)) // <crc>
+	l += len(bspace)                              // ` `
+	l += asciiSize(messages)                      // <messages>
+	l += termLen                                  // `\r\n`
+	l += len(body)                                // <data>
+	return l
+}
 
 // Batch represents a collection of Messages
 // BATCH <size> <topic> <checksum> <messages>\r\n<data>
@@ -213,6 +232,7 @@ func (b *Batch) CalcSize() int {
 }
 
 func (b *Batch) calculateChecksum() uint32 {
+	// TODO define one hash function, dryyyy
 	return crc32.Checksum(b.Bytes(), crcTable)
 }
 
