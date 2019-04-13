@@ -2,6 +2,7 @@ package events
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -44,6 +45,15 @@ func newQueryIndex(workDir string, topic string, maxPartitions int) *queryIndex 
 		manager:       logger.NewFileIndex(workDir),
 		parts:         make(map[uint64]int),
 	}
+}
+
+func (r *queryIndex) String() string {
+	b := &bytes.Buffer{}
+	for i := 0; i < r.batchesN; i++ {
+		b.WriteString(r.batches[i].String())
+		b.WriteString("\n")
+	}
+	return b.String()
 }
 
 func (r *queryIndex) reset() {
@@ -114,6 +124,20 @@ func (r *queryIndex) findStart(off uint64) (int, bool) {
 	return -1, false
 }
 
+func (r *queryIndex) ensureBatches() {
+	i := r.batchesN
+	if cap(r.batches) <= i {
+		nextSize := 1000
+		if cap(r.batches) > 0 {
+			nextSize = cap(r.batches) * 2
+		}
+		batches := make([]*queryIndexBatch, nextSize)
+		copy(batches, r.batches)
+		r.batches = batches
+		// fmt.Println("grew to", len(r.batches))
+	}
+}
+
 func (r *queryIndex) pushBatch(off, part uint64, size, messages int) error {
 	if _, ok := r.parts[part]; !ok {
 		if len(r.parts) >= r.maxPartitions {
@@ -126,16 +150,7 @@ func (r *queryIndex) pushBatch(off, part uint64, size, messages int) error {
 	}
 
 	i := r.batchesN
-	if cap(r.batches) <= i {
-		nextSize := 1000
-		if cap(r.batches) > 0 {
-			nextSize = cap(r.batches) * 2
-		}
-		batches := make([]*queryIndexBatch, nextSize)
-		copy(batches, r.batches)
-		r.batches = batches
-		// fmt.Println("grew to", len(r.batches))
-	}
+	r.ensureBatches()
 
 	batch := r.batches[i]
 	if batch == nil {
@@ -245,23 +260,39 @@ func (r *queryIndex) readIndex(part uint64) error {
 	defer rdr.Close()
 
 	br := bufio.NewReader(rdr)
-	r.batchesN = 0
-	for i := 0; i < r.maxPartitions; i++ {
-		if r.batches[i] == nil {
-			break
+	// r.batchesN = 0
+	for {
+		r.ensureBatches()
+		if r.batches[r.batchesN] == nil {
+			r.batches[r.batchesN] = &queryIndexBatch{}
 		}
-		// fmt.Println("readIndex", r.batches[i])
-		if _, err := r.readIndexBatch(br, r.batches[i]); err != nil {
+		if _, err := r.readIndexBatch(br, r.batches[r.batchesN]); err != nil {
 			if err == io.EOF {
 				return nil
 			}
 			return err
 		}
+		fmt.Println("readIndex", r.batchesN, r.batches[r.batchesN])
 		r.batchesN++
 	}
-	return nil
 }
 
+func (r *queryIndex) zeroBuf(buf []byte) {
+	for i := range buf {
+		buf[i] = '0'
+	}
+}
+
+// func (r *queryIndex) writeZero(w io.Writer, n int) error {
+// 	for i := 0; i < n; i++ {
+// 		if _, err := w.Write([]byte(0)); err != nil {
+// 			return err
+// 		}
+// 	}
+// 	return nil
+// }
+
+// TODO this and the read needs to read/write a known size
 func (r *queryIndex) writeIndexBatch(w io.Writer, buf []byte, batch *queryIndexBatch) (int, error) {
 	var total int
 

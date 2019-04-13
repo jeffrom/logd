@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path"
@@ -36,6 +37,7 @@ func NewFileIndex(workDir string) *FileIndex {
 // }
 
 func (idx *FileIndex) GetIndex(topic string, part uint64) (io.ReadWriteCloser, error) {
+	fmt.Println("reading index for topic", topic, "partition", part)
 	p := idx.path(topic, part)
 	return os.OpenFile(p, os.O_RDWR|os.O_CREATE, 0600)
 }

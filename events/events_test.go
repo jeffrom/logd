@@ -384,6 +384,7 @@ func pushBatch(t testing.TB, h *Handlers, fixture []byte) *protocol.ClientRespon
 	if err != nil {
 		t.Fatalf("%+v", err)
 	}
+	fmt.Printf("wrote batch at %d\n", resp.ClientResponse.Offset())
 	return checkBatchResp(t, h.conf, resp)
 }
 
