@@ -145,7 +145,7 @@ func (q *eventQ) loop() { // nolint: gocyclo
 	}()
 
 	for {
-		internal.Debugf(q.conf, "waiting for event")
+		internal.Debugf(q.conf, "waiting for event (%s)", q.topic)
 
 		select {
 		// new flow for handling requests passed in from servers

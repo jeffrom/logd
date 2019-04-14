@@ -3,7 +3,6 @@ package protocol
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"strings"
@@ -241,7 +240,7 @@ func TestBatchReadErrors(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		batch.Reset()
 		_, err := batch.ReadFrom(br)
-		fmt.Println(i, err)
+		// fmt.Println(i, err)
 		if err != nil {
 			if err != io.EOF {
 				errs = append(errs, err)

@@ -2,7 +2,6 @@ package events
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"log"
 	"sync"
@@ -151,6 +150,13 @@ func newTopic(conf *config.Config, name string) *topic {
 	}
 }
 
+func (t *topic) String() string {
+	if t == nil {
+		return "<nil>"
+	}
+	return t.name
+}
+
 func (t *topic) reset() {
 	t.parts.reset()
 }
@@ -211,7 +217,7 @@ func (t *topic) setupPartitions() error {
 	}
 
 	// load query index from disk
-	for i := 0; i < t.parts.nparts-1; i++ {
+	for i := 0; i < len(parts)-1; i++ {
 		// fmt.Println("load query index at", i, t.parts.parts[i])
 		if err := t.idx.readIndex(t.parts.parts[i].startOffset); err != nil {
 			return err
@@ -226,7 +232,7 @@ func (t *topic) setupPartitions() error {
 		return serr
 	}
 
-	fmt.Println(t.idx)
+	// fmt.Println(t.idx)
 	log.Printf("Topic %s starting at %d (partition %d, delta %d)", t.name, t.parts.headOffset(), head.startOffset, head.size)
 	return nil
 }

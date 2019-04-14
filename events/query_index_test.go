@@ -3,7 +3,6 @@ package events
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"io"
 	"os"
 	"testing"
@@ -53,8 +52,7 @@ func TestQueryIndex(t *testing.T) {
 	conf.MaxPartitions = maxParts
 	qi := newQueryIndex(conf.WorkDir, "default", maxParts)
 	testQueryIndexPush(t, qi, 1000)
-	args := partitionArgListPool.Get().(*partitionArgList).initialize(maxParts)
-	defer partitionArgListPool.Put(args)
+	args := newPartitionArgList(500)
 
 	off := qi.batches[0].offset
 	if err := qi.Query(off, 150, args); err != nil {
@@ -64,14 +62,14 @@ func TestQueryIndex(t *testing.T) {
 		t.Fatal("expected 1 partitions but got ", args.nparts)
 	}
 
+	args.initialize(500)
 	off = qi.batches[0].offset
 	if err := qi.Query(off, 500, args); err != nil {
 		t.Fatal(err)
 	}
-	if args.nparts != 3 {
-		t.Fatal("expected 3 partitions but got ", args.nparts)
+	if args.nparts != 2 {
+		t.Fatal("expected 2 partitions but got ", args.nparts)
 	}
-	// fmt.Println(args)
 }
 
 func TestQueryIndexReadWrite(t *testing.T) {
@@ -121,7 +119,7 @@ func TestQueryIndexRotateSync(t *testing.T) {
 	checkPartArg(t, partArgs.parts[0], 0, 0, 100)
 	// fmt.Printf("%+v\n", partArgs.parts[0])
 
-	checkError(t, qi.Push(0, 100, 100, 2))
+	checkError(t, qi.Push(100, 100, 100, 2))
 
 	partArgs.initialize(500)
 	checkError(t, qi.Query(0, 1, partArgs))
@@ -146,10 +144,11 @@ func TestQueryIndexRotateSync(t *testing.T) {
 	checkPartArg(t, partArgs.parts[0], 0, 0, 100)
 	checkPartArg(t, partArgs.parts[1], 100, 0, 100)
 
-	checkError(t, qi.Push(0, 200, 100, 3))
-	checkError(t, qi.Push(0, 300, 100, 4))
+	checkError(t, qi.Push(200, 200, 100, 3))
+	checkError(t, qi.Push(300, 300, 100, 4))
 
 	expectNumBatches(t, 3, qi)
+	// fmt.Println(qi.batches[:qi.batchesN])
 	expectError(t, protocol.ErrNotFound, qi.Query(0, 1, partArgs))
 
 	partArgs.initialize(500)
@@ -168,7 +167,7 @@ func TestQueryIndexRotateSync(t *testing.T) {
 	checkPartArg(t, partArgs.parts[0], 100, 0, 100)
 	checkPartArg(t, partArgs.parts[1], 200, 0, 100)
 
-	checkError(t, qi.Push(0, 400, 100, 2))
+	checkError(t, qi.Push(400, 400, 100, 2))
 
 	expectError(t, protocol.ErrNotFound, qi.Query(100, 1, partArgs))
 
@@ -182,7 +181,6 @@ func TestQueryIndexRotateSync(t *testing.T) {
 	checkError(t, qi.writeIndex(400))
 	// t.Fatalf("welp, 200 didn't get written for some reason")
 
-	fmt.Println(qi)
 	qi = newMockQueryIndex("default", maxParts, m)
 	checkError(t, qi.readIndex(200))
 	checkError(t, qi.readIndex(300))
@@ -213,7 +211,6 @@ func TestQueryIndexRotateSync(t *testing.T) {
 	checkPartArg(t, partArgs.parts[0], 200, 0, 100)
 	checkPartArg(t, partArgs.parts[1], 300, 0, 100)
 
-	fmt.Println(qi.batches[:qi.batchesN])
 	partArgs.initialize(500)
 	checkError(t, qi.Query(200, 8, partArgs))
 	checkPartArgListSize(t, partArgs, 3)
