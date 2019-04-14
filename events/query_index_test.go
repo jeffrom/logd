@@ -114,6 +114,7 @@ func TestQueryIndexRotateSync(t *testing.T) {
 
 	qi = newMockQueryIndex("default", maxParts, m)
 	checkError(t, qi.readIndex(0))
+	expectNumBatches(t, 1, qi)
 
 	checkError(t, qi.Query(0, 1, partArgs))
 	checkPartArgListSize(t, partArgs, 1)
@@ -148,6 +149,7 @@ func TestQueryIndexRotateSync(t *testing.T) {
 	checkError(t, qi.Push(0, 200, 100, 3))
 	checkError(t, qi.Push(0, 300, 100, 4))
 
+	expectNumBatches(t, 3, qi)
 	expectError(t, protocol.ErrNotFound, qi.Query(0, 1, partArgs))
 
 	partArgs.initialize(500)
@@ -178,13 +180,46 @@ func TestQueryIndexRotateSync(t *testing.T) {
 	checkError(t, qi.writeIndex(200))
 	checkError(t, qi.writeIndex(300))
 	checkError(t, qi.writeIndex(400))
-	t.Fatalf("welp, 200 didn't get written for some reason")
+	// t.Fatalf("welp, 200 didn't get written for some reason")
 
 	fmt.Println(qi)
 	qi = newMockQueryIndex("default", maxParts, m)
 	checkError(t, qi.readIndex(200))
 	checkError(t, qi.readIndex(300))
 	checkError(t, qi.readIndex(400))
+
+	partArgs.initialize(500)
+	expectNumBatches(t, 3, qi)
+	expectError(t, protocol.ErrNotFound, qi.Query(0, 1, partArgs))
+	expectError(t, protocol.ErrNotFound, qi.Query(0, 100, partArgs))
+
+	partArgs.initialize(500)
+	checkError(t, qi.Query(200, 1, partArgs))
+	checkPartArgListSize(t, partArgs, 1)
+	checkPartArg(t, partArgs.parts[0], 200, 0, 100)
+	checkError(t, qi.Query(200, 3, partArgs))
+	checkPartArgListSize(t, partArgs, 1)
+	checkPartArg(t, partArgs.parts[0], 200, 0, 100)
+
+	partArgs.initialize(500)
+	checkError(t, qi.Query(200, 4, partArgs))
+	checkPartArgListSize(t, partArgs, 2)
+	checkPartArg(t, partArgs.parts[0], 200, 0, 100)
+	checkPartArg(t, partArgs.parts[1], 300, 0, 100)
+
+	partArgs.initialize(500)
+	checkError(t, qi.Query(200, 7, partArgs))
+	checkPartArgListSize(t, partArgs, 2)
+	checkPartArg(t, partArgs.parts[0], 200, 0, 100)
+	checkPartArg(t, partArgs.parts[1], 300, 0, 100)
+
+	fmt.Println(qi.batches[:qi.batchesN])
+	partArgs.initialize(500)
+	checkError(t, qi.Query(200, 8, partArgs))
+	checkPartArgListSize(t, partArgs, 3)
+	checkPartArg(t, partArgs.parts[0], 200, 0, 100)
+	checkPartArg(t, partArgs.parts[1], 300, 0, 100)
+	checkPartArg(t, partArgs.parts[2], 400, 0, 100)
 }
 
 func newMockQueryIndex(topic string, maxPartitions int, m logger.IndexManager) *queryIndex {
@@ -270,5 +305,19 @@ func expectError(t testing.TB, expected error, err error) {
 	t.Helper()
 	if err != expected {
 		t.Fatalf("expected %v but got %v", expected, err)
+	}
+}
+
+func expectNumBatches(t testing.TB, n int, qi *queryIndex) {
+	t.Helper()
+	count := 0
+	for i := 0; i < len(qi.batches); i++ {
+		if qi.batches[i] == nil {
+			break
+		}
+		count++
+	}
+	if count != n {
+		t.Fatalf("expected query index to have %d batches but had %d: %+v", n, count, qi.batches[:count])
 	}
 }

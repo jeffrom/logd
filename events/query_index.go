@@ -76,7 +76,7 @@ func (r *queryIndex) Query(off uint64, messages int, res *partitionArgList) erro
 	if currPartOff < 0 {
 		currPartOff = 0
 	}
-	currSize := batch.size
+	collectedSize := batch.size
 	currPart := batch.partition
 
 	for collectedMessages < messages {
@@ -85,25 +85,36 @@ func (r *queryIndex) Query(off uint64, messages int, res *partitionArgList) erro
 		}
 		batch = r.batches[head]
 
-		if batch.partition > currPart {
-			res.add(currPart, currPartOff, currSize)
+		if batch.partition > currPart && !r.alreadyAdded(res, currPart, currPartOff, collectedSize) {
+			res.add(currPart, currPartOff, collectedSize)
 			currPart = batch.partition
 			currPartOff = 0
-			currSize = 0
+			collectedSize = 0
 		}
 
-		currSize += batch.size
+		collectedSize += batch.size
 		collectedMessages += batch.messages
 
 		head++
 	}
 
-	if currSize > 0 {
-		res.add(currPart, currPartOff, currSize)
+	if collectedSize > 0 && !r.alreadyAdded(res, currPart, currPartOff, collectedSize) {
+		res.add(currPart, currPartOff, collectedSize)
 	}
 	// fmt.Println(n, head, r.batchesN, len(r.batches))
 
 	return nil
+}
+
+func (r *queryIndex) alreadyAdded(res *partitionArgList, part uint64, off, size int) bool {
+	if r.batchesN == 0 || len(r.batches) == 0 || res.nparts == 0 {
+		return false
+	}
+	head := res.parts[res.nparts-1]
+	if head.offset == part {
+		return true
+	}
+	return false
 }
 
 func (r *queryIndex) Push(off, part uint64, size, messages int) error {
@@ -142,15 +153,24 @@ func (r *queryIndex) ensureBatches() {
 	}
 }
 
-func (r *queryIndex) pushBatch(off, part uint64, size, messages int) error {
+func (r *queryIndex) handleRotate(part uint64) error {
 	if _, ok := r.parts[part]; !ok {
-		if len(r.parts) >= r.maxPartitions-1 {
+		// fmt.Println("handleRotate", r.parts, len(r.parts), r.maxPartitions)
+		if len(r.parts) >= r.maxPartitions {
 			if err := r.rotate(part); err != nil {
 				return err
 			}
 		} else {
 			r.parts[part] = r.batchesN
 		}
+	}
+
+	return nil
+}
+
+func (r *queryIndex) pushBatch(off, part uint64, size, messages int) error {
+	if err := r.handleRotate(part); err != nil {
+		return err
 	}
 
 	i := r.batchesN
@@ -172,6 +192,7 @@ func (r *queryIndex) pushBatch(off, part uint64, size, messages int) error {
 
 func (r *queryIndex) rotate(newPart uint64) error {
 	minPart, minIdx := r.minPart()
+	// fmt.Println("rotate", minPart, minIdx)
 	copy(r.batches, r.batches[minIdx:])
 	for idx := range r.parts {
 		r.parts[idx] -= minIdx
@@ -205,7 +226,7 @@ func (r *queryIndex) minPart() (uint64, int) {
 		}
 	}
 
-	return finaln, finalidx
+	return finaln, finalidx + 1
 }
 
 func (r *queryIndex) writeIndex(part uint64) error {
@@ -267,17 +288,25 @@ func (r *queryIndex) readIndex(part uint64) error {
 	// r.batchesN = 0
 	for {
 		r.ensureBatches()
-		if r.batches[r.batchesN] == nil {
-			r.batches[r.batchesN] = &queryIndexBatch{}
+		batch := r.batches[r.batchesN]
+		if batch == nil {
+			batch = &queryIndexBatch{}
 		}
-		if _, err := r.readIndexBatch(br, r.batches[r.batchesN]); err != nil {
+		if _, err := r.readIndexBatch(br, batch); err != nil {
 			if err == io.EOF {
 				return nil
 			}
 			return err
 		}
-		fmt.Println("readIndex", r.batchesN, r.batches[r.batchesN])
+		if err := r.handleRotate(batch.partition); err != nil {
+			return err
+		}
+		// if _, ok := r.parts[batch.partition]; !ok {
+		// 	r.parts[batch.partition] = r.batchesN
+		// }
+		r.batches[r.batchesN] = batch
 		r.batchesN++
+		fmt.Println("readIndex", r.batchesN, batch)
 	}
 }
 

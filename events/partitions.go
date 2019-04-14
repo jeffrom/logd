@@ -222,9 +222,13 @@ func (pl *partitionArgList) String() string {
 }
 
 type partitionArgs struct {
+	// offset represents the partition offset. It should point to a partition
+	// file that can be loaded by the logger.
 	offset uint64
-	delta  int
-	limit  int
+	// delta is the offset position from the start of the partition file.
+	delta int
+	// limit is the amount of bytes to read from the partition.
+	limit int
 }
 
 func (pa *partitionArgs) String() string {
