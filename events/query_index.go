@@ -126,25 +126,29 @@ func (r *queryIndex) Push(off, part uint64, size, messages int) error {
 }
 
 func (r *queryIndex) findStart(off uint64) (int, bool) {
-	// fmt.Println("findStart", off)
-	for i := 0; i < r.batchesN; i++ {
-		batch := r.batches[i]
-
+	start := 0
+	stop := r.batchesN
+	mid := stop / 2
+	for start < stop {
+		batch := r.batches[mid]
+		// fmt.Println("searching for", off, ":", start, mid, stop, batch)
 		if batch.offset == off {
-			return i, true
+			return mid, true
 		}
 
-		queryOffset := batch.offset
-		// fmt.Println("findStart search", off, batch.offset, "(partition", batch.partition, ")", queryOffset)
-
-		if queryOffset > off {
-			break
+		if off < batch.offset {
+			stop = mid - 1
+		} else {
+			start = mid + 1
 		}
-		if queryOffset == off {
-			return i, true
-		}
+		mid = (start + stop) / 2
+		// fmt.Println("shifted window", start, mid, stop)
 	}
 
+	// fmt.Println("final check for", off, ":", mid, r.batches[mid])
+	if r.batches[mid] != nil && r.batches[mid].offset == off {
+		return mid, true
+	}
 	return -1, false
 }
 
