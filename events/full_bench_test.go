@@ -89,6 +89,7 @@ func benchmarkBatchFull(b *testing.B, conf *config.Config, fixturename string, t
 	if err := h.GoStart(); err != nil {
 		b.Fatal(err)
 	}
+	defer shutdownHandlers(b, h)
 	addr := h.servers[0].ListenAddr().String()
 	fixture := testhelper.LoadFixture(fixturename)
 
@@ -130,6 +131,7 @@ func benchmarkReadFull(b *testing.B, conf *config.Config) {
 	if err := h.GoStart(); err != nil {
 		b.Fatal(err)
 	}
+	defer shutdownHandlers(b, h)
 	addr := h.servers[0].ListenAddr().String()
 
 	fixture := testhelper.LoadFixture("words.txt")
@@ -186,4 +188,10 @@ func fillTopic(b *testing.B, conf *config.Config, h *Handlers, data []byte) {
 	}
 
 	w.Flush()
+}
+
+func shutdownHandlers(b *testing.B, h *Handlers) {
+	if err := h.Stop(); err != nil {
+		b.Fatal("shutdown failed:", err)
+	}
 }

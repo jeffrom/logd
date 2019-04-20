@@ -118,11 +118,8 @@ func (h *Handlers) Start() error {
 func (h *Handlers) PushRequest(ctx context.Context, req *protocol.Request) (*protocol.Response, error) {
 	if ok, _ := blockingReqs[req.Name]; ok {
 		return h.pushBlockingRequest(ctx, req)
-	} else {
-		return h.asyncQ.PushRequest(ctx, req)
-		// return h.asyncQ.handleRequest(req)
 	}
-	return nil, nil
+	return h.asyncQ.PushRequest(ctx, req)
 }
 
 func (h *Handlers) pushBlockingRequest(ctx context.Context, req *protocol.Request) (*protocol.Response, error) {

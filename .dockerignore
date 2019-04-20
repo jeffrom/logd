@@ -2,3 +2,7 @@
 /tmp
 /testdata/*
 */testdata/*
+!/testdata/*.golden
+!*/testdata/*.golden
+!/testdata/*.txt
+!*/testdata/*.txt

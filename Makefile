@@ -38,23 +38,23 @@ ls.tmp:
 
 .PHONY: deps
 deps:
-	@echo "Installing dep tool and dependencies..."
-	dep version || go get -u github.com/golang/dep/cmd/dep
-	dep ensure -v
-	go get github.com/wadey/gocovmerge
-	go get golang.org/x/tools/cmd/benchcmp
-	go get github.com/AlekSi/gocoverutil
+	# @echo "Installing dep tool and dependencies..."
+	# dep version || go get -u github.com/golang/dep/cmd/dep
+	# dep ensure -v
+	GO111MODULE=off go get github.com/wadey/gocovmerge
+	GO111MODULE=off go get golang.org/x/tools/cmd/benchcmp
+	GO111MODULE=off go get github.com/AlekSi/gocoverutil
 	mkdir -p report
 	mkdir -p integration_test/out
 
-.PHONY: deps.dep
-deps.dep:
-	@echo "Installing dep tool..."
-	go get -u github.com/golang/dep/cmd/dep
+# .PHONY: deps.dep
+# deps.dep:
+# 	@echo "Installing dep tool..."
+# 	go get -u github.com/golang/dep/cmd/dep
 
 .PHONY: build
 build:
-	go install -x -v ./...
+	go install -v ./...
 
 .PHONY: doc.serve
 doc.serve:

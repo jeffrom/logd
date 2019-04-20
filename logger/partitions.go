@@ -424,8 +424,14 @@ func (p *Partition) Reset() {
 
 func (p *Partition) String() string {
 	args := []interface{}{p.offset, p.size}
+	r := p.reader
 	s := "logger.Partition<offset: %d, size: %d"
-	if f, ok := p.reader.(*os.File); ok {
+	if lr, ok := r.(*io.LimitedReader); ok {
+		s += ", limit: %d"
+		args = append(args, lr.N)
+		r = lr.R
+	}
+	if f, ok := r.(*os.File); ok {
 		s += ", file: %s"
 		args = append(args, f.Name())
 	}
