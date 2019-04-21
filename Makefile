@@ -69,7 +69,7 @@ test: test.cover test.race
 
 .PHONY: test.race
 test.race:
-	go test -race $(PKGS)
+	GO111MODULE=on go test -race $(PKGS)
 
 .PHONY: test.cover
 # $(foreach pkg,$(WITHOUT_APPTEST),go test -outputdir=../report -cover ./$(pkg);)
@@ -78,7 +78,7 @@ test.cover:
 
 .PHONY: test.coverprofile
 test.coverprofile:
-	gocoverutil -coverprofile=cov.out test -covermode=count ./...
+	GO111MODULE=on gocoverutil -coverprofile=cov.out test -covermode=count ./...
 
 .PHONY: test.golden
 test.golden:
@@ -121,7 +121,7 @@ bench.ci:
 
 .PHONY: bench.race
 bench.race:
-	go test ./... -run ^$$ -bench . -benchmem -benchtime 2s -race
+	GO111MODULE=on go test ./... -run ^$$ -bench . -benchmem -benchtime 2s -race
 
 .PHONY: ci
 # ci: clean deps build lint.install test.coverprofile test.race test.integration.compile test.integration test.report lint test.report.summary
