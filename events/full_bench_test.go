@@ -125,25 +125,27 @@ func benchmarkBatchFull(b *testing.B, conf *config.Config, fixturename string, t
 
 	r := newRepeater(len(fixtures))
 
-	batch := protocol.NewBatch(conf)
-	buf := bytes.NewBuffer(fixtures[r.next()])
-	br := bufio.NewReader(buf)
-	if _, err := batch.ReadFrom(br); err != nil {
-		b.Fatal(err)
-	}
-
-	c, err := logd.Dial(addr)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer c.Close()
-
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		if _, err := c.Batch(batch); err != nil {
+	b.RunParallel(func(pb *testing.PB) {
+		batch := protocol.NewBatch(conf)
+		buf := bytes.NewBuffer(fixtures[r.next()])
+		br := bufio.NewReader(buf)
+		if _, err := batch.ReadFrom(br); err != nil {
 			b.Fatal(err)
 		}
-	}
+
+		c, err := logd.Dial(addr)
+		if err != nil {
+			b.Fatal(err)
+		}
+		defer c.Close()
+
+		for pb.Next() {
+			if _, err := c.Batch(batch); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
 }
 
 func benchmarkReadFull(b *testing.B, conf *config.Config, messages int) {
@@ -157,27 +159,29 @@ func benchmarkReadFull(b *testing.B, conf *config.Config, messages int) {
 	fixture := testhelper.LoadFixture("words.txt")
 	fillTopic(b, conf, h, fixture)
 
-	c, err := logd.Dial(addr)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer c.Close()
-
-	topic := []byte("default")
-
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, bs, err := c.ReadOffset(topic, 0, messages)
+	b.RunParallel(func(pb *testing.PB) {
+		c, err := logd.Dial(addr)
 		if err != nil {
 			b.Fatal(err)
 		}
+		defer c.Close()
 
-		for bs.Scan() {
+		topic := []byte("default")
+
+		for pb.Next() {
+			_, bs, err := c.ReadOffset(topic, 0, 3)
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			for bs.Scan() {
+			}
+			if err := bs.Error(); err != nil && err != io.EOF {
+				b.Fatal(err)
+			}
 		}
-		if err := bs.Error(); err != nil && err != io.EOF {
-			b.Fatal(err)
-		}
-	}
+	})
 }
 
 func fillTopic(b *testing.B, conf *config.Config, h *Handlers, data []byte) {
