@@ -108,10 +108,13 @@ func TestQueryIndexRotateSync(t *testing.T) {
 	partArgs := newPartitionArgList(500)
 
 	checkError(t, qi.Push(0, 0, 100, 1))
+	expectNumBatches(t, 1, qi)
+	// fmt.Println("before", qi.batches[0])
 	checkError(t, qi.writeIndex(0))
 
 	qi = newMockQueryIndex("default", maxParts, m)
 	checkError(t, qi.readIndex(0))
+	// fmt.Println("after", qi.batches[0])
 	expectNumBatches(t, 1, qi)
 
 	checkError(t, qi.Query(0, 1, partArgs))
@@ -120,6 +123,7 @@ func TestQueryIndexRotateSync(t *testing.T) {
 	// fmt.Printf("%+v\n", partArgs.parts[0])
 
 	checkError(t, qi.Push(100, 100, 100, 2))
+	expectNumBatches(t, 2, qi)
 
 	partArgs.initialize(500)
 	checkError(t, qi.Query(0, 1, partArgs))
@@ -145,10 +149,11 @@ func TestQueryIndexRotateSync(t *testing.T) {
 	checkPartArg(t, partArgs.parts[1], 100, 0, 100)
 
 	checkError(t, qi.Push(200, 200, 100, 3))
+	expectNumBatches(t, 3, qi)
 	checkError(t, qi.Push(300, 300, 100, 4))
 
+	// fmt.Println(qi.batchesN, qi.batches[:qi.batchesN])
 	expectNumBatches(t, 3, qi)
-	// fmt.Println(qi.batches[:qi.batchesN])
 	expectError(t, protocol.ErrNotFound, qi.Query(0, 1, partArgs))
 
 	partArgs.initialize(500)
@@ -168,6 +173,8 @@ func TestQueryIndexRotateSync(t *testing.T) {
 	checkPartArg(t, partArgs.parts[1], 200, 0, 100)
 
 	checkError(t, qi.Push(400, 400, 100, 2))
+	expectNumBatches(t, 3, qi)
+	// fmt.Println(qi.batchesN, qi.batches[:qi.batchesN])
 
 	expectError(t, protocol.ErrNotFound, qi.Query(100, 1, partArgs))
 
@@ -176,18 +183,22 @@ func TestQueryIndexRotateSync(t *testing.T) {
 	checkPartArgListSize(t, partArgs, 1)
 	checkPartArg(t, partArgs.parts[0], 200, 0, 100)
 
+	// fmt.Println("write 200")
 	checkError(t, qi.writeIndex(200))
+	// fmt.Println("write 300")
 	checkError(t, qi.writeIndex(300))
 	checkError(t, qi.writeIndex(400))
 	// t.Fatalf("welp, 200 didn't get written for some reason")
 
 	qi = newMockQueryIndex("default", maxParts, m)
 	checkError(t, qi.readIndex(200))
+	expectNumBatches(t, 1, qi)
 	checkError(t, qi.readIndex(300))
+	expectNumBatches(t, 2, qi)
 	checkError(t, qi.readIndex(400))
+	expectNumBatches(t, 3, qi)
 
 	partArgs.initialize(500)
-	expectNumBatches(t, 3, qi)
 	expectError(t, protocol.ErrNotFound, qi.Query(0, 1, partArgs))
 	expectError(t, protocol.ErrNotFound, qi.Query(0, 100, partArgs))
 

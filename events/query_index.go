@@ -131,7 +131,7 @@ func (r *queryIndex) ensureBatches(n int) {
 
 func (r *queryIndex) pushBatch(off, part uint64, size, messages int) error {
 	if _, ok := r.parts[part]; !ok {
-		if len(r.parts) >= r.maxPartitions {
+		if len(r.parts) >= r.maxPartitions-1 {
 			if err := r.rotate(part); err != nil {
 				return err
 			}
@@ -158,7 +158,9 @@ func (r *queryIndex) pushBatch(off, part uint64, size, messages int) error {
 }
 
 func (r *queryIndex) rotate(newPart uint64) error {
+	fmt.Println("before rotate", r.batches[:r.batchesN])
 	minPart, minIdx := r.minPart()
+	fmt.Println("removing part", minPart)
 	copy(r.batches, r.batches[minIdx:])
 	for idx := range r.parts {
 		r.parts[idx] -= minIdx
@@ -170,7 +172,9 @@ func (r *queryIndex) rotate(newPart uint64) error {
 		return err
 	}
 
+	fmt.Println("adding part", newPart)
 	r.parts[newPart] = r.batchesN
+	fmt.Println("after rotate", r.batches[:r.batchesN])
 	return nil
 }
 
@@ -253,18 +257,18 @@ func (r *queryIndex) readIndex(part uint64) error {
 	br := bufio.NewReader(rdr)
 	r.batchesN = 0
 	for i := 0; i < r.maxPartitions; i++ {
-		// prevents a panic but not strictly necessary
 		r.ensureBatches(i + 1000)
-		if r.batches[i] == nil {
-			break
-		}
-		// fmt.Println("readIndex", r.batches[i])
-		if _, err := r.readIndexBatch(br, r.batches[i]); err != nil {
+
+		// fmt.Println("readIndex", i)
+		batch := &queryIndexBatch{}
+		if _, err := r.readIndexBatch(br, batch); err != nil {
+			// fmt.Println("error reading index batch:", err, batch)
 			if err == io.EOF {
 				return nil
 			}
 			return err
 		}
+		r.batches[i] = batch
 		r.batchesN++
 	}
 	return nil
@@ -273,29 +277,33 @@ func (r *queryIndex) readIndex(part uint64) error {
 func (r *queryIndex) writeIndexBatch(w io.Writer, buf []byte, batch *queryIndexBatch) (int, error) {
 	var total int
 
-	binary.LittleEndian.PutUint64(buf, uint64(batch.offset))
-	n := 8
+	// binary.LittleEndian.PutUint64(buf, uint64(batch.offset))
+	n := binary.PutUvarint(buf, batch.offset)
+	// n := 8
 	total += n
 	if _, err := w.Write(buf[:n]); err != nil {
 		return total, err
 	}
 
-	binary.LittleEndian.PutUint64(buf, uint64(batch.partition))
-	n = 8
+	// binary.LittleEndian.PutUint64(buf, uint64(batch.partition))
+	n = binary.PutUvarint(buf, batch.partition)
+	// n = 8
 	total += n
 	if _, err := w.Write(buf[:n]); err != nil {
 		return total, err
 	}
 
-	binary.LittleEndian.PutUint64(buf, uint64(batch.size))
-	n = 8
+	// binary.LittleEndian.PutUint64(buf, uint64(batch.size))
+	n = binary.PutVarint(buf, int64(batch.size))
+	// n = 8
 	total += n
 	if _, err := w.Write(buf[:n]); err != nil {
 		return total, err
 	}
 
-	binary.LittleEndian.PutUint64(buf, uint64(batch.messages))
-	n = 8
+	// binary.LittleEndian.PutUint64(buf, uint64(batch.messages))
+	n = binary.PutVarint(buf, int64(batch.messages))
+	// n = 8
 	total += n
 	if _, err := w.Write(buf[:n]); err != nil {
 		return total, err
