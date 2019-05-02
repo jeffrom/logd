@@ -218,7 +218,7 @@ type partitionArgList struct {
 }
 
 func (pl *partitionArgList) String() string {
-	return fmt.Sprintf("%s", pl.parts[:pl.nparts])
+	return fmt.Sprintf("(n: %d) %s", pl.nbatches, pl.parts[:pl.nparts])
 }
 
 type partitionArgs struct {

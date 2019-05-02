@@ -278,6 +278,7 @@ func (q *eventQ) handleRead(req *protocol.Request) (*protocol.Response, error) {
 	cr := req.Response.ClientResponse
 	cr.SetOffset(readreq.Offset)
 	cr.SetBatches(partArgs.nbatches)
+	// log.Panicf("%s %d", partArgs, partArgs.nbatches)
 	_, err = req.WriteResponse(resp, cr)
 	if err != nil {
 		return errResponse(q.conf, req, resp, err)

@@ -170,7 +170,8 @@ func (c *Client) setRW(rw io.ReadWriteCloser) {
 
 	if c.sr == nil {
 		c.r = rw
-		c.br = bufio.NewReaderSize(rw, c.conf.BatchSize)
+		// c.br = bufio.NewReaderSize(rw, c.conf.BatchSize)
+		c.br = bufio.NewReaderSize(internal.NewReadLogger("client READ", rw, 3), c.conf.BatchSize)
 	}
 
 	if c.scloser == nil {
@@ -256,6 +257,7 @@ func (c *Client) readBatches(nbatches int, r *bufio.Reader) (int64, error) {
 	var total int64
 	var n int64
 	var err error
+	c.batchbuf.Reset()
 	for i := 0; i < nbatches; i++ {
 		c.batch.Reset()
 		n, err = c.batch.ReadFrom(r)
@@ -297,6 +299,7 @@ func (c *Client) ReadOffset(topic []byte, offset uint64, limit int) (int, *proto
 	if _, err := c.readBatches(nbatches, c.br); err != nil {
 		return nbatches, nil, err
 	}
+	// fmt.Printf("%q\n", c.batchbuf.Bytes())
 	c.batchbr.Reset(c.batchbuf)
 	c.bs.Reset(c.batchbr)
 	internal.IgnoreError(c.conf.Verbose, c.SetReadDeadline(time.Now().Add(c.readTimeout)))

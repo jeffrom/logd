@@ -57,7 +57,18 @@ func BenchmarkReadFull(b *testing.B) {
 	conf.PartitionSize = conf.MaxBatchSize * 100
 	conf.Host = ":0"
 
-	benchmarkReadFull(b, conf)
+	benchmarkReadFull(b, conf, 3)
+}
+
+func BenchmarkReadFull10000(b *testing.B) {
+	conf := testhelper.DefaultConfig(testing.Verbose())
+	conf.Timeout = 5 * time.Second
+	conf.IdleTimeout = 5 * time.Second
+	conf.MaxBatchSize = 65535
+	conf.PartitionSize = conf.MaxBatchSize * 100
+	conf.Host = ":0"
+
+	benchmarkReadFull(b, conf, 10000)
 }
 
 func BenchmarkReadFull4(b *testing.B) {
@@ -69,7 +80,7 @@ func BenchmarkReadFull4(b *testing.B) {
 	conf.PartitionSize = conf.MaxBatchSize * 100
 	conf.Host = ":0"
 
-	benchmarkReadFull(b, conf)
+	benchmarkReadFull(b, conf, 3)
 }
 
 type repeater struct {
@@ -135,7 +146,7 @@ func benchmarkBatchFull(b *testing.B, conf *config.Config, fixturename string, t
 	}
 }
 
-func benchmarkReadFull(b *testing.B, conf *config.Config) {
+func benchmarkReadFull(b *testing.B, conf *config.Config, messages int) {
 	h := NewHandlers(conf)
 	if err := h.GoStart(); err != nil {
 		b.Fatal(err)
@@ -156,7 +167,7 @@ func benchmarkReadFull(b *testing.B, conf *config.Config) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, bs, err := c.ReadOffset(topic, 0, 3)
+		_, bs, err := c.ReadOffset(topic, 0, messages)
 		if err != nil {
 			b.Fatal(err)
 		}

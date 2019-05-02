@@ -21,7 +21,7 @@ type BatchScanner struct {
 func NewBatchScanner(conf *config.Config, r io.Reader) *BatchScanner {
 	bs := &BatchScanner{
 		r:     r,
-		br:    bufio.NewReader(r),
+		br:    bufio.NewReaderSize(r, conf.MaxBatchSize),
 		batch: NewBatch(conf),
 	}
 	if conf != nil {
@@ -47,9 +47,6 @@ func (s *BatchScanner) Scan() bool {
 	s.batch.Reset()
 	n, err := s.batch.ReadFrom(s.br)
 	s.scanned += int(n)
-	// if err != nil {
-	// 	err = errors.Wrap(ErrInvalidOffset, err.Error())
-	// }
 	s.err = err
 	return err == nil
 }

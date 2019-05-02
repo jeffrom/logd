@@ -2,7 +2,6 @@ package events
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -47,15 +46,6 @@ func newQueryIndex(workDir string, topic string, maxPartitions int) *queryIndex 
 	}
 }
 
-func (r *queryIndex) String() string {
-	b := &bytes.Buffer{}
-	for i := 0; i < r.batchesN; i++ {
-		b.WriteString(r.batches[i].String())
-		b.WriteString("\n")
-	}
-	return b.String()
-}
-
 func (r *queryIndex) reset() {
 	r.batchesN = 0
 }
@@ -70,52 +60,39 @@ func (r *queryIndex) Query(off uint64, messages int, res *partitionArgList) erro
 	}
 
 	batch := r.batches[n]
+	res.nbatches++
 	head := n + 1
 	collectedMessages := batch.messages
 	currPartOff := int(batch.offset - batch.partition)
-	if currPartOff < 0 {
-		currPartOff = 0
-	}
-	collectedSize := batch.size
+	currSize := batch.size
 	currPart := batch.partition
 
-	// fmt.Println("Query", off, messages, n)
 	for collectedMessages < messages {
 		if head >= r.batchesN { // we're out of batches
 			break
 		}
 		batch = r.batches[head]
+		res.nbatches++
 
-		if batch.partition > currPart && !r.alreadyAdded(res, currPart, currPartOff, collectedSize) {
-			res.add(currPart, currPartOff, collectedSize)
+		if batch.partition > currPart {
+			res.add(currPart, currPartOff, currSize)
 			currPart = batch.partition
 			currPartOff = 0
-			collectedSize = 0
+			currSize = 0
 		}
 
-		collectedSize += batch.size
+		currSize += batch.size
 		collectedMessages += batch.messages
 
 		head++
 	}
 
-	if collectedSize > 0 && !r.alreadyAdded(res, currPart, currPartOff, collectedSize) {
-		res.add(currPart, currPartOff, collectedSize)
+	if currSize > 0 {
+		res.add(currPart, currPartOff, currSize)
 	}
-	// fmt.Println(n, head, r.batchesN, len(r.batches), res)
+	// fmt.Println(n, head, r.batchesN, len(r.batches))
 
 	return nil
-}
-
-func (r *queryIndex) alreadyAdded(res *partitionArgList, part uint64, off, size int) bool {
-	if r.batchesN == 0 || len(r.batches) == 0 || res.nparts == 0 {
-		return false
-	}
-	head := res.parts[res.nparts-1]
-	if head.offset == part {
-		return true
-	}
-	return false
 }
 
 func (r *queryIndex) Push(off, part uint64, size, messages int) error {
@@ -126,33 +103,30 @@ func (r *queryIndex) Push(off, part uint64, size, messages int) error {
 }
 
 func (r *queryIndex) findStart(off uint64) (int, bool) {
-	start := 0
-	stop := r.batchesN
-	mid := stop / 2
-	for start < stop {
-		batch := r.batches[mid]
-		// fmt.Println("searching for", off, ":", start, mid, stop, batch)
+	for i := 0; i < r.batchesN; i++ {
+		batch := r.batches[i]
+		if batch.offset > off {
+			break
+		}
 		if batch.offset == off {
-			return mid, true
+			return i, true
 		}
-
-		if off < batch.offset {
-			stop = mid - 1
-		} else {
-			start = mid + 1
-		}
-		mid = (start + stop) / 2
-		// fmt.Println("shifted window", start, mid, stop)
 	}
 
-	// fmt.Println("final check for", off, ":", mid, r.batches[mid])
-	if r.batches[mid] != nil && r.batches[mid].offset == off {
-		return mid, true
-	}
 	return -1, false
 }
 
-func (r *queryIndex) ensureBatches() {
+func (r *queryIndex) pushBatch(off, part uint64, size, messages int) error {
+	if _, ok := r.parts[part]; !ok {
+		if len(r.parts) >= r.maxPartitions {
+			if err := r.rotate(part); err != nil {
+				return err
+			}
+		} else {
+			r.parts[part] = r.batchesN
+		}
+	}
+
 	i := r.batchesN
 	if cap(r.batches) <= i {
 		nextSize := 1000
@@ -164,30 +138,6 @@ func (r *queryIndex) ensureBatches() {
 		r.batches = batches
 		// fmt.Println("grew to", len(r.batches))
 	}
-}
-
-func (r *queryIndex) handleAddPartition(part uint64) error {
-	if _, ok := r.parts[part]; !ok {
-		// fmt.Println("handleAddPartition", r.parts, len(r.parts), r.maxPartitions)
-		if len(r.parts) >= r.maxPartitions {
-			if err := r.rotate(part); err != nil {
-				return err
-			}
-		} else {
-			r.parts[part] = r.batchesN
-		}
-	}
-
-	return nil
-}
-
-func (r *queryIndex) pushBatch(off, part uint64, size, messages int) error {
-	if err := r.handleAddPartition(part); err != nil {
-		return err
-	}
-
-	i := r.batchesN
-	r.ensureBatches()
 
 	batch := r.batches[i]
 	if batch == nil {
@@ -198,7 +148,6 @@ func (r *queryIndex) pushBatch(off, part uint64, size, messages int) error {
 	batch.size = size
 	batch.messages = messages
 	r.batches[i] = batch
-	// fmt.Println("pushBatch", batch)
 
 	r.batchesN++
 	return nil
@@ -206,7 +155,6 @@ func (r *queryIndex) pushBatch(off, part uint64, size, messages int) error {
 
 func (r *queryIndex) rotate(newPart uint64) error {
 	minPart, minIdx := r.minPart()
-	// fmt.Println("rotate", minPart, minIdx)
 	copy(r.batches, r.batches[minIdx:])
 	for idx := range r.parts {
 		r.parts[idx] -= minIdx
@@ -240,7 +188,7 @@ func (r *queryIndex) minPart() (uint64, int) {
 		}
 	}
 
-	return finaln, finalidx + 1
+	return finaln, finalidx
 }
 
 func (r *queryIndex) writeIndex(part uint64) error {
@@ -299,44 +247,23 @@ func (r *queryIndex) readIndex(part uint64) error {
 	defer rdr.Close()
 
 	br := bufio.NewReader(rdr)
-	// r.batchesN = 0
-	for {
-		r.ensureBatches()
-		batch := r.batches[r.batchesN]
-		if batch == nil {
-			batch = &queryIndexBatch{}
+	r.batchesN = 0
+	for i := 0; i < r.maxPartitions; i++ {
+		if r.batches[i] == nil {
+			break
 		}
-		if _, err := r.readIndexBatch(br, batch); err != nil {
+		// fmt.Println("readIndex", r.batches[i])
+		if _, err := r.readIndexBatch(br, r.batches[i]); err != nil {
 			if err == io.EOF {
 				return nil
 			}
 			return err
 		}
-		if err := r.handleAddPartition(batch.partition); err != nil {
-			return err
-		}
-		r.batches[r.batchesN] = batch
 		r.batchesN++
-		// fmt.Println("readIndex", r.batchesN, batch)
 	}
+	return nil
 }
 
-func (r *queryIndex) zeroBuf(buf []byte) {
-	for i := range buf {
-		buf[i] = '0'
-	}
-}
-
-// func (r *queryIndex) writeZero(w io.Writer, n int) error {
-// 	for i := 0; i < n; i++ {
-// 		if _, err := w.Write([]byte(0)); err != nil {
-// 			return err
-// 		}
-// 	}
-// 	return nil
-// }
-
-// TODO this and the read needs to read/write a known size
 func (r *queryIndex) writeIndexBatch(w io.Writer, buf []byte, batch *queryIndexBatch) (int, error) {
 	var total int
 
