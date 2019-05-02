@@ -170,8 +170,8 @@ func (c *Client) setRW(rw io.ReadWriteCloser) {
 
 	if c.sr == nil {
 		c.r = rw
-		// c.br = bufio.NewReaderSize(rw, c.conf.BatchSize)
-		c.br = bufio.NewReaderSize(internal.NewReadLogger("client READ", rw, 3), c.conf.BatchSize)
+		c.br = bufio.NewReaderSize(rw, c.conf.BatchSize)
+		// c.br = bufio.NewReaderSize(internal.NewReadLogger("client READ", rw, 3), c.conf.BatchSize)
 	}
 
 	if c.scloser == nil {
