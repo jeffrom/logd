@@ -116,6 +116,19 @@ func (r *queryIndex) findStart(off uint64) (int, bool) {
 	return -1, false
 }
 
+func (r *queryIndex) ensureBatches(n int) {
+	if cap(r.batches) <= n {
+		nextSize := 1000
+		if cap(r.batches) > 0 {
+			nextSize = cap(r.batches) * 2
+		}
+		batches := make([]*queryIndexBatch, nextSize)
+		copy(batches, r.batches)
+		r.batches = batches
+		// fmt.Println("grew to", len(r.batches))
+	}
+}
+
 func (r *queryIndex) pushBatch(off, part uint64, size, messages int) error {
 	if _, ok := r.parts[part]; !ok {
 		if len(r.parts) >= r.maxPartitions {
@@ -128,16 +141,7 @@ func (r *queryIndex) pushBatch(off, part uint64, size, messages int) error {
 	}
 
 	i := r.batchesN
-	if cap(r.batches) <= i {
-		nextSize := 1000
-		if cap(r.batches) > 0 {
-			nextSize = cap(r.batches) * 2
-		}
-		batches := make([]*queryIndexBatch, nextSize)
-		copy(batches, r.batches)
-		r.batches = batches
-		// fmt.Println("grew to", len(r.batches))
-	}
+	r.ensureBatches(i)
 
 	batch := r.batches[i]
 	if batch == nil {
@@ -249,6 +253,8 @@ func (r *queryIndex) readIndex(part uint64) error {
 	br := bufio.NewReader(rdr)
 	r.batchesN = 0
 	for i := 0; i < r.maxPartitions; i++ {
+		// prevents a panic but not strictly necessary
+		r.ensureBatches(i + 1000)
 		if r.batches[i] == nil {
 			break
 		}
@@ -267,25 +273,29 @@ func (r *queryIndex) readIndex(part uint64) error {
 func (r *queryIndex) writeIndexBatch(w io.Writer, buf []byte, batch *queryIndexBatch) (int, error) {
 	var total int
 
-	n := binary.PutUvarint(buf, batch.offset)
+	binary.LittleEndian.PutUint64(buf, uint64(batch.offset))
+	n := 8
 	total += n
 	if _, err := w.Write(buf[:n]); err != nil {
 		return total, err
 	}
 
-	n = binary.PutUvarint(buf, batch.partition)
+	binary.LittleEndian.PutUint64(buf, uint64(batch.partition))
+	n = 8
 	total += n
 	if _, err := w.Write(buf[:n]); err != nil {
 		return total, err
 	}
 
-	n = binary.PutVarint(buf, int64(batch.size))
+	binary.LittleEndian.PutUint64(buf, uint64(batch.size))
+	n = 8
 	total += n
 	if _, err := w.Write(buf[:n]); err != nil {
 		return total, err
 	}
 
-	n = binary.PutVarint(buf, int64(batch.messages))
+	binary.LittleEndian.PutUint64(buf, uint64(batch.messages))
+	n = 8
 	total += n
 	if _, err := w.Write(buf[:n]); err != nil {
 		return total, err

@@ -3,6 +3,8 @@
 # TODO
 
 - [ ] make offset an int64
+- [ ] test that events/events returns the correct number of batches when there
+  is more than one
 - [ ] configuration to limit the number of topics. whitelist
 - [ ] writer backfill (see interface in client/state.go). there's already a
       simple implementation.
