@@ -25,7 +25,6 @@ jobs:
           keys:
             - v2-package-cache
 
-
       # specify any bash command here prefixed with `run: `
       - run: make ci
 
@@ -36,3 +35,7 @@ jobs:
           paths:
             - /go/pkg
             - /go/bin
+
+      - store_artifacts:
+          path: /go/src/github.com/jeffrom/logd/report/benchcmp.out
+          destination: benchcmp-output
