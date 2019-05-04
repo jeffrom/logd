@@ -18,16 +18,10 @@ set -u
 
 cd "$( cd "$(dirname "$0")" ; pwd )/../"
 
-set -x
-
 rotate() {
     fullpath="$1"
     filebase="$(basename "$1")"
     filedir="$(dirname "$1")"
-
-    if [[ ! -d "$filedir" ]]; then
-        return
-    fi
 
     nums=()
     while read -r f; do
@@ -35,19 +29,17 @@ rotate() {
         nums+=("$num")
     done < <(find "./${filedir}" -name "*.${filebase}.*")
 
-    if [[ ${#nums[@]} -eq 0 ]]; then
-        return
+    if [[ ${#nums[@]} -gt 0 ]]; then
+        IFS=$'\n' sorted=($(sort -r <<<"${nums[*]}"))
+        # XXX this doesnt work in the CI container
+        # unset IFS
+
+        # echo $sorted
+        for n in ${sorted[*]}; do
+            next=$((n+1))
+            mv "${fullpath}.$n" "${fullpath}.$next"
+        done
     fi
-
-    IFS=$'\n' sorted=($(sort -r <<<"${nums[*]}"))
-    # XXX this doesnt work in the CI container
-    # unset IFS
-
-    # echo $sorted
-    for n in ${sorted[*]}; do
-        next=$((n+1))
-        mv "${fullpath}.$n" "${fullpath}.$next"
-    done
 
     if [[ -e "${fullpath}" ]]; then
         mv "${fullpath}" "${fullpath}.1"

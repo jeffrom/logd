@@ -13,3 +13,4 @@ cache:
     directories:
         # - $GOPATH/github.com/jeffrom/logd/vendor
         - $GOPATH/bin
+        - $GOPATH/pkg
