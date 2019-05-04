@@ -15,7 +15,8 @@ if grep "docker" /proc/1/cgroup > /dev/null; then
 fi
 
 if ! git diff-index --quiet HEAD --; then
-    echo "Please commit all changes before using this command."
+    echo "Please commit all changes before using this command. Changes:"
+    git diff
     exit 1
 fi
 
