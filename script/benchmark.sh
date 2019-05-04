@@ -18,9 +18,11 @@ rotate() {
         nums+=("$num")
     done < <(find "./${filedir}" -name "*.${filebase}.*")
 
-    IFS=$'\n' sorted=($(sort -r <<<"${nums[*]}"))
-    # XXX this doesnt work in the CI container
-    # unset IFS
+    if [[ ${#nums[@]} -gt 0 ]]; then
+        IFS=$'\n' sorted=($(sort -r <<<"${nums[*]}"))
+        # XXX this doesnt work in the CI container
+        # unset IFS
+    fi
 
     # echo $sorted
     for n in ${sorted[*]}; do
