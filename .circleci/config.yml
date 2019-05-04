@@ -30,13 +30,12 @@ jobs:
 
       # - run: sudo chmod -R 777 /go/pkg
       # - run: sudo chmod -R 777 /go/bin
-      - run: sudo chown -R circle /go/pkg
-      - run: sudo chown -R circle /go/bin
       - save_cache:
           key: v4-package-cache
           paths:
-            - /go/pkg
-            - /go/bin
+            - ~/.cache/go-build
+            # - /go/pkg
+            # - /go/bin
 
       - store_artifacts:
           path: /go/src/github.com/jeffrom/logd/report/benchcmp.out
