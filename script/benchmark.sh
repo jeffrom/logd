@@ -4,6 +4,7 @@ set -eo pipefail
 package="${1:-...}"
 benchtime="${BENCHTIME:-1s}"
 benchmarks="${BENCH:-.}"
+go111module="${GO111MODULE:-on}"
 set -u
 
 cd "$( cd "$(dirname "$0")" ; pwd )/../"
@@ -53,7 +54,7 @@ set +e
 set -e
 
 set -x
-go test ./"$package" -run="^$" -bench="$benchmarks" \
+GO111MODULE="$go111module" go test ./"$package" -run="^$" -bench="$benchmarks" \
     -benchmem \
     -benchtime="$benchtime" \
     | tee -a report/bench.out
