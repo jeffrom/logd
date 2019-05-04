@@ -22,15 +22,15 @@ jobs:
       - checkout
 
       - restore_cache:
-        keys:
-          - v1-package-cache
+          keys:
+            - v1-package-cache
 
 
       # specify any bash command here prefixed with `run: `
       - run: make ci
 
       - save_cache:
-        key: v1-package-cache
-        paths:
-          - /go/pkg
-          - /go/bin
+          key: v1-package-cache
+          paths:
+            - /go/pkg
+            - /go/bin
