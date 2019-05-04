@@ -1,0 +1,26 @@
+# vi: ft=dockerfile
+FROM golang:1.12 as builder
+
+RUN mkdir /build
+WORKDIR /build
+
+COPY go.mod /build/
+COPY go.sum /build/
+RUN go mod download
+
+COPY . /build
+RUN CGO_ENABLED=0 go build -o log-cli.bin ./cmd/log-cli
+
+FROM alpine
+
+RUN addgroup loguser && \
+    adduser -S -D -H -h /logd -G loguser loguser && \
+    mkdir /log-cli && \
+    chown loguser:loguser /log-cli
+USER loguser
+
+COPY --from=builder /build/log-cli.bin /log-cli/log-cli
+
+WORKDIR /log-cli
+
+ENTRYPOINT ["./log-cli"]

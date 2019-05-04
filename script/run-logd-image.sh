@@ -2,11 +2,15 @@
 set -exo pipefail
 
 tag="${TAG:-unstable}"
-workdir="${LOCAL_WORKDIR:-logs}"
+volume="${VOLUME:-logs}"
 image_workdir="${WORKDIR:-/opt/logd}"
+port="${PORT:-1774}"
+http_port="${HTTP_PORT:-1775}"
+
 set -u
 
 docker run --rm \
-    --volume "$workdir":"$image_workdir" \
-    --publish 1774:1774 \
+    --volume "$volume":"$image_workdir" \
+    --publish "$port":"$port" \
+    --publish "$http_port":"$http_port" \
     logd/logd:"$tag" --workdir "$image_workdir" "$@"

@@ -1,6 +1,10 @@
 ./script/
 ./logs/
 /tmp
+*.pprof
+*.out
+./vendor/
+./build/
 /testdata/*
 */testdata/*
 !/testdata/*.golden

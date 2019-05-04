@@ -18,11 +18,11 @@
 - [ ] test case where scanner state has a single message in a batch, with all
       others in subsequent batches, and other such cases
 - [ ] scale reads better
-  - remove unneccessary io
+  - [X] remove unneccessary io
   - for many connections with the right config settings (limited topics,
     partitions / topic that fits in memory), try mmap
   - some combo of mmap and regular fs access
-  - currently 2 sets of fs reads per operation (1 to validate, 1 to stream to
+  - [X] currently 2 sets of fs reads per operation (1 to validate, 1 to stream to
     client), and numerous calls to stat() that could be kept in app state
   - also currently one goroutine accessing fs per topic so there's a lot of
     blocking with many connections. would be better to have many goroutines
