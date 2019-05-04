@@ -109,7 +109,7 @@ benchcmp:
 
 .PHONY: bench.compare
 bench.compare:
-	./script/compare_benchmarks.sh
+	BENCHTIME=5s ./script/compare_benchmarks.sh
 
 .PHONY: bench.race
 bench.race:
