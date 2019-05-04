@@ -220,8 +220,13 @@ func (r *queryIndex) writeIndex(part uint64) error {
 	bw := bufio.NewWriter(w)
 
 	start, end := r.partBounds(part)
-	// fmt.Println("writing index at", part, ", from", start, r.batches[start], "to", end, r.batches[end-1])
+	// fmt.Println("writing index at", part, ", from", start, r.batches[start], "to", end, r.batches[end])
 	for i := start; i < end; i++ {
+		// fmt.Println("writeIndex iteration", i, r.batches[i])
+		if r.batches[i].partition != part {
+			// fmt.Println("writeIndex done")
+			break
+		}
 		if _, err := r.writeIndexBatch(bw, buf, r.batches[i]); err != nil {
 			return err
 		}
@@ -243,7 +248,7 @@ func (r *queryIndex) partBounds(part uint64) (int, int) {
 			continue
 		}
 		if batch.partition > part {
-			end = i
+			end = i + 1
 			break
 		}
 		if batch.partition != part {
@@ -265,18 +270,19 @@ func (r *queryIndex) readIndex(part uint64) error {
 	defer rdr.Close()
 
 	br := bufio.NewReader(rdr)
-	for i := 0; i < r.maxPartitions; i++ {
-		r.ensureBatches(i + 1000)
+	for {
+		r.ensureBatches(r.batchesN + 1)
 
-		// fmt.Println("readIndex", i)
+		// fmt.Println("readIndex iteration", r.batchesN)
 		batch := &queryIndexBatch{}
 		if _, err := r.readIndexBatch(br, batch); err != nil {
-			// fmt.Println("error reading index batch:", err, batch)
+			// fmt.Println("error reading index batch:", err)
 			if err == io.EOF {
 				return nil
 			}
 			return err
 		}
+		// fmt.Println("readIndex success", batch)
 
 		if err := r.handleAddPartition(part); err != nil {
 			return err
@@ -284,7 +290,6 @@ func (r *queryIndex) readIndex(part uint64) error {
 		r.batches[r.batchesN] = batch
 		r.batchesN++
 	}
-	return nil
 }
 
 func (r *queryIndex) writeIndexBatch(w io.Writer, buf []byte, batch *queryIndexBatch) (int, error) {

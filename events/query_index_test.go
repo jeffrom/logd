@@ -3,7 +3,6 @@ package events
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"io"
 	"os"
 	"testing"
@@ -106,7 +105,6 @@ func TestQueryIndexRotateSync(t *testing.T) {
 
 	m := newMockIndexManager()
 	qi := newMockQueryIndex("default", maxParts, m)
-	partArgs := newPartitionArgList(500)
 
 	checkError(t, qi.Push(0, 0, 100, 1))
 	expectNumBatches(t, 1, qi)
@@ -118,6 +116,7 @@ func TestQueryIndexRotateSync(t *testing.T) {
 	// fmt.Println("after", qi.batches[0])
 	expectNumBatches(t, 1, qi)
 
+	partArgs := newPartitionArgList(500)
 	checkError(t, qi.Query(0, 1, partArgs))
 	checkPartArgListSize(t, partArgs, 1)
 	checkPartArg(t, partArgs.parts[0], 0, 0, 100)
@@ -184,7 +183,7 @@ func TestQueryIndexRotateSync(t *testing.T) {
 	checkPartArgListSize(t, partArgs, 1)
 	checkPartArg(t, partArgs.parts[0], 200, 0, 100)
 
-	fmt.Println("write 200", m)
+	// fmt.Println("write 200", m)
 	// fmt.Println(qi.batchesN, qi.batches[:qi.batchesN])
 	checkError(t, qi.writeIndex(200))
 	// fmt.Println("write 300", m)
@@ -233,6 +232,26 @@ func TestQueryIndexRotateSync(t *testing.T) {
 	checkPartArg(t, partArgs.parts[0], 200, 0, 100)
 	checkPartArg(t, partArgs.parts[1], 300, 0, 100)
 	checkPartArg(t, partArgs.parts[2], 400, 0, 100)
+}
+
+func TestQueryIndexMultiBatch(t *testing.T) {
+	maxParts := 3
+
+	m := newMockIndexManager()
+	qi := newMockQueryIndex("default", maxParts, m)
+
+	checkError(t, qi.Push(0, 0, 100, 1))
+	expectNumBatches(t, 1, qi)
+	checkError(t, qi.Push(67, 0, 100, 1))
+	expectNumBatches(t, 2, qi)
+	checkError(t, qi.writeIndex(0))
+
+	qi = newMockQueryIndex("default", maxParts, m)
+	checkError(t, qi.readIndex(0))
+	expectNumBatches(t, 2, qi)
+
+	checkError(t, qi.Push(102, 0, 100, 1))
+	expectNumBatches(t, 3, qi)
 }
 
 func newMockQueryIndex(topic string, maxPartitions int, m logger.IndexManager) *queryIndex {
