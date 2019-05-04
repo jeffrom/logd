@@ -3,6 +3,7 @@ package events
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"testing"
@@ -183,13 +184,15 @@ func TestQueryIndexRotateSync(t *testing.T) {
 	checkPartArgListSize(t, partArgs, 1)
 	checkPartArg(t, partArgs.parts[0], 200, 0, 100)
 
-	// fmt.Println("write 200")
+	fmt.Println("write 200", m)
+	// fmt.Println(qi.batchesN, qi.batches[:qi.batchesN])
 	checkError(t, qi.writeIndex(200))
-	// fmt.Println("write 300")
+	// fmt.Println("write 300", m)
 	checkError(t, qi.writeIndex(300))
 	checkError(t, qi.writeIndex(400))
 	// t.Fatalf("welp, 200 didn't get written for some reason")
 
+	// fmt.Println("newMockQueryIndex")
 	qi = newMockQueryIndex("default", maxParts, m)
 	checkError(t, qi.readIndex(200))
 	expectNumBatches(t, 1, qi)
@@ -206,6 +209,8 @@ func TestQueryIndexRotateSync(t *testing.T) {
 	checkError(t, qi.Query(200, 1, partArgs))
 	checkPartArgListSize(t, partArgs, 1)
 	checkPartArg(t, partArgs.parts[0], 200, 0, 100)
+
+	partArgs.initialize(500)
 	checkError(t, qi.Query(200, 3, partArgs))
 	checkPartArgListSize(t, partArgs, 1)
 	checkPartArg(t, partArgs.parts[0], 200, 0, 100)
@@ -257,6 +262,7 @@ func newMockIndexManager() *mockIndexManager {
 }
 
 func (m *mockIndexManager) GetIndex(topic string, part uint64) (io.ReadWriteCloser, error) {
+	fmt.Println("GetIndex", topic, part)
 	parts, ok := m.indexes[topic]
 	if !ok {
 		m.indexes[topic] = make(map[uint64]*mockFile)
@@ -265,6 +271,7 @@ func (m *mockIndexManager) GetIndex(topic string, part uint64) (io.ReadWriteClos
 
 	idx, ok := parts[part]
 	if !ok {
+		fmt.Println("GetIndex not found", topic, part)
 		parts[part] = &mockFile{Buffer: bytes.Buffer{}}
 		idx = parts[part]
 	}

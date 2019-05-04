@@ -129,21 +129,29 @@ func (r *queryIndex) ensureBatches(n int) {
 	}
 }
 
-func (r *queryIndex) pushBatch(off, part uint64, size, messages int) error {
+func (r *queryIndex) handleAddPartition(part uint64) error {
 	if _, ok := r.parts[part]; !ok {
-		if len(r.parts) >= r.maxPartitions-1 {
+		fmt.Println("new partition", part)
+		if len(r.parts) >= r.maxPartitions {
+			fmt.Println("rotating for", part, r.parts)
 			if err := r.rotate(part); err != nil {
 				return err
 			}
-		} else {
-			r.parts[part] = r.batchesN
 		}
+		r.parts[part] = r.batchesN
+	}
+	return nil
+}
+
+func (r *queryIndex) pushBatch(off, part uint64, size, messages int) error {
+	fmt.Println("pushBatch", part, r.parts)
+	if err := r.handleAddPartition(part); err != nil {
+		return err
 	}
 
-	i := r.batchesN
-	r.ensureBatches(i)
+	r.ensureBatches(r.batchesN)
 
-	batch := r.batches[i]
+	batch := r.batches[r.batchesN]
 	if batch == nil {
 		batch = &queryIndexBatch{}
 	}
@@ -151,7 +159,7 @@ func (r *queryIndex) pushBatch(off, part uint64, size, messages int) error {
 	batch.partition = part
 	batch.size = size
 	batch.messages = messages
-	r.batches[i] = batch
+	r.batches[r.batchesN] = batch
 
 	r.batchesN++
 	return nil
@@ -160,12 +168,13 @@ func (r *queryIndex) pushBatch(off, part uint64, size, messages int) error {
 func (r *queryIndex) rotate(newPart uint64) error {
 	fmt.Println("before rotate", r.batches[:r.batchesN])
 	minPart, minIdx := r.minPart()
+	incrIdx := minIdx + 1
 	fmt.Println("removing part", minPart)
-	copy(r.batches, r.batches[minIdx:])
+	copy(r.batches, r.batches[incrIdx:])
 	for idx := range r.parts {
-		r.parts[idx] -= minIdx
+		r.parts[idx] -= incrIdx
 	}
-	r.batchesN -= minIdx
+	r.batchesN -= incrIdx
 	delete(r.parts, minPart)
 
 	if err := r.manager.RemoveIndex(r.topic, minPart); err != nil {
@@ -174,7 +183,7 @@ func (r *queryIndex) rotate(newPart uint64) error {
 
 	fmt.Println("adding part", newPart)
 	r.parts[newPart] = r.batchesN
-	fmt.Println("after rotate", r.batches[:r.batchesN])
+	fmt.Println("after rotate", r.parts, r.batches[:r.batchesN])
 	return nil
 }
 
@@ -183,6 +192,7 @@ func (r *queryIndex) minPart() (uint64, int) {
 	var finalidx int
 	var started bool
 
+	fmt.Println("minPart", r.parts)
 	for n, idx := range r.parts {
 		if !started {
 			finaln = n
@@ -255,11 +265,10 @@ func (r *queryIndex) readIndex(part uint64) error {
 	defer rdr.Close()
 
 	br := bufio.NewReader(rdr)
-	r.batchesN = 0
 	for i := 0; i < r.maxPartitions; i++ {
 		r.ensureBatches(i + 1000)
 
-		// fmt.Println("readIndex", i)
+		fmt.Println("readIndex", i)
 		batch := &queryIndexBatch{}
 		if _, err := r.readIndexBatch(br, batch); err != nil {
 			// fmt.Println("error reading index batch:", err, batch)
@@ -268,7 +277,11 @@ func (r *queryIndex) readIndex(part uint64) error {
 			}
 			return err
 		}
-		r.batches[i] = batch
+
+		if err := r.handleAddPartition(part); err != nil {
+			return err
+		}
+		r.batches[r.batchesN] = batch
 		r.batchesN++
 	}
 	return nil
