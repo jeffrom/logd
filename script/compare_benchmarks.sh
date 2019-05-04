@@ -14,6 +14,12 @@ if grep "docker" /proc/1/cgroup > /dev/null; then
     git reset --hard HEAD
 fi
 
+if [[ ! -z "$CI" && "$CI" != "false" && "$CI" != "no" ]]; then
+    echo "in CI, so cleaning git state. These changes will be undone:"
+    git diff
+    git reset --hard HEAD
+fi
+
 if ! git diff-index --quiet HEAD --; then
     echo "Please commit all changes before using this command. Changes:"
     git diff
