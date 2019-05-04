@@ -1,0 +1,13 @@
+# vi: ft=dockerfile
+FROM golang:1.12
+
+RUN mkdir /logd
+WORKDIR /logd
+
+COPY go.mod /logd/
+COPY go.sum /logd/
+RUN go mod download
+
+COPY . /logd
+
+CMD ["make", "ci"]
