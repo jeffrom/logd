@@ -4,7 +4,12 @@ set -eo pipefail
 package="${1:-...}"
 benchtime="${BENCHTIME:-1s}"
 benchmarks="${BENCH:-.}"
+race="${RACE:-}"
 go111module="${GO111MODULE:-on}"
+
+if [[ "$race" = "true" ]]; then
+    race="-race"
+fi
 
 if [[ ! -z "$CI" && "$CI" != "false" && "$CI" != "no" ]]; then
     go111module=on
@@ -61,6 +66,7 @@ set -x
 GO111MODULE="$go111module" go test ./"$package" -run="^$" -bench="$benchmarks" \
     -benchmem \
     -benchtime="$benchtime" \
+    "$race" \
     | tee -a report/bench.out
 
     # -blockprofile=block.pprof \

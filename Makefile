@@ -113,7 +113,7 @@ bench.compare:
 
 .PHONY: bench.race
 bench.race:
-	GO111MODULE=on go test ./... -run ^$$ -bench . -benchmem -benchtime 2s -race
+	RACE=true ./script/benchmark.sh
 
 .PHONY: bench.ci
 bench.ci: bench.race bench.compare
