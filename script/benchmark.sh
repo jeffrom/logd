@@ -22,16 +22,16 @@ rotate() {
         IFS=$'\n' sorted=($(sort -r <<<"${nums[*]}"))
         # XXX this doesnt work in the CI container
         # unset IFS
-    fi
 
-    # echo $sorted
-    for n in ${sorted[*]}; do
-        next=$((n+1))
-        mv "${fullpath}.$n" "${fullpath}.$next"
-    done
+        # echo $sorted
+        for n in ${sorted[*]}; do
+            next=$((n+1))
+            mv "${fullpath}.$n" "${fullpath}.$next"
+        done
 
-    if [[ -e "${fullpath}" ]]; then
-        mv "${fullpath}" "${fullpath}.1"
+        if [[ -e "${fullpath}" ]]; then
+            mv "${fullpath}" "${fullpath}.1"
+        fi
     fi
 }
 
