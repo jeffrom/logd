@@ -40,8 +40,8 @@ func (c *Config) String() string {
 
 // Default is the default application config
 var Default = &Config{
-	Host:            "localhost:1774",
-	HttpHost:        "localhost:1775",
+	Host:            ":1774",
+	HttpHost:        ":1775",
 	Timeout:         10 * time.Second,
 	IdleTimeout:     30 * time.Second,
 	ShutdownTimeout: 15 * time.Second,
