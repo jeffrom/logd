@@ -23,15 +23,15 @@ jobs:
 
       - restore_cache:
           keys:
-            - v2-package-cache
+            - v3-package-cache
 
       # specify any bash command here prefixed with `run: `
       - run: make ci
 
-      - run: sudo chmod -R 664 /go/pkg
-      - run: sudo chmod -R 755 /go/bin
+      - run: sudo chmod -R 777 /go/pkg
+      - run: sudo chmod -R 777 /go/bin
       - save_cache:
-          key: v2-package-cache
+          key: v3-package-cache
           paths:
             - /go/pkg
             - /go/bin
