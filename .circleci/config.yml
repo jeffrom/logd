@@ -23,7 +23,7 @@ jobs:
 
       - restore_cache:
           keys:
-            - v1-package-cache
+            - v2-package-cache
 
 
       # specify any bash command here prefixed with `run: `
@@ -32,7 +32,7 @@ jobs:
       - run: chmod -R 664 /go/pkg
       - run: chmod -R 755 /go/bin
       - save_cache:
-          key: v1-package-cache
+          key: v2-package-cache
           paths:
             - /go/pkg
             - /go/bin
