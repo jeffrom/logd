@@ -30,7 +30,7 @@ fi
 
 branch=$(git rev-parse --abbrev-ref HEAD)
 
-./script/benchmark.sh
+PACKAGE=events BENCH=Full ./script/benchmark.sh
 
 if [[ "$branch" == "master" ]]; then
     # checkout previous commit on master
@@ -44,7 +44,7 @@ finish() {
 }
 trap finish EXIT
 
-./script/benchmark.sh
+PACKAGE=events BENCH=Full ./script/benchmark.sh
 
 {
     head -n 1 report/bench.out

@@ -39,19 +39,11 @@ ls.tmp:
 
 .PHONY: deps
 deps:
-	# @echo "Installing dep tool and dependencies..."
-	# dep version || go get -u github.com/golang/dep/cmd/dep
-	# dep ensure -v
 	GO111MODULE=off go get github.com/wadey/gocovmerge
 	GO111MODULE=off go get golang.org/x/tools/cmd/benchcmp
 	GO111MODULE=off go get github.com/AlekSi/gocoverutil
 	mkdir -p report
 	mkdir -p integration_test/out
-
-# .PHONY: deps.dep
-# deps.dep:
-# 	@echo "Installing dep tool..."
-# 	go get -u github.com/golang/dep/cmd/dep
 
 .PHONY: build
 build:
@@ -73,7 +65,6 @@ test.race:
 	GO111MODULE=on go test -race $(PKGS)
 
 .PHONY: test.cover
-# $(foreach pkg,$(WITHOUT_APPTEST),go test -outputdir=../report -cover ./$(pkg);)
 test.cover:
 	go test -cover -coverpkg ./... ./...
 

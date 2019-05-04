@@ -1,7 +1,7 @@
 #!/bin/bash
 set -eo pipefail
 
-package="${1:-...}"
+package="${PACKAGE:-...}"
 benchtime="${BENCHTIME:-1s}"
 benchmarks="${BENCH:-.}"
 race="${RACE:-}"
