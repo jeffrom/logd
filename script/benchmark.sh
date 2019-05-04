@@ -18,20 +18,22 @@ rotate() {
         nums+=("$num")
     done < <(find "./${filedir}" -name "*.${filebase}.*")
 
-    if [[ ${#nums[@]} -gt 0 ]]; then
-        IFS=$'\n' sorted=($(sort -r <<<"${nums[*]}"))
-        # XXX this doesnt work in the CI container
-        # unset IFS
+    if [[ ${#nums[@]} -eq 0 ]]; then
+        return
+    fi
 
-        # echo $sorted
-        for n in ${sorted[*]}; do
-            next=$((n+1))
-            mv "${fullpath}.$n" "${fullpath}.$next"
-        done
+    IFS=$'\n' sorted=($(sort -r <<<"${nums[*]}"))
+    # XXX this doesnt work in the CI container
+    # unset IFS
 
-        if [[ -e "${fullpath}" ]]; then
-            mv "${fullpath}" "${fullpath}.1"
-        fi
+    # echo $sorted
+    for n in ${sorted[*]}; do
+        next=$((n+1))
+        mv "${fullpath}.$n" "${fullpath}.$next"
+    done
+
+    if [[ -e "${fullpath}" ]]; then
+        mv "${fullpath}" "${fullpath}.1"
     fi
 }
 
