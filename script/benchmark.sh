@@ -18,6 +18,8 @@ set -u
 
 cd "$( cd "$(dirname "$0")" ; pwd )/../"
 
+set -x
+
 rotate() {
     fullpath="$1"
     filebase="$(basename "$1")"
