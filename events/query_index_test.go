@@ -262,7 +262,7 @@ func newMockIndexManager() *mockIndexManager {
 }
 
 func (m *mockIndexManager) GetIndex(topic string, part uint64) (io.ReadWriteCloser, error) {
-	fmt.Println("GetIndex", topic, part)
+	// fmt.Println("GetIndex", topic, part)
 	parts, ok := m.indexes[topic]
 	if !ok {
 		m.indexes[topic] = make(map[uint64]*mockFile)
@@ -271,7 +271,7 @@ func (m *mockIndexManager) GetIndex(topic string, part uint64) (io.ReadWriteClos
 
 	idx, ok := parts[part]
 	if !ok {
-		fmt.Println("GetIndex not found", topic, part)
+		// fmt.Println("GetIndex not found", topic, part)
 		parts[part] = &mockFile{Buffer: bytes.Buffer{}}
 		idx = parts[part]
 	}

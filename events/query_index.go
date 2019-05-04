@@ -131,9 +131,9 @@ func (r *queryIndex) ensureBatches(n int) {
 
 func (r *queryIndex) handleAddPartition(part uint64) error {
 	if _, ok := r.parts[part]; !ok {
-		fmt.Println("new partition", part)
+		// fmt.Println("new partition", part)
 		if len(r.parts) >= r.maxPartitions {
-			fmt.Println("rotating for", part, r.parts)
+			// fmt.Println("rotating for", part, r.parts)
 			if err := r.rotate(part); err != nil {
 				return err
 			}
@@ -144,7 +144,7 @@ func (r *queryIndex) handleAddPartition(part uint64) error {
 }
 
 func (r *queryIndex) pushBatch(off, part uint64, size, messages int) error {
-	fmt.Println("pushBatch", part, r.parts)
+	// fmt.Println("pushBatch", part, r.parts)
 	if err := r.handleAddPartition(part); err != nil {
 		return err
 	}
@@ -166,10 +166,10 @@ func (r *queryIndex) pushBatch(off, part uint64, size, messages int) error {
 }
 
 func (r *queryIndex) rotate(newPart uint64) error {
-	fmt.Println("before rotate", r.batches[:r.batchesN])
+	// fmt.Println("before rotate", r.batches[:r.batchesN])
 	minPart, minIdx := r.minPart()
 	incrIdx := minIdx + 1
-	fmt.Println("removing part", minPart)
+	// fmt.Println("removing part", minPart)
 	copy(r.batches, r.batches[incrIdx:])
 	for idx := range r.parts {
 		r.parts[idx] -= incrIdx
@@ -181,9 +181,9 @@ func (r *queryIndex) rotate(newPart uint64) error {
 		return err
 	}
 
-	fmt.Println("adding part", newPart)
+	// fmt.Println("adding part", newPart)
 	r.parts[newPart] = r.batchesN
-	fmt.Println("after rotate", r.parts, r.batches[:r.batchesN])
+	// fmt.Println("after rotate", r.parts, r.batches[:r.batchesN])
 	return nil
 }
 
@@ -192,7 +192,7 @@ func (r *queryIndex) minPart() (uint64, int) {
 	var finalidx int
 	var started bool
 
-	fmt.Println("minPart", r.parts)
+	// fmt.Println("minPart", r.parts)
 	for n, idx := range r.parts {
 		if !started {
 			finaln = n
@@ -268,7 +268,7 @@ func (r *queryIndex) readIndex(part uint64) error {
 	for i := 0; i < r.maxPartitions; i++ {
 		r.ensureBatches(i + 1000)
 
-		fmt.Println("readIndex", i)
+		// fmt.Println("readIndex", i)
 		batch := &queryIndexBatch{}
 		if _, err := r.readIndexBatch(br, batch); err != nil {
 			// fmt.Println("error reading index batch:", err, batch)
