@@ -29,8 +29,8 @@ jobs:
       # specify any bash command here prefixed with `run: `
       - run: make ci
 
-      - run: chmod -R 664 /go/pkg
-      - run: chmod -R 755 /go/bin
+      - run: sudo chmod -R 664 /go/pkg
+      - run: sudo chmod -R 755 /go/bin
       - save_cache:
           key: v2-package-cache
           paths:
