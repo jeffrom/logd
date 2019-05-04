@@ -6,6 +6,7 @@ import (
 	"io"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/logd"
@@ -16,6 +17,8 @@ import (
 func BenchmarkBatchFull(b *testing.B) {
 	b.SetParallelism(4)
 	conf := testhelper.DefaultConfig(testing.Verbose())
+	conf.Timeout = 5 * time.Second
+	conf.IdleTimeout = 5 * time.Second
 	conf.Host = ":0"
 
 	benchmarkBatchFull(b, conf, "batch.small", []string{"default"})
@@ -24,6 +27,8 @@ func BenchmarkBatchFull(b *testing.B) {
 func BenchmarkBatchFullLarge(b *testing.B) {
 	b.SetParallelism(4)
 	conf := testhelper.DefaultConfig(testing.Verbose())
+	conf.Timeout = 5 * time.Second
+	conf.IdleTimeout = 5 * time.Second
 	conf.Host = ":0"
 	conf.MaxBatchSize = 1024 * 64
 	conf.PartitionSize = 1024 * 1024
@@ -34,6 +39,8 @@ func BenchmarkBatchFullLarge(b *testing.B) {
 func BenchmarkBatchFullTopics8(b *testing.B) {
 	b.SetParallelism(2)
 	conf := testhelper.DefaultConfig(testing.Verbose())
+	conf.Timeout = 5 * time.Second
+	conf.IdleTimeout = 5 * time.Second
 	conf.Host = ":0"
 
 	benchmarkBatchFull(b, conf, "batch.small", []string{
@@ -44,21 +51,36 @@ func BenchmarkBatchFullTopics8(b *testing.B) {
 
 func BenchmarkReadFull(b *testing.B) {
 	conf := testhelper.DefaultConfig(testing.Verbose())
+	conf.Timeout = 5 * time.Second
+	conf.IdleTimeout = 5 * time.Second
 	conf.MaxBatchSize = 65535
 	conf.PartitionSize = conf.MaxBatchSize * 100
 	conf.Host = ":0"
 
-	benchmarkReadFull(b, conf)
+	benchmarkReadFull(b, conf, 3)
+}
+
+func BenchmarkReadFull10000(b *testing.B) {
+	conf := testhelper.DefaultConfig(testing.Verbose())
+	conf.Timeout = 5 * time.Second
+	conf.IdleTimeout = 5 * time.Second
+	conf.MaxBatchSize = 65535
+	conf.PartitionSize = conf.MaxBatchSize * 100
+	conf.Host = ":0"
+
+	benchmarkReadFull(b, conf, 10000)
 }
 
 func BenchmarkReadFull4(b *testing.B) {
 	b.SetParallelism(4)
 	conf := testhelper.DefaultConfig(testing.Verbose())
+	conf.Timeout = 5 * time.Second
+	conf.IdleTimeout = 5 * time.Second
 	conf.MaxBatchSize = 65535
 	conf.PartitionSize = conf.MaxBatchSize * 100
 	conf.Host = ":0"
 
-	benchmarkReadFull(b, conf)
+	benchmarkReadFull(b, conf, 3)
 }
 
 type repeater struct {
@@ -89,6 +111,7 @@ func benchmarkBatchFull(b *testing.B, conf *config.Config, fixturename string, t
 	if err := h.GoStart(); err != nil {
 		b.Fatal(err)
 	}
+	defer shutdownHandlers(b, h)
 	addr := h.servers[0].ListenAddr().String()
 	fixture := testhelper.LoadFixture(fixturename)
 
@@ -103,58 +126,59 @@ func benchmarkBatchFull(b *testing.B, conf *config.Config, fixturename string, t
 	r := newRepeater(len(fixtures))
 
 	b.ResetTimer()
-	b.RunParallel(func(b *testing.PB) {
+	b.RunParallel(func(pb *testing.PB) {
 		batch := protocol.NewBatch(conf)
 		buf := bytes.NewBuffer(fixtures[r.next()])
 		br := bufio.NewReader(buf)
 		if _, err := batch.ReadFrom(br); err != nil {
-			panic(err)
+			b.Fatal(err)
 		}
 
 		c, err := logd.Dial(addr)
 		if err != nil {
-			panic(err)
+			b.Fatal(err)
 		}
 		defer c.Close()
 
-		for b.Next() {
+		for pb.Next() {
 			if _, err := c.Batch(batch); err != nil {
-				panic(err)
+				b.Fatal(err)
 			}
 		}
 	})
 }
 
-func benchmarkReadFull(b *testing.B, conf *config.Config) {
+func benchmarkReadFull(b *testing.B, conf *config.Config, messages int) {
 	h := NewHandlers(conf)
 	if err := h.GoStart(); err != nil {
 		b.Fatal(err)
 	}
+	defer shutdownHandlers(b, h)
 	addr := h.servers[0].ListenAddr().String()
 
 	fixture := testhelper.LoadFixture("words.txt")
 	fillTopic(b, conf, h, fixture)
 
 	b.ResetTimer()
-	b.RunParallel(func(b *testing.PB) {
+	b.RunParallel(func(pb *testing.PB) {
 		c, err := logd.Dial(addr)
 		if err != nil {
-			panic(err)
+			b.Fatal(err)
 		}
 		defer c.Close()
 
 		topic := []byte("default")
 
-		for b.Next() {
+		for pb.Next() {
 			_, bs, err := c.ReadOffset(topic, 0, 3)
 			if err != nil {
-				panic(err)
+				b.Fatal(err)
 			}
 
 			for bs.Scan() {
 			}
 			if err := bs.Error(); err != nil && err != io.EOF {
-				panic(err)
+				b.Fatal(err)
 			}
 		}
 	})
@@ -177,13 +201,19 @@ func fillTopic(b *testing.B, conf *config.Config, h *Handlers, data []byte) {
 	for s.Scan() {
 		// read += len(s.Bytes()) + len(fmt.Sprintf("MSG %d\r\n\r\n", len(s.Bytes())))
 
-		b := make([]byte, len(s.Bytes()))
-		copy(b, s.Bytes())
-		_, err := w.Write(b)
+		buf := make([]byte, len(s.Bytes()))
+		copy(buf, s.Bytes())
+		_, err := w.Write(buf)
 		if err != nil {
-			panic(err)
+			b.Fatal(err)
 		}
 	}
 
 	w.Flush()
+}
+
+func shutdownHandlers(b *testing.B, h *Handlers) {
+	if err := h.Stop(); err != nil {
+		b.Fatal("shutdown failed:", err)
+	}
 }

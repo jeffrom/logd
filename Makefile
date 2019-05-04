@@ -38,23 +38,23 @@ ls.tmp:
 
 .PHONY: deps
 deps:
-	@echo "Installing dep tool and dependencies..."
-	dep version || go get -u github.com/golang/dep/cmd/dep
-	dep ensure -v
-	go get github.com/wadey/gocovmerge
-	go get golang.org/x/tools/cmd/benchcmp
-	go get github.com/AlekSi/gocoverutil
+	# @echo "Installing dep tool and dependencies..."
+	# dep version || go get -u github.com/golang/dep/cmd/dep
+	# dep ensure -v
+	GO111MODULE=off go get github.com/wadey/gocovmerge
+	GO111MODULE=off go get golang.org/x/tools/cmd/benchcmp
+	GO111MODULE=off go get github.com/AlekSi/gocoverutil
 	mkdir -p report
 	mkdir -p integration_test/out
 
-.PHONY: deps.dep
-deps.dep:
-	@echo "Installing dep tool..."
-	go get -u github.com/golang/dep/cmd/dep
+# .PHONY: deps.dep
+# deps.dep:
+# 	@echo "Installing dep tool..."
+# 	go get -u github.com/golang/dep/cmd/dep
 
 .PHONY: build
 build:
-	go install -x -v ./...
+	GO111MODULE=on go install -v ./...
 
 .PHONY: doc.serve
 doc.serve:
@@ -69,7 +69,7 @@ test: test.cover test.race
 
 .PHONY: test.race
 test.race:
-	go test -race $(PKGS)
+	GO111MODULE=on go test -race $(PKGS)
 
 .PHONY: test.cover
 # $(foreach pkg,$(WITHOUT_APPTEST),go test -outputdir=../report -cover ./$(pkg);)
@@ -78,7 +78,7 @@ test.cover:
 
 .PHONY: test.coverprofile
 test.coverprofile:
-	gocoverutil -coverprofile=cov.out test -covermode=count ./...
+	GO111MODULE=on gocoverutil -coverprofile=cov.out test -covermode=count ./...
 
 .PHONY: test.golden
 test.golden:
@@ -121,7 +121,7 @@ bench.ci:
 
 .PHONY: bench.race
 bench.race:
-	go test ./... -run ^$$ -bench . -benchmem -benchtime 2s -race
+	GO111MODULE=on go test ./... -run ^$$ -bench . -benchmem -benchtime 2s -race
 
 .PHONY: ci
 # ci: clean deps build lint.install test.coverprofile test.race test.integration.compile test.integration test.report lint test.report.summary

@@ -145,7 +145,7 @@ func (q *eventQ) loop() { // nolint: gocyclo
 	}()
 
 	for {
-		internal.Debugf(q.conf, "waiting for event")
+		internal.Debugf(q.conf, "waiting for event (%s)", q.topic)
 
 		select {
 		// new flow for handling requests passed in from servers
@@ -170,7 +170,7 @@ func (q *eventQ) Stop() error {
 	case q.stopC <- err:
 	case <-time.After(500 * time.Millisecond):
 		log.Printf("event queue failed to stop properly")
-		return errors.New("shutdown failed")
+		return errors.New("shutdown timed out")
 	}
 
 	return nil
@@ -191,6 +191,10 @@ func (q *eventQ) handleBatch(req *protocol.Request) (*protocol.Response, error) 
 
 	// set next write partition if needed
 	if topic.parts.shouldRotate(req.FullSize()) {
+		if err := topic.idx.writeIndex(topic.parts.head.startOffset); err != nil {
+			return errResponse(q.conf, req, resp, err)
+		}
+
 		nextStartOffset := topic.parts.nextOffset()
 		if sperr := topic.logw.SetPartition(nextStartOffset); sperr != nil {
 			return errResponse(q.conf, req, resp, sperr)
@@ -209,9 +213,12 @@ func (q *eventQ) handleBatch(req *protocol.Request) (*protocol.Response, error) 
 
 	// get response offset and update log state
 	respOffset := topic.parts.nextOffset()
-	if aerr := topic.parts.addBatch(batch, req.FullSize()); aerr != nil {
+	_, aerr := topic.parts.addBatch(batch, req.FullSize())
+	if aerr != nil {
 		return errResponse(q.conf, req, resp, aerr)
 	}
+
+	// update query index
 	if err := topic.Push(respOffset, topic.parts.head.startOffset, req.FullSize(), batch.Messages); err != nil {
 		return errResponse(q.conf, req, resp, err)
 	}
@@ -252,7 +259,9 @@ func (q *eventQ) handleRead(req *protocol.Request) (*protocol.Response, error) {
 		return errResponse(q.conf, req, resp, protocol.ErrNotFound)
 	}
 
-	partArgs, err := q.gatherReadArgs(topic, readreq.Offset, readreq.Messages)
+	args := partitionArgListPool.Get().(*partitionArgList).initialize(q.conf.MaxPartitions)
+	defer partitionArgListPool.Put(args)
+	partArgs, err := q.gatherReadArgs(topic, readreq.Offset, readreq.Messages, args)
 	if err != nil {
 		// fmt.Println("gatherReadArgs error:", err)
 
@@ -269,6 +278,7 @@ func (q *eventQ) handleRead(req *protocol.Request) (*protocol.Response, error) {
 	cr := req.Response.ClientResponse
 	cr.SetOffset(readreq.Offset)
 	cr.SetBatches(partArgs.nbatches)
+	// log.Panicf("%s %d", partArgs, partArgs.nbatches)
 	_, err = req.WriteResponse(resp, cr)
 	if err != nil {
 		return errResponse(q.conf, req, resp, err)
@@ -308,7 +318,9 @@ func (q *eventQ) handleTail(req *protocol.Request) (*protocol.Response, error) {
 	}
 	off := firstPart.startOffset
 
-	partArgs, err := q.gatherReadArgs(topic, off, tailreq.Messages)
+	args := partitionArgListPool.Get().(*partitionArgList).initialize(q.conf.MaxPartitions)
+	defer partitionArgListPool.Put(args)
+	partArgs, err := q.gatherReadArgs(topic, off, tailreq.Messages, args)
 	if err != nil {
 		return errResponse(q.conf, req, resp, err)
 	}
@@ -370,8 +382,23 @@ func (q *eventQ) handleConfig(req *protocol.Request) (*protocol.Response, error)
 	return resp, nil
 }
 
-func (q *eventQ) gatherReadArgs(topic *topic, offset uint64, messages int) (*partitionArgList, error) {
-	return topic.Query(offset, messages)
+func (q *eventQ) gatherReadArgs(topic *topic, offset uint64, messages int, newArgs *partitionArgList) (*partitionArgList, error) {
+	err := topic.idx.Query(offset, messages, newArgs)
+	return newArgs, err
+	// if err != nil {
+	// 	log.Printf("<%d, %d>: error w/ new query index: %+v", offset, messages, err)
+	// }
+
+	// // old way
+	// args, err := topic.Query(offset, messages)
+	// if err != nil {
+	// 	return args, err
+	// }
+
+	// if !newArgs.equals(args) {
+	// 	log.Printf("<%d, %d>: new args not equal to old:\n\nold: %+v\n\nnew: %v\n", offset, messages, args, newArgs)
+	// }
+	// return args, err
 }
 
 // handleShutdown handles a shutdown request

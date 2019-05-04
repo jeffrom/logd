@@ -3,7 +3,6 @@ package protocol
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"strings"
@@ -12,6 +11,26 @@ import (
 	"github.com/jeffrom/logd/config"
 	"github.com/jeffrom/logd/testhelper"
 )
+
+func TestBatchEnvelopeSize(t *testing.T) {
+	conf := testhelper.DefaultConfig(testing.Verbose())
+	msg := []byte("cool message, yep")
+	protoMsg := []byte("MSG 17\r\ncool message, yep\r\n")
+	n := BatchEnvelopeSize("cool", protoMsg, 1)
+
+	batch := NewBatch(conf)
+	batch.SetTopic([]byte("cool"))
+	batch.Append(msg)
+
+	b := &bytes.Buffer{}
+	if _, err := batch.WriteTo(b); err != nil {
+		t.Fatal(err)
+	}
+
+	if n != b.Len() {
+		t.Fatal("expected", b.Len(), "but got envelope size of", n)
+	}
+}
 
 func TestWriteBatch(t *testing.T) {
 	conf := testhelper.DefaultConfig(testing.Verbose())
@@ -221,7 +240,7 @@ func TestBatchReadErrors(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		batch.Reset()
 		_, err := batch.ReadFrom(br)
-		fmt.Println(i, err)
+		// fmt.Println(i, err)
 		if err != nil {
 			if err != io.EOF {
 				errs = append(errs, err)

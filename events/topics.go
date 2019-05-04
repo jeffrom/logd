@@ -12,6 +12,12 @@ import (
 	"github.com/jeffrom/logd/protocol"
 )
 
+var partitionArgListPool = sync.Pool{
+	New: func() interface{} {
+		return &partitionArgList{}
+	},
+}
+
 // topics manages the topic filesystem for the event queues.
 type topics struct {
 	conf    *config.Config
@@ -124,6 +130,7 @@ type topic struct {
 	conf  *config.Config
 	name  string
 	parts *partitions
+	idx   *queryIndex
 	logp  logger.PartitionManager
 	logw  logger.LogWriter
 	logrp logger.LogRepairer
@@ -131,14 +138,23 @@ type topic struct {
 
 func newTopic(conf *config.Config, name string) *topic {
 	logp := logger.NewPartitions(conf, name)
+
 	return &topic{
 		conf:  conf,
 		name:  name,
 		parts: newPartitions(conf, logp),
+		idx:   newQueryIndex(conf.WorkDir, name, conf.MaxPartitions),
 		logp:  logp,
 		logw:  logger.NewWriter(conf, name),
 		logrp: logger.NewRepairer(conf, name),
 	}
+}
+
+func (t *topic) String() string {
+	if t == nil {
+		return "<nil>"
+	}
+	return t.name
 }
 
 func (t *topic) reset() {
@@ -189,13 +205,21 @@ func (t *topic) setupPartitions() error {
 	}
 
 	for _, part := range parts {
-		if err := t.parts.add(part.Offset(), part.Size()); err != nil {
+		if _, err := t.parts.add(part.Offset(), part.Size()); err != nil {
 			return err
 		}
 	}
 
 	if len(parts) == 0 {
-		if err := t.parts.add(0, 0); err != nil {
+		if _, err := t.parts.add(0, 0); err != nil {
+			return err
+		}
+	}
+
+	// load query index from disk
+	for i := 0; i < len(parts)-1; i++ {
+		// fmt.Println("load query index at", i, t.parts.parts[i])
+		if err := t.idx.readIndex(t.parts.parts[i].startOffset); err != nil {
 			return err
 		}
 	}
@@ -207,6 +231,8 @@ func (t *topic) setupPartitions() error {
 	if serr := t.logw.SetPartition(head.startOffset); serr != nil {
 		return serr
 	}
+
+	// fmt.Println(t.idx)
 	log.Printf("Topic %s starting at %d (partition %d, delta %d)", t.name, t.parts.headOffset(), head.startOffset, head.size)
 	return nil
 }
@@ -265,5 +291,5 @@ func (t *topic) Query(off uint64, messages int) (*partitionArgList, error) {
 }
 
 func (t *topic) Push(off, part uint64, size, messages int) error {
-	return nil
+	return t.idx.Push(off, part, size, messages)
 }

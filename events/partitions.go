@@ -42,13 +42,15 @@ func (p *partitions) reset() {
 }
 
 // add is used when loading the log from disk
-func (p *partitions) add(offset uint64, size int) error {
+func (p *partitions) add(offset uint64, size int) (bool, error) {
+	var rotated bool
 	last := p.parts[p.nparts]
 	if p.nparts == p.conf.MaxPartitions-1 && last.startOffset != 0 {
 		if err := p.logp.Remove(p.parts[0].startOffset); err != nil {
-			return err
+			return rotated, err
 		}
 		p.rotate()
+		rotated = true
 	}
 
 	part := p.parts[p.nparts]
@@ -60,7 +62,7 @@ func (p *partitions) add(offset uint64, size int) error {
 	if p.nparts < p.conf.MaxPartitions-1 {
 		p.nparts++
 	}
-	return nil
+	return rotated, nil
 }
 
 func (p *partitions) rotate() {
@@ -88,14 +90,17 @@ func (p *partitions) nextOffset() uint64 {
 	return next
 }
 
-func (p *partitions) addBatch(b *protocol.Batch, size int) error {
+func (p *partitions) addBatch(b *protocol.Batch, size int) (bool, error) {
+	var rotated bool
 	if p.shouldRotate(size) {
-		if err := p.add(p.nextOffset(), 0); err != nil {
-			return err
+		wasRotated, err := p.add(p.nextOffset(), 0)
+		if err != nil {
+			return rotated, err
 		}
+		rotated = wasRotated
 	}
 	p.head.addBatch(b, size)
-	return nil
+	return rotated, nil
 }
 
 func (p *partitions) headOffset() uint64 {
@@ -213,13 +218,17 @@ type partitionArgList struct {
 }
 
 func (pl *partitionArgList) String() string {
-	return fmt.Sprintf("%s", pl.parts[:pl.nparts])
+	return fmt.Sprintf("(n: %d) %s", pl.nbatches, pl.parts[:pl.nparts])
 }
 
 type partitionArgs struct {
+	// offset represents the partition offset. It should point to a partition
+	// file that can be loaded by the logger.
 	offset uint64
-	delta  int
-	limit  int
+	// delta is the offset position from the start of the partition file.
+	delta int
+	// limit is the amount of bytes to read from the partition.
+	limit int
 }
 
 func (pa *partitionArgs) String() string {
@@ -239,6 +248,22 @@ func newPartitionArgList(max int) *partitionArgList {
 	return pl
 }
 
+func (pl *partitionArgList) initialize(max int) *partitionArgList {
+	pl.reset()
+	pl.max = max
+	if max > len(pl.parts) {
+		pl.parts = make([]*partitionArgs, max)
+	}
+
+	for i := 0; i < max; i++ {
+		if pl.parts[i] == nil {
+			pl.parts[i] = &partitionArgs{}
+		}
+	}
+
+	return pl
+}
+
 func (pl *partitionArgList) reset() {
 	pl.nparts = 0
 	pl.nbatches = 0
@@ -253,4 +278,22 @@ func (pl *partitionArgList) add(soff uint64, delta int, limit int) {
 	pl.parts[pl.nparts].limit = limit
 
 	pl.nparts++
+}
+
+func (pl *partitionArgList) equals(other *partitionArgList) bool {
+	if pl.nparts != other.nparts {
+		return false
+	}
+
+	for i := 0; i < pl.nparts; i++ {
+		a := pl.parts[i]
+		b := other.parts[i]
+		if a == nil || b == nil {
+			return false
+		}
+		if a.offset != b.offset || a.delta != b.delta || a.limit != b.limit {
+			return false
+		}
+	}
+	return true
 }

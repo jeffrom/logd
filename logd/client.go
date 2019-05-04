@@ -171,6 +171,7 @@ func (c *Client) setRW(rw io.ReadWriteCloser) {
 	if c.sr == nil {
 		c.r = rw
 		c.br = bufio.NewReaderSize(rw, c.conf.BatchSize)
+		// c.br = bufio.NewReaderSize(internal.NewReadLogger("client READ", rw, 3), c.conf.BatchSize)
 	}
 
 	if c.scloser == nil {
@@ -256,6 +257,7 @@ func (c *Client) readBatches(nbatches int, r *bufio.Reader) (int64, error) {
 	var total int64
 	var n int64
 	var err error
+	c.batchbuf.Reset()
 	for i := 0; i < nbatches; i++ {
 		c.batch.Reset()
 		n, err = c.batch.ReadFrom(r)
@@ -274,7 +276,7 @@ func (c *Client) readBatches(nbatches int, r *bufio.Reader) (int64, error) {
 // ReadOffset sends a READ request, returning a scanner that can be used to
 // iterate over the messages in the response.
 func (c *Client) ReadOffset(topic []byte, offset uint64, limit int) (int, *protocol.BatchScanner, error) {
-	internal.Debugf(c.gconf, "READ %s %d %d", topic, offset, limit)
+	internal.Debugf(c.gconf, "%s: READ %s %d %d", c.LocalAddr(), topic, offset, limit)
 	req := c.readreq
 	req.Reset()
 	req.SetTopic(topic)
@@ -297,6 +299,7 @@ func (c *Client) ReadOffset(topic []byte, offset uint64, limit int) (int, *proto
 	if _, err := c.readBatches(nbatches, c.br); err != nil {
 		return nbatches, nil, err
 	}
+	// fmt.Printf("%q\n", c.batchbuf.Bytes())
 	c.batchbr.Reset(c.batchbuf)
 	c.bs.Reset(c.batchbr)
 	internal.IgnoreError(c.conf.Verbose, c.SetReadDeadline(time.Now().Add(c.readTimeout)))
@@ -374,6 +377,7 @@ func (c *Client) do(wt io.WriterTo) (int64, int64, error) {
 	if err := c.ensureConn(); err != nil {
 		return 0, 0, err
 	}
+	// c.br.Reset(c.Conn)
 
 	internal.IgnoreError(c.conf.Verbose, c.SetWriteDeadline(time.Now().Add(c.writeTimeout)))
 	sent, err := wt.WriteTo(c.bw)
@@ -464,10 +468,10 @@ func (c *Client) setNextInterval() {
 // flush flushes all pending data to the server
 func (c *Client) flush() error {
 	if c.bw != nil && c.bw.Buffered() > 0 {
-		internal.Debugf(c.gconf, "client.Flush() initiated (%d bytes)", c.bw.Buffered())
+		internal.Debugf(c.gconf, "%s: client.Flush() initiated (%d bytes)", c.LocalAddr(), c.bw.Buffered())
 		internal.IgnoreError(c.conf.Verbose, c.SetWriteDeadline(time.Now().Add(c.writeTimeout)))
 		err := c.bw.Flush()
-		internal.Debugf(c.gconf, "client.Flush() complete (err: %v)", err)
+		internal.Debugf(c.gconf, "%s: client.Flush() complete (err: %v)", c.LocalAddr(), err)
 		internal.IgnoreError(c.conf.Verbose, c.SetWriteDeadline(time.Time{}))
 		return err
 	}
@@ -479,7 +483,7 @@ func (c *Client) readClientResponse() (int64, error) {
 	internal.IgnoreError(c.conf.Verbose, c.SetReadDeadline(time.Now().Add(c.readTimeout)))
 	n, err := c.cr.ReadFrom(c.br)
 	internal.IgnoreError(c.conf.Verbose, c.SetReadDeadline(time.Time{}))
-	internal.Debugf(c.gconf, "read %d bytes from %s: %+v (err: %v)", n, c.RemoteAddr(), c.cr, err)
+	internal.Debugf(c.gconf, "%s: read %d bytes from %s: %+v (err: %v)", c.LocalAddr(), n, c.RemoteAddr(), c.cr, err)
 	return n, c.handleErr(err)
 }
 

@@ -28,6 +28,7 @@ func benchmarkBatch(b *testing.B, conf *config.Config, logw logger.LogWriter) {
 	if err := h.GoStart(); err != nil {
 		b.Fatalf("unexpected startup error: %+v", err)
 	}
+	defer shutdownHandlers(b, h)
 
 	ctx := context.Background()
 	fixture := testhelper.LoadFixture("batch.small")

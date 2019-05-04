@@ -96,28 +96,7 @@ func newUUID() string {
 	uuid[8] = uuid[8]&^0xc0 | 0x80
 	// version 4 (pseudo-random); see section 4.1.3
 	uuid[6] = uuid[6]&^0xf0 | 0x40
-	return string(fmt.Sprintf("%x-%x-%x-%x-%x", uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:]))
-}
-
-// sync write. needs to write any pending data on the channel first.
-func (c *Conn) write(bufs ...[]byte) (int64, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	internal.Debugf(c.conf, "->%s: %q", c.RemoteAddr(), internal.Prettybuf(bufs...))
-
-	var n int64
-	for _, buf := range bufs {
-		wrote, err := c.bw.Write(buf)
-		n += int64(wrote)
-		c.written += wrote
-		if err != nil {
-			return n, err
-		}
-	}
-
-	err := c.Flush()
-	return n, err
+	return fmt.Sprintf("%x-%x-%x-%x-%x", uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:])
 }
 
 func (c *Conn) Write(p []byte) (int, error) {

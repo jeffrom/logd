@@ -3,6 +3,8 @@
 # TODO
 
 - [ ] make offset an int64
+- [ ] test that events/events returns the correct number of batches when there
+  is more than one
 - [ ] configuration to limit the number of topics. whitelist
 - [ ] writer backfill (see interface in client/state.go). there's already a
       simple implementation.
@@ -48,6 +50,13 @@
   - logd protocol is working
     | curl -X POST -d $'READ default 0 3\r\n' -H 'Content-type: application/logd' http://localhost:1775/log
 - [ ] a writer backpressure config that sets the buffer size on the writers channel
+- [ ] run some integration tests against device mapper testing drivers (man dmsetup)
+  - some examples, maybe not possible depending on how device mapper targets work
+  - write some nonrandom text (like a book) some number of times, and assert
+  that all of it is read back
+  - write some nonrandom text, teeing it, with protocol, to a regular file,
+  then compare it to the logfiles logd writes
+
 
 # maybe later
 
