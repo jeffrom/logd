@@ -22,6 +22,11 @@ rotate() {
     fullpath="$1"
     filebase="$(basename "$1")"
     filedir="$(dirname "$1")"
+
+    if [[ ! -d "$filedir" ]]; then
+        return
+    fi
+
     nums=()
     while read -r f; do
         num="${f##./${fullpath}.}"
