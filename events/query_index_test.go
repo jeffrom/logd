@@ -344,14 +344,12 @@ func expectError(t testing.TB, expected error, err error) {
 
 func expectNumBatches(t testing.TB, n int, qi *queryIndex) {
 	t.Helper()
-	count := 0
-	for i := 0; i < len(qi.batches); i++ {
-		if qi.batches[i] == nil {
-			break
-		}
-		count++
+	if n != qi.batchesN {
+		t.Fatalf("expected query index to have %d batches but had %d: %+v", n, qi.batchesN, qi.batches[:qi.batchesN])
 	}
-	if count != n {
-		t.Fatalf("expected query index to have %d batches but had %d: %+v", n, count, qi.batches[:count])
+	for i := 0; i < qi.batchesN; i++ {
+		if qi.batches[i] == nil {
+			t.Fatalf("unexpected nil batch at index %d", i)
+		}
 	}
 }

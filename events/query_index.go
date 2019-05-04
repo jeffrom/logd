@@ -38,12 +38,15 @@ func (b *queryIndexBatch) String() string {
 }
 
 func newQueryIndex(workDir string, topic string, maxPartitions int) *queryIndex {
-	return &queryIndex{
+	qi := &queryIndex{
 		maxPartitions: maxPartitions,
 		topic:         topic,
 		manager:       logger.NewFileIndex(workDir),
 		parts:         make(map[uint64]int),
 	}
+
+	qi.ensureBatches(10000)
+	return qi
 }
 
 func (r *queryIndex) reset() {
@@ -126,6 +129,12 @@ func (r *queryIndex) ensureBatches(n int) {
 		copy(batches, r.batches)
 		r.batches = batches
 		// fmt.Println("grew to", len(r.batches))
+
+		for i := 0; i < len(r.batches); i++ {
+			if r.batches[i] == nil {
+				r.batches[i] = &queryIndexBatch{}
+			}
+		}
 	}
 }
 
