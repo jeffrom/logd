@@ -58,4 +58,5 @@ trap finish EXIT
 # other branches, it means HEAD on master. Basically, the "new" column will be
 # the branch you just pushed, but the benchmarks run on the new branch first.
 # This seemed nicest because if the benchmarks fail, you know immediately.
+# Also, you usually want to see the new benchmarks first if you're watching.
 benchcmp report/bench.out report/bench.out.1 | tee -a report/benchcmp.out
