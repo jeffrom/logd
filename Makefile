@@ -142,11 +142,11 @@ test.report:
 
 .PHONY: test.report.summary
 test.report.summary:
-	echo -n "total: "; go tool cover -func=cov.out | tail -n 1 | sed -e 's/\((statements)\|total:\)//g' | tr -s "[:space:]"
+	echo -n "total: "; go tool cover -func=report/cov.out | tail -n 1 | sed -e 's/\((statements)\|total:\)//g' | tr -s "[:space:]"
 
 .PHONY: test.report.html
 test.report.html:
-	go tool cover -html=cov.out -o cov.html
+	go tool cover -html=report/cov.out -o report/cov.html
 
 .PHONY: report.depgraph
 report.depgraph:
