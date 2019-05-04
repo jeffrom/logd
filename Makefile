@@ -21,6 +21,7 @@ clean:
 	rm -rf $(TMPDIR)/logd-artifacts.log*
 	rm -rf ./tmp
 	rm -rf logs/*
+	rm -rf report/*
 
 .PHONY: clean.reports
 clean.reports:
@@ -78,7 +79,8 @@ test.cover:
 
 .PHONY: test.coverprofile
 test.coverprofile:
-	GO111MODULE=on gocoverutil -coverprofile=cov.out test -covermode=count ./...
+	mkdir -p report
+	GO111MODULE=on gocoverutil -coverprofile=report/cov.out test -covermode=count ./...
 
 .PHONY: test.golden
 test.golden:
@@ -90,43 +92,38 @@ test.golden:
 
 .PHONY: lint
 lint:
-	gometalinter --aggregate --vendored-linters --vendor --enable-all $(SHORT_PKGS)
-	# ./script/lint.sh
+	./script/lint.sh
 
 .PHONY: lint.install
 lint.install:
-	go get github.com/alecthomas/gometalinter
-	gometalinter --install
-
-.PHONY: lint.update
-lint.update:
-	go get -u github.com/alecthomas/gometalinter
-	gometalinter --install --update
+	GO111MODULE=on go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.16.0
 
 .PHONY: bench
 BENCH ?= .
 bench:
-	mkdir -p report
-	# ./script/benchmark.sh
-	# $(foreach pkg,$(SHORT_PKGS),go test -bench=$(BENCH) -cpuprofile=$(pkg).cpu.pprof -memprofile=$(pkg).mem.pprof -mutexprofile=$(pkg).mutex.pprof -outputdir=../report -benchmem -run="^$$" ./$(pkg) | tee -a report/$(pkg).bench.out;)
-	$(foreach pkg,$(SHORT_PKGS),go test -bench=$(BENCH) -benchtime=2s -cpuprofile=$(pkg).cpu.pprof -outputdir=../report -benchmem -run="^$$" ./$(pkg) | tee -a report/$(pkg).bench.out;)
+	./script/benchmark.sh
 
 .PHONY: benchcmp
 benchcmp:
 	benchcmp report/bench.out report/bench.out.1
 
-.PHONY: bench.ci
-bench.ci:
+.PHONY: bench.compare
+bench.compare:
 	./script/compare_benchmarks.sh
 
 .PHONY: bench.race
 bench.race:
 	GO111MODULE=on go test ./... -run ^$$ -bench . -benchmem -benchtime 2s -race
 
+.PHONY: bench.ci
+bench.ci: bench.race bench.compare
+
 .PHONY: ci
-# ci: clean deps build lint.install test.coverprofile test.race test.integration.compile test.integration test.report lint test.report.summary
-# ci: clean deps build test.coverprofile test.race bench.race test.report test.report.summary
-ci: clean deps build test.coverprofile test.race bench.race test.report.summary
+ci: clean deps build test.coverprofile test.race bench.ci test.report.summary
+
+.PHONY: ci.local
+ci.local:
+	./script/image-ci.sh
 
 .PHONY: test.integration.compile
 test.integration.compile:

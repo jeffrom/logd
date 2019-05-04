@@ -1,6 +1,12 @@
 #!/bin/bash
-set -euxo pipefail
+set -eo pipefail
 
+package="${1:-...}"
+benchtime="${BENCHTIME:-1s}"
+benchmarks="${BENCH:-.}"
+set -u
+
+cd "$( cd "$(dirname "$0")" ; pwd )/../"
 
 rotate() {
     fullpath="$1"
@@ -12,14 +18,11 @@ rotate() {
         nums+=("$num")
     done < <(find "./${filedir}" -name "*.${filebase}.*")
 
-    # if [ ${#nums[@]} -eq 0 ]; then
-    #     echo "no previous benchmark reports found"
-    #     return
-    # fi
     IFS=$'\n' sorted=($(sort -r <<<"${nums[*]}"))
-    unset IFS
+    # XXX this doesnt work in the CI container
+    # unset IFS
 
-    echo $sorted
+    # echo $sorted
     for n in ${sorted[*]}; do
         next=$((n+1))
         mv "${fullpath}.$n" "${fullpath}.$next"
@@ -30,22 +33,29 @@ rotate() {
     fi
 }
 
-rotate "report/bench.out"
-rotate "report/cpu.pprof"
-rotate "report/mem.pprof"
-rotate "report/mutex.pprof"
+mkdir -p report
 
-# git rev-parse HEAD > report/bench.out
+rotate "report/bench.out"
+# rotate "report/cpu.pprof"
+# rotate "report/mem.pprof"
+# rotate "report/mutex.pprof"
+
 set +e
-git log --oneline | head -n 1 > report/bench.out
+{
+    git log --oneline | head -n 1
+    echo "---"
+    echo
+} > report/bench.out
 set -e
 
-# go test -run="^$" -bench="${RUN:-.}" \
-#     -benchmem \
-#     -benchtime=1s \
-#     -blockprofile=block.pprof \
-#     -cpuprofile=cpu.pprof \
-#     -memprofile=mem.pprof \
-#     -mutexprofile=mutex.pprof \
-#     -outputdir=report \
-#     | tee -a report/bench.out
+set -x
+go test ./"$package" -run="^$" -bench="$benchmarks" \
+    -benchmem \
+    -benchtime="$benchtime" \
+    | tee -a report/bench.out
+
+    # -blockprofile=block.pprof \
+    # -cpuprofile=cpu.pprof \
+    # -memprofile=mem.pprof \
+    # -mutexprofile=mutex.pprof \
+    # -outputdir=report \

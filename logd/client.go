@@ -31,8 +31,8 @@ func (nd *netDialer) DialTimeout(network, addr string, timeout time.Duration) (n
 	return net.DialTimeout(network, addr, timeout)
 }
 
-// Client represents a connection to the database
-type Client struct { // nolint: golint
+// Client represents a connection to the database.
+type Client struct {
 	net.Conn
 	conf     *Config
 	gconf    *config.Config

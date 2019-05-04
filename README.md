@@ -114,8 +114,8 @@ interface is saturated, while clients can send and receive tens of thousands of
 reasonably-sized messages per second. The bottleneck for reads and writes
 should be kernel space, specifically network and disk IO, not the server
 itself. The kernel should be leveraged here to increase performance. For
-example, the `sendfile` system call is used when sending batches to client
-readers.
+example, on OSes that support it, the `sendfile` system call is used when
+sending batches to client readers.
 
 Other goals are to minimize hot-path memory allocations and copying of bytes.
 
