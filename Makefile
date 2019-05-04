@@ -20,7 +20,7 @@ clean:
 	rm -rf $(TMPDIR)/logd-testdata*
 	rm -rf $(TMPDIR)/logd-artifacts.log*
 	rm -rf ./tmp
-	find ./logs -not -name ".gitignore" -not -name "logs" -exec rm -rf {} \;
+	test -d logs && find ./logs -not -name ".gitignore" -not -name "logs" -exec rm -rf {} \; || true
 	rm -rf report/*
 
 .PHONY: clean.reports
