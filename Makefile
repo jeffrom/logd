@@ -20,7 +20,7 @@ clean:
 	rm -rf $(TMPDIR)/logd-testdata*
 	rm -rf $(TMPDIR)/logd-artifacts.log*
 	rm -rf ./tmp
-	rm -rf logs/*
+	test -d logs && find ./logs -not -name ".gitignore" -not -name "logs" -exec rm -rf {} \; || true
 	rm -rf report/*
 
 .PHONY: clean.reports
@@ -39,19 +39,11 @@ ls.tmp:
 
 .PHONY: deps
 deps:
-	# @echo "Installing dep tool and dependencies..."
-	# dep version || go get -u github.com/golang/dep/cmd/dep
-	# dep ensure -v
 	GO111MODULE=off go get github.com/wadey/gocovmerge
 	GO111MODULE=off go get golang.org/x/tools/cmd/benchcmp
 	GO111MODULE=off go get github.com/AlekSi/gocoverutil
 	mkdir -p report
 	mkdir -p integration_test/out
-
-# .PHONY: deps.dep
-# deps.dep:
-# 	@echo "Installing dep tool..."
-# 	go get -u github.com/golang/dep/cmd/dep
 
 .PHONY: build
 build:
@@ -73,7 +65,6 @@ test.race:
 	GO111MODULE=on go test -race $(PKGS)
 
 .PHONY: test.cover
-# $(foreach pkg,$(WITHOUT_APPTEST),go test -outputdir=../report -cover ./$(pkg);)
 test.cover:
 	go test -cover -coverpkg ./... ./...
 
@@ -109,11 +100,11 @@ benchcmp:
 
 .PHONY: bench.compare
 bench.compare:
-	./script/compare_benchmarks.sh
+	BENCHTIME=5s ./script/compare_benchmarks.sh
 
 .PHONY: bench.race
 bench.race:
-	GO111MODULE=on go test ./... -run ^$$ -bench . -benchmem -benchtime 2s -race
+	RACE=true ./script/benchmark.sh
 
 .PHONY: bench.ci
 bench.ci: bench.race bench.compare
@@ -142,11 +133,11 @@ test.report:
 
 .PHONY: test.report.summary
 test.report.summary:
-	echo -n "total: "; go tool cover -func=cov.out | tail -n 1 | sed -e 's/\((statements)\|total:\)//g' | tr -s "[:space:]"
+	echo -n "total: "; go tool cover -func=report/cov.out | tail -n 1 | sed -e 's/\((statements)\|total:\)//g' | tr -s "[:space:]"
 
 .PHONY: test.report.html
 test.report.html:
-	go tool cover -html=cov.out -o cov.html
+	go tool cover -html=report/cov.out -o report/cov.html
 
 .PHONY: report.depgraph
 report.depgraph:
