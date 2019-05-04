@@ -12,14 +12,15 @@ RUN CGO_ENABLED=0 go build -o logd.bin ./cmd/logd
 
 FROM alpine
 
-RUN addgroup loguser && \
+RUN mkdir -p /opt/logd && \
+    mkdir -p /opt/tmp && \
+    addgroup loguser && \
     adduser -S -D -H -h /logd -G loguser loguser && \
-    mkdir /logd && \
-    chown loguser:loguser /logd
+    chown loguser:loguser /opt/logd && \
+    chmod -R 777 /opt/tmp
+
+COPY --from=builder /build/logd.bin /usr/local/bin/logd
+
 USER loguser
 
-COPY --from=builder /build/logd.bin /logd/logd
-
-WORKDIR /logd
-
-ENTRYPOINT ["./logd"]
+ENTRYPOINT ["logd"]

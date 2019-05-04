@@ -1,4 +1,5 @@
-/logs
+./script/
+./logs/
 /tmp
 /testdata/*
 */testdata/*

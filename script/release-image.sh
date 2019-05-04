@@ -15,20 +15,27 @@ if [[ "$do_release" == "-h" || "$do_release" == "--help" ]]; then
 fi
 
 if [[ "$do_release" != "release" ]]; then
-    echo "Only pushing latest tag. Use \`$0 release\` to push a release."
+    echo "Only pushing unstable tag. Use \`$0 release\` to push a release."
 fi
 
-docker build --rm -t logd/logd:latest .
-docker build --rm -t logd/log-cli:latest -f Dockerfile.cli .
+set -x
+docker build --rm -t logd/logd:unstable .
+docker build --rm -t logd/log-cli:unstable -f Dockerfile.cli .
 
 if [[ "$do_release" == "release" ]]; then
     tag="$(cat VERSION)"
-    docker tag logd/logd:latest logd/logd:"$tag"
-    docker tag logd/log-cli:latest logd/log-cli:"$tag"
+    docker tag logd/logd:unstable logd/logd:"$tag"
+    docker tag logd/logd:unstable logd/logd:latest
+    docker tag logd/log-cli:unstable logd/log-cli:"$tag"
+    docker tag logd/log-cli:unstable logd/log-cli:latest
 
     docker push logd/logd:"$tag"
+    docker push logd/logd:latest
+
     docker push logd/log-cli:"$tag"
+    docker push logd/log-cli:latest
+else
+    docker push logd/logd:unstable
+    docker push logd/log-cli:unstable
 fi
 
-docker push logd/logd:latest
-docker push logd/log-cli:latest
