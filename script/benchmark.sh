@@ -5,6 +5,10 @@ package="${1:-...}"
 benchtime="${BENCHTIME:-1s}"
 benchmarks="${BENCH:-.}"
 go111module="${GO111MODULE:-on}"
+
+if [[ ! -z "$CI" && "$CI" != "false" && "$CI" != "no" ]]; then
+    go111module=on
+fi
 set -u
 
 cd "$( cd "$(dirname "$0")" ; pwd )/../"
