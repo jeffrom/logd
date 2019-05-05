@@ -2,12 +2,14 @@
 # Make sure to check the documentation at http://goreleaser.com
 env:
   - GO111MODULE=on
+
 before:
   hooks:
     # you may remove this if you don't use vgo
     - go mod download
     # you may remove this if you don't need go generate
     - go generate ./...
+
 builds:
 - env:
   - CGO_ENABLED=0
@@ -19,6 +21,7 @@ builds:
   main: ./cmd/log-cli
   binary: log-cli
   ldflags: -s -w -X main.ReleaseVersion={{.Version}} -X main.ReleaseCommit={{.ShortCommit}} -X main.ReleaseDate={{.Date}}
+
 dockers:
 - dockerfile: .goreleaser/Dockerfile
   binaries:
@@ -44,6 +47,7 @@ dockers:
   - "--label=org.label-schema.schema-version=1.0"
   - "--label=org.label-schema.version={{.Version}}"
   - "--label=org.label-schema.name={{.ProjectName}}"
+
 archives:
 - replacements:
     darwin: Darwin
@@ -51,10 +55,16 @@ archives:
     windows: Windows
     386: i386
     amd64: x86_64
+  files:
+    - README.md
+    - CHANGELOG.md
+
 checksum:
   name_template: 'checksums.txt'
+
 snapshot:
   name_template: "{{ .Tag }}-next"
+
 changelog:
   sort: asc
   filters:
