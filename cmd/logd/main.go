@@ -107,9 +107,8 @@ var RootCmd = &cobra.Command{
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
 		if printVersion {
-			fmt.Println(ReleaseVersion)
-			fmt.Println(ReleaseDate)
-			fmt.Println(ReleaseCommit)
+			fmt.Printf("version: %s, released: %s, commit: %s\n",
+				ReleaseVersion, ReleaseDate, ReleaseCommit)
 			return
 		}
 		if traceFile != "" {

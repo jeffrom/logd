@@ -14,8 +14,7 @@ var VersionCmd = &cobra.Command{
 	Long:    ``,
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.Debugf(tmpConfig.ToGeneralConfig(), "%+v", tmpConfig)
-		fmt.Println(ReleaseVersion)
-		fmt.Println(ReleaseDate)
-		fmt.Println(ReleaseCommit)
+		fmt.Printf("version: %s, released: %s, commit: %s\n",
+			ReleaseVersion, ReleaseDate, ReleaseCommit)
 	},
 }
