@@ -9,6 +9,7 @@ import (
 	"github.com/jeffrom/logd/internal"
 	"github.com/jeffrom/logd/protocol"
 	"github.com/jeffrom/logd/server"
+	"github.com/jeffrom/logd/stats"
 	"github.com/jeffrom/logd/transport"
 )
 
@@ -189,12 +190,14 @@ func (h *Handlers) pushBlockingRequest(ctx context.Context, req *protocol.Reques
 
 func (h *Handlers) addTopicAllowed(name string) error {
 	if h.conf.MaxTopics > 0 && len(h.h) >= h.conf.MaxTopics {
+		stats.DisallowedTopics.Add(1)
 		return protocol.ErrMaxTopics
 	}
 	if len(h.whitelist) == 0 {
 		return nil
 	}
 	if ok, _ := h.whitelist[name]; !ok {
+		stats.DisallowedTopics.Add(1)
 		return protocol.ErrTopicNotAllowed
 	}
 	return nil
