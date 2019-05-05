@@ -1,4 +1,8 @@
 
+<a name="v0.1.0-f514394d2"></a>
+## [v0.1.0-f514394d2](https://github.com/jeffrom/logd/compare/v0.1.0-494184431...v0.1.0-f514394d2) (2019-05-05)
+
+
 <a name="v0.1.0-494184431"></a>
 ## [v0.1.0-494184431](https://github.com/jeffrom/logd/compare/v0.1.2-0fca12052...v0.1.0-494184431) (2019-05-05)
 
