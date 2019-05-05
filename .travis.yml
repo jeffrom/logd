@@ -3,14 +3,27 @@ go:
     - "1.11"
     - "1.12"
 
+addons:
+  apt:
+    packages:
+      - rpm
+      - snapd
+
+env:
+  - PATH=/snap/bin:$PATH
+
 install:
   - git config remote.origin.fetch +refs/heads/*:refs/remotes/origin/*
   - git fetch --unshallow --tags
+  - sudo snap install snapcraft --classic
 
 script: make ci
 
 cache:
     directories:
-        # - $GOPATH/github.com/jeffrom/logd/vendor
         - $GOPATH/bin
         - $GOPATH/pkg
+        - ~/.cache/go-build
+
+deploy:
+  - provider: script

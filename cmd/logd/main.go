@@ -17,6 +17,12 @@ import (
 	"github.com/spf13/viper"
 )
 
+var (
+	ReleaseVersion = "none"
+	ReleaseCommit  = "none"
+	ReleaseDate    = "none"
+)
+
 var cfgFile string
 var printVersion bool
 var tmpConfig = config.New()
@@ -101,7 +107,9 @@ var RootCmd = &cobra.Command{
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
 		if printVersion {
-			fmt.Println(internal.Version)
+			fmt.Println(ReleaseVersion)
+			fmt.Println(ReleaseDate)
+			fmt.Println(ReleaseCommit)
 			return
 		}
 		if traceFile != "" {

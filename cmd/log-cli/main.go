@@ -12,6 +12,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	ReleaseVersion = "none"
+	ReleaseCommit  = "none"
+	ReleaseDate    = "none"
+)
+
 var tmpConfig = &logd.Config{}
 var topicFlag string
 

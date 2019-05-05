@@ -11,10 +11,12 @@ builds:
   - CGO_ENABLED=0
   main: ./cmd/logd
   binary: logd
+  ldflags: -s -w -X main.ReleaseVersion={{.Version}} -X main.ReleaseCommit={{.ShortCommit}} -X main.ReleaseDate={{.Date}}
 - env:
   - CGO_ENABLED=0
   main: ./cmd/log-cli
   binary: log-cli
+  ldflags: -s -w -X main.ReleaseVersion={{.Version}} -X main.ReleaseCommit={{.ShortCommit}} -X main.ReleaseDate={{.Date}}
 archives:
 - replacements:
     darwin: Darwin
