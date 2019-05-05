@@ -54,7 +54,7 @@ release: release.patch
 
 .PHONY: release.prerelease
 release.prerelease:
-	RELEASE=true ./script/bump-version.sh
+	RELEASE=true ./script/bump-version.sh pre-release -p next
 
 .PHONY: release.patch
 release.patch:
