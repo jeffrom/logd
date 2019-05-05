@@ -3,7 +3,7 @@ set -euxo pipefail
 
 cd "$( cd "$(dirname "$0")" ; pwd )/../"
 
-if ! command -v benchcmp; then
+if ! command -v benchcmp > /dev/null; then
     GO111MODULE=off go get golang.org/x/tools/cmd/benchcmp
 fi
 
