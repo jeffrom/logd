@@ -26,6 +26,7 @@ tmp/
 /integration_test/out
 
 ./build/*
+./dist/
 
 # compiled test binaries
 server.test

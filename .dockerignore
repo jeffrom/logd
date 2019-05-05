@@ -3,6 +3,7 @@
 /tmp
 ./vendor/
 ./build/
+./dist/
 
 *.test
 *.pprof
