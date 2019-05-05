@@ -37,7 +37,8 @@ fi
 # update VERSION file
 args=($@)
 if [[ ${#args[@]} -eq 0 ]]; then
-    next=$(git-semver patch --dryrun)
+    shortsha=$(git rev-parse --short=9 --verify HEAD)
+    next=$(git-semver pre-release -p "$shortsha" --dryrun)
 else
     next=$(git-semver "$@" --dryrun)
 fi

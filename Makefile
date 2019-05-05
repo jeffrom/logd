@@ -49,6 +49,21 @@ deps:
 build:
 	GO111MODULE=on go install -v ./...
 
+.PHONY: release
+release: release.patch
+
+.PHONY: release.patch
+release.patch:
+	RELEASE=true ./script/bump-version.sh patch
+
+.PHONY: release.minor
+release.minor:
+	RELEASE=true ./script/bump-version.sh minor
+
+.PHONY: release.major
+release.major:
+	RELEASE=true ./script/bump-version.sh major
+
 .PHONY: doc.serve
 doc.serve:
 	godoc -http=:6060 -goroot /usr/share/go
