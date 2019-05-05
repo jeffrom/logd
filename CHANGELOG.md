@@ -1,6 +1,14 @@
 
+<a name="v0.1.7"></a>
+## [v0.1.7](https://github.com/jeffrom/logd/compare/v0.1.6...v0.1.7) (2019-05-05)
+
+### Chore
+
+* don't use snap yet
+
+
 <a name="v0.1.6"></a>
-## [v0.1.6](https://github.com/jeffrom/logd/compare/v0.1.5...v0.1.6) (0001-01-01)
+## [v0.1.6](https://github.com/jeffrom/logd/compare/v0.1.5...v0.1.6) (2019-05-05)
 
 
 <a name="v0.1.5"></a>
