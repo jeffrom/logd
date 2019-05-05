@@ -1,4 +1,12 @@
 
+<a name="v0.1.2-0fca12052"></a>
+## [v0.1.2-0fca12052](https://github.com/jeffrom/logd/compare/v0.1.2...v0.1.2-0fca12052) (2019-05-05)
+
+### Chore
+
+* push images to docker, releases to github with travis
+
+
 <a name="v0.1.2"></a>
 ## [v0.1.2](https://github.com/jeffrom/logd/compare/v0.1.1...v0.1.2) (2019-05-05)
 
