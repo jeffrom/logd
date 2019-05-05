@@ -1,4 +1,8 @@
 
+<a name="v0.1.9"></a>
+## [v0.1.9](https://github.com/jeffrom/logd/compare/v0.1.8...v0.1.9) (0001-01-01)
+
+
 <a name="v0.1.8"></a>
 ## [v0.1.8](https://github.com/jeffrom/logd/compare/v0.1.7...v0.1.8) (2019-05-05)
 
