@@ -56,3 +56,15 @@ func TestTopics(t *testing.T) {
 		}
 	}
 }
+
+func TestTopicConfigMaxTopics(t *testing.T) {
+	// new topics not allowed > the limit
+	// infinite new topics if MaxTopics <= 0
+	t.Fatal("not implemented")
+}
+
+func TestTopicConfigTopicWhitelist(t *testing.T) {
+	// new topics not allowed if not in whitelist
+	// infinite new topics if whitelist is empty
+	t.Fatal("not implemented")
+}
