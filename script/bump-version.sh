@@ -30,7 +30,8 @@ release="${RELEASE:-}"
 set -u
 
 if [[ "$release" != "true" ]]; then
-    echo "Running in dry-run. Wont commit changes. use RELEASE=true $0 to commit."
+    echo "Running in dry-run. Wont commit changes."
+    echo "Use RELEASE=true $0 to commit."
 fi
 
 # update VERSION file
