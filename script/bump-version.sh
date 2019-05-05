@@ -36,7 +36,6 @@ fi
 
 # get latest version
 latest=$(git tag  -l --merged master --sort='-*authordate' | head -n1)
-latest=$(git tag  -l --merged master --sort='-*authordate' | head -n1)
 semver_parts=(${latest//./ })
 major=${semver_parts[0]}
 minor=${semver_parts[1]}

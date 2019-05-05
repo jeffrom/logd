@@ -52,6 +52,7 @@ func init() {
 	StatsErrors = expvar.NewInt("errors.stats")
 	CloseErrors = expvar.NewInt("errors.close")
 	ConfigErrors = expvar.NewInt("errors.config")
+
 	TotalTopics = expvar.NewInt("topics.total")
 	DisallowedTopics = expvar.NewInt("topics.disallowed")
 }
