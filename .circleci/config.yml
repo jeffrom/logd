@@ -45,13 +45,13 @@ jobs:
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
       - run: curl -sL https://git.io/goreleaser | bash
 
-workflows:
-  version: 2
-  release:
-    jobs:
-      - release:
-          filters:
-            branches:
-              ignore: /.*/
-            tags:
-              only: /v[0-9]+(\.[0-9]+)*(-.*)*/
+# workflows:
+#   version: 2
+#   release:
+#     jobs:
+#       - release:
+#           filters:
+#             branches:
+#               ignore: /.*/
+#             tags:
+#               only: /v[0-9]+(\.[0-9]+)*(-.*)*/
