@@ -26,6 +26,7 @@ type Handlers struct {
 	mu        sync.Mutex // for h
 	asyncQ    *eventQ
 	topics    *topics
+	whitelist map[string]bool
 	servers   []transport.Server
 	shutdownC chan error
 }
@@ -39,8 +40,13 @@ func NewHandlers(conf *config.Config) *Handlers {
 		h:         make(map[string]*eventQ),
 		asyncQ:    newEventQ(conf),
 		topics:    newTopics(conf),
+		whitelist: make(map[string]bool),
 		servers:   []transport.Server{},
 		shutdownC: make(chan error, 1),
+	}
+
+	for _, tname := range conf.TopicWhitelist {
+		h.whitelist[tname] = true
 	}
 
 	if conf.Host != "" {
@@ -153,7 +159,13 @@ func (h *Handlers) pushBlockingRequest(ctx context.Context, req *protocol.Reques
 		}
 
 		if err := h.addTopicAllowed(name); err != nil {
-			return nil, err
+			resp, werr := errResponse(h.conf, req, req.Response, err)
+			if werr != nil && werr != err {
+				h.mu.Unlock()
+				return resp, werr
+			}
+			h.mu.Unlock()
+			return resp, nil
 		}
 
 		q := newEventQ(h.conf)
@@ -176,6 +188,15 @@ func (h *Handlers) pushBlockingRequest(ctx context.Context, req *protocol.Reques
 }
 
 func (h *Handlers) addTopicAllowed(name string) error {
+	if h.conf.MaxTopics > 0 && len(h.h) >= h.conf.MaxTopics {
+		return protocol.ErrMaxTopics
+	}
+	if len(h.whitelist) == 0 {
+		return nil
+	}
+	if ok, _ := h.whitelist[name]; !ok {
+		return protocol.ErrTopicNotAllowed
+	}
 	return nil
 }
 

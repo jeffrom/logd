@@ -27,8 +27,8 @@ type Config struct {
 	MaxPartitions  int           `json:"max-partitions"`
 	FlushBatches   int           `json:"flush-batches"`
 	FlushInterval  time.Duration `json:"flush-interval"`
+	MaxTopics      int           `json:"topics"`
 	TopicWhitelist []string      `json:"topic-whitelist"`
-	MaxTopics      int           `json:"max-topics"`
 }
 
 // New returns a new configuration object

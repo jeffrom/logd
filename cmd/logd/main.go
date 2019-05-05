@@ -79,6 +79,12 @@ func init() {
 	pflags.DurationVar(&tmpConfig.FlushInterval, "flush-interval", config.Default.FlushInterval, "amount of time to wait before flushing")
 	viper.BindPFlag("flush-interval", pflags.Lookup("flush-interval"))
 
+	pflags.IntVar(&tmpConfig.MaxTopics, "topics", config.Default.MaxTopics, "maximum number of allowed topics")
+	viper.BindPFlag("topics", pflags.Lookup("max-topics"))
+
+	pflags.StringArrayVar(&tmpConfig.TopicWhitelist, "allowed-topics", config.Default.TopicWhitelist, "allowed topics")
+	viper.BindPFlag("allowed-topics", pflags.Lookup("allowed-topics"))
+
 	pflags.StringVar(&traceFile, "trace", "", "save execution trace data")
 	pflags.StringVar(&cpuProfile, "cpuprofile", "", "save cpu profiling data")
 }
