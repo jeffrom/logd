@@ -1,4 +1,13 @@
 
+<a name="v0.1.11"></a>
+## [v0.1.11](https://github.com/jeffrom/logd/compare/v0.1.10...v0.1.11) (2019-05-05)
+
+### Chore
+
+* change semver script
+* include changelog, readme in release
+
+
 <a name="v0.1.10"></a>
 ## [v0.1.10](https://github.com/jeffrom/logd/compare/v0.1.9...v0.1.10) (2019-05-05)
 
