@@ -4,6 +4,7 @@
 
 ### Chore
 
+* fixing bump version script
 * bump version script
 
 

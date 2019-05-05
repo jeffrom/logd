@@ -20,10 +20,10 @@ if [[ "$branch" != "master" ]]; then
     exit 1
 fi
 
-# if git status --porcelain | grep -v '^?? ' > /dev/null; then
-#     echo "Found uncommitted changes. Please commit and try again."
-#     exit 1
-# fi
+if git status --porcelain | grep -v '^?? ' > /dev/null; then
+    echo "Found uncommitted changes. Please commit and try again."
+    exit 1
+fi
 
 set +u
 release="${RELEASE:-}"
@@ -46,8 +46,9 @@ printf "%s" "$version" > VERSION
 
 # generate CHANGELOG
 changelog=$(./script/generate-changelog.sh --config .chglog/config-commit.yml --next-tag v"$version" v"$version")
+
 set -x
-RELEASE=true ./script/generate-changelog.sh --next-tag v"$version"
+./script/generate-changelog.sh --output CHANGELOG.md --next-tag v"$version"
 set +x
 
 commit_message="logd v$version
