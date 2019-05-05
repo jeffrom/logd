@@ -29,7 +29,7 @@ cache:
         - ~/.cache/go-build
 
 after_success:
-  - test -n "$TRAVIS_TAG" && docker login -u="$DOCKER_USER" -p="$DOCKER_PASSWORD"
+  - test -n "$TRAVIS_TAG" && docker login -u "$DOCKER_USER" -p "$DOCKER_PASSWORD"
 
 deploy:
   - provider: script
