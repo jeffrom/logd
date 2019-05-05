@@ -1,58 +1,67 @@
-[modeline]: <> ( vim: set ft=markdown: )
+# Roadmap
 
-# TODO
+## 0.2.0
 
-- [ ] make offset an int64
-- [ ] test that events/events returns the correct number of batches when there
-  is more than one
-- [ ] configuration to limit the number of topics. whitelist
-- [ ] writer backfill (see interface in client/state.go). there's already a
-      simple implementation.
-- [ ] test client scanner message offset/delta is correct
-- [ ] more tests for client scanner restarts from offsets+delta cases
-- [ ] have client periodically send a PING to server to keep connection alive
-  - OR(/AND) try to reconnect synchronously once, maybe with a separate config
-    for the timeout, when an io.EOF is returned. if the reconnection fails, go
-    back to async reconnect attempts.
-  - could also just be an issue w/ sequencing & error handling in the writer
-- [ ] test case where scanner state has a single message in a batch, with all
-      others in subsequent batches, and other such cases
-- [ ] scale reads better
-  - [X] remove unneccessary io
-  - [ ] for many connections with the right config settings (limited topics,
-    partitions / topic that fits in memory), try mmap
-  - [ ] some combo of mmap and regular fs access
-  - [X] currently 2 sets of fs reads per operation (1 to validate, 1 to stream to
-    client), and numerous calls to stat() that could be kept in app state
-  - [ ] also currently one goroutine accessing fs per topic so there's a lot of
-    blocking with many connections. would be better to have many goroutines
-    access fs with maybe some kind of limit on max open files.
-- [ ] run some integration tests against device mapper testing drivers (man dmsetup)
-    - some examples, maybe not possible depending on how device mapper targets work
-      - write some nonrandom text (like a book) some number of times, and assert
-        that all of it is read back
-      - write some nonrandom text, teeing it, with protocol, to a regular file,
-        then compare it to the logfiles logd writes
-- [x] audit / fix int types, such as batch size (should be int, not uint64)
-- [ ] simple replication, scanner failover
-- [ ] config validation
-- [ ] `testhelper/mock_server.go` has some race condition problems. probably
-      has to do with the closing connection stuff
-- [ ] verify batches in the connection goroutine to better leverage multiple
-      processors for the expensive checksum
-  - XXX maybe not actually, benchmarks show this to be slower. at least the
-    strategy of using a sync.Pool of batches that get attached to the request.
-  - option to disable checksum verification would also be good
-- server side limit on number of messages returned for reads
-- [x] verify topics concurrently during startup
-- [ ] http server
-  - should have a json protocol
-  - logd protocol is working
-    | curl -X POST -d $'READ default 0 3\r\n' -H 'Content-type: application/logd' http://localhost:1775/log
-- [ ] a writer backpressure config that sets the buffer size on the writers channel
+- [X] configuration to limit the number of topics
+- [X] topic whitelist
+- [ ] document config
+- [ ] stabilize logd.Backlog
+
+### testing
+
+- [ ] eventQ should return the correct number of batches when there is more than one
+- [ ] configuration validation
+- [ ] scanner offset/delta state with restarts
+
+## 0.3.0
+
+- [ ] writer error handler / reconnect sequencing
+- [ ] server-side limit on number of messages returned for reads
+- [ ] yaml configuration files
+- [ ] fix: events test attempts to reconnect to default host:port. it should
+      instead try to reconnect to the test server's ephemeral host:port.
+
+### testing
+
+- [ ] scanner state: single message in batch with subsequent messages completed up
+      to the next batch, and other such cases
+
+## 0.4.0
+
+- [ ] stabilize socket client reconnection
+- [ ] stabilize graceful shutdown
+- [ ] Writer, Scanner get own configs
+- [ ] fix(cli): log-cli incorrectly prints "topic is empty" when bad offset
+      requested
+
+## 0.5.0: ready for public testing
+
+- [ ] log-forwarder agent / client. accept MSG, build batches, flush to server.
+- [ ] stabilize configuration api
+- [ ] stabilize client api
+- [ ] make uint64 client-facing variables into int64
+- [ ] linting
+
+## 0.6.0
+
+- [ ] writer backpressure config
+- [ ] test context cancellations
+
+### testing
+
+- [ ] device mapper based tests such as flakey device mapper with nonrandom text input
+
+## 0.7.0
+
+- [ ] blocking READ
+
+## 0.8.0
+
+- [ ] replication
+- [ ] scanner failover
 
 
-# maybe later
+# maybe
 
 <!-- - [ ] XXX writer: on each flush, send a map or array of offset:delta -> message to
       a callback -->
@@ -83,7 +92,7 @@
       _ continue on startup when there are still pending delete hooks
       _ log delete hook output to logd stdout
 
-# COMPLETED
+## previously completed
 
 ## July-August 2018
 
@@ -150,27 +159,3 @@
 - [x] test suite should also include system-level tests with coverage
 
 - [x] make synchronization idiomatic w/ stuff like https://udhos.github.io/golang-concurrency-tricks/
-
-# OBSOLETE
-
-- [ ] fix sendfile. internal.LogFile needs to be able to return a seeked
-      os.File wrapped in an io.LimitReader
-- [ ] read from a partition:offset, not just an id
-- [ ] add batch to protocol so we can seek quickly around the logfile without an index
-- [ ] replication. replicas ACK to master. instrument replica delay
-- [ ] protocol.Reader, Writer should not hold their own buffers, should
-      implement something similar to io.ReaderFrom and io.WriterTo
-  - may want to just have Command, Response, Message have ReadFrom and WriteTo methods
-  - then we can add Batch
-- [ ] Store head/tail id in index
-  - [x] head
-  - [ ] tail
-- [ ] clear index entries that have been deleted
-- [ ] refuse/accept functionality
-  - `refuse(_at)` / `accept(_at)` should be able to synchronize switching at
-    partition boundaries, as well as ids.
-  - probably want to be able to have the server close a connection and tell the
-    client where they should try to reconnect?
-- [ ] `STATS` is a lot simpler after refactoring response logic. there
-      shouldn't be cmd.respC AND resp.readerC. all server response bytes should go
-      through one channel.
