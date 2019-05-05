@@ -11,19 +11,19 @@ if ! command -v git-semver > /dev/null; then
     exit 1
 fi
 
-if git status --porcelain | grep -v '^?? ' > /dev/null; then
-    echo "Found uncommitted changes. Please commit and try again."
-    exit 1
-fi
-
 branch=$(git symbolic-ref HEAD 2> /dev/null)
-branch=${branch##refs/heads}
+branch=${branch##refs/heads/}
 branch=${branch:-HEAD}
 
 if [[ "$branch" != "master" ]]; then
     echo "Not on master branch. Please checkout master and try again."
     exit 1
 fi
+
+# if git status --porcelain | grep -v '^?? ' > /dev/null; then
+#     echo "Found uncommitted changes. Please commit and try again."
+#     exit 1
+# fi
 
 set +u
 release="${RELEASE:-}"

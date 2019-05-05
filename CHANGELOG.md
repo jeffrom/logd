@@ -2,6 +2,10 @@
 <a name="v0.1.1"></a>
 ## [v0.1.1](https://github.com/jeffrom/logd/compare/v0.1.0...v0.1.1) (2019-05-04)
 
+### Chore
+
+* bump version script
+
 
 <a name="v0.1.0"></a>
 ## v0.1.0 (2019-01-21)
