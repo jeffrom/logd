@@ -34,5 +34,5 @@ jobs:
             - ~/.cache/go-build
 
       - store_artifacts:
-          path: /go/src/github.com/jeffrom/logd/report/benchcmp.out
+          path: report/benchcmp.out
           destination: benchcmp-output
