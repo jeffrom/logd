@@ -52,6 +52,10 @@ build:
 .PHONY: release
 release: release.patch
 
+.PHONY: release.prerelease
+release.prerelease:
+	RELEASE=true ./script/bump-version.sh
+
 .PHONY: release.patch
 release.patch:
 	RELEASE=true ./script/bump-version.sh patch
