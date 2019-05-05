@@ -77,7 +77,7 @@ var cmdPool = sync.Pool{
 	},
 }
 
-// Writer writes message batches to the log server
+// Writer writes message batches to the log server.
 type Writer struct {
 	Client       *Client
 	conf         *Config

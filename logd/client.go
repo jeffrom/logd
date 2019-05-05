@@ -93,12 +93,13 @@ func New(conf *Config) *Client {
 	return c
 }
 
-// Dial returns a new instance of Conn
+// Dial returns a new instance of *Client with a connected Conn.
 func Dial(addr string) (*Client, error) {
 	return DialConfig(addr, DefaultConfig)
 }
 
-// DialConfig returns a configured Conn
+// DialConfig returns a new, configured instance of *Client with a connected
+// Conn.
 func DialConfig(addr string, conf *Config) (*Client, error) {
 	// internal.Debugf(conf, "starting options: %s", conf)
 	c := New(conf)
@@ -217,7 +218,7 @@ func (c *Client) unsetSticky() {
 }
 
 // Batch sends a BATCH request and returns the response. Batch does not retry.
-// If you want reconnect functionality, use a Writer
+// If you want reconnect functionality, use a Writer.
 func (c *Client) Batch(batch *protocol.Batch) (uint64, error) {
 	if batch.Empty() {
 		return 0, ErrEmptyBatch

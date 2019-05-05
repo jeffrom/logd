@@ -41,7 +41,7 @@ type Scanner struct {
 	limit             int
 }
 
-// NewScanner returns a new instance of *Scanner
+// NewScanner returns a new instance of *Scanner.
 func NewScanner(conf *Config, topic string) *Scanner {
 	s := &Scanner{
 		conf:     conf,
@@ -122,7 +122,7 @@ func (s *Scanner) resetDoneC() {
 	}
 }
 
-// WithSetStatePuller sets the StatePuller on the Scanner
+// WithSetStatePuller sets the StatePuller on the Scanner.
 func (s *Scanner) WithStateHandler(statem StatePuller) *Scanner {
 	s.statem = statem
 	return s

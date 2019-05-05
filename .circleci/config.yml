@@ -19,23 +19,19 @@ jobs:
     ####   /go/src/bitbucket.org/circleci/go-tool
     working_directory: /go/src/github.com/jeffrom/logd
     steps:
+      # specify any bash command here prefixed with `run: `
       - checkout
 
       - restore_cache:
           keys:
             - v4-package-cache
 
-      # specify any bash command here prefixed with `run: `
       - run: make ci
 
-      # - run: sudo chmod -R 777 /go/pkg
-      # - run: sudo chmod -R 777 /go/bin
       - save_cache:
           key: v4-package-cache
           paths:
             - ~/.cache/go-build
-            # - /go/pkg
-            # - /go/bin
 
       - store_artifacts:
           path: /go/src/github.com/jeffrom/logd/report/benchcmp.out
