@@ -1,25 +1,10 @@
 
-<a name="v0.1.0-f514394d2"></a>
-## [v0.1.0-f514394d2](https://github.com/jeffrom/logd/compare/v0.1.0-494184431...v0.1.0-f514394d2) (2019-05-05)
-
-
-<a name="v0.1.0-494184431"></a>
-## [v0.1.0-494184431](https://github.com/jeffrom/logd/compare/v0.1.2-0fca12052...v0.1.0-494184431) (2019-05-05)
-
-
-<a name="v0.1.2-0fca12052"></a>
-## [v0.1.2-0fca12052](https://github.com/jeffrom/logd/compare/v0.1.2...v0.1.2-0fca12052) (2019-05-05)
-
-### Chore
-
-* push images to docker, releases to github with travis
-
-
 <a name="v0.1.2"></a>
 ## [v0.1.2](https://github.com/jeffrom/logd/compare/v0.1.1...v0.1.2) (2019-05-05)
 
 ### Chore
 
+* push images to docker, releases to github with travis
 * set up goreleaser to push docker images
 
 
