@@ -20,7 +20,7 @@ install:
 services:
   - docker
 
-script: test -n "$TRAVIS_TAG" || make ci
+script: if test -z "$TRAVIS_TAG"; then make ci; else true; fi
 
 cache:
     directories:
