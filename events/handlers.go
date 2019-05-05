@@ -152,6 +152,10 @@ func (h *Handlers) pushBlockingRequest(ctx context.Context, req *protocol.Reques
 			return q.PushRequest(ctx, req)
 		}
 
+		if err := h.addTopicAllowed(name); err != nil {
+			return nil, err
+		}
+
 		q := newEventQ(h.conf)
 		topic, err := h.topics.add(name)
 		if err != nil {
@@ -169,6 +173,10 @@ func (h *Handlers) pushBlockingRequest(ctx context.Context, req *protocol.Reques
 		return q.PushRequest(ctx, req)
 	}
 	return h.asyncQ.PushRequest(ctx, req)
+}
+
+func (h *Handlers) addTopicAllowed(name string) error {
+	return nil
 }
 
 func (h *Handlers) Stop() error {
