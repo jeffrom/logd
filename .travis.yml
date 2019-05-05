@@ -7,16 +7,16 @@ addons:
   apt:
     packages:
       - rpm
-      - snapd
+      # - snapd
 
 env:
-  - PATH=/snap/bin:$PATH
+  # - PATH=/snap/bin:$PATH
   - GO111MODULE=on
 
 install:
   - git config remote.origin.fetch +refs/heads/*:refs/remotes/origin/*
   - git fetch --unshallow --tags
-  - sudo snap install snapcraft --classic
+  # - sudo snap install snapcraft --classic
 
 services:
   - docker
