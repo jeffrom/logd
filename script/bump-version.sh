@@ -64,6 +64,8 @@ $changelog
 "
 
 if [[ "$release" != "true" ]]; then
+    echo
+    echo "dry run mode"
     echo "VERSION: $version"
     echo "commit: $commit_message"
     exit
