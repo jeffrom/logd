@@ -17,6 +17,9 @@ install:
   - git fetch --unshallow --tags
   - sudo snap install snapcraft --classic
 
+services:
+  - docker
+
 script: make ci
 
 cache:
@@ -25,5 +28,13 @@ cache:
         - $GOPATH/pkg
         - ~/.cache/go-build
 
+after_success:
+  - test -n "$TRAVIS_TAG" && docker login -u="$DOCKER_USER" -p="$DOCKER_PASSWORD"
+
 deploy:
   - provider: script
+    skip_cleanup: true
+    script: curl -sL https://git.io/goreleaser | bash
+    on:
+      tags: true
+      condition: $TRAVIS_OS_NAME = linux
