@@ -1,6 +1,14 @@
 
+<a name="v0.1.10"></a>
+## [v0.1.10](https://github.com/jeffrom/logd/compare/v0.1.9...v0.1.10) (2019-05-05)
+
+### Chore
+
+* travis should only release from go 1.12
+
+
 <a name="v0.1.9"></a>
-## [v0.1.9](https://github.com/jeffrom/logd/compare/v0.1.8...v0.1.9) (0001-01-01)
+## [v0.1.9](https://github.com/jeffrom/logd/compare/v0.1.8...v0.1.9) (2019-05-05)
 
 
 <a name="v0.1.8"></a>
