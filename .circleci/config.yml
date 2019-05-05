@@ -42,6 +42,7 @@ jobs:
       - image: circleci/golang:1.12
     steps:
       - checkout
+      - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
       - run: curl -sL https://git.io/goreleaser | bash
 
 workflows:

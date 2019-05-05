@@ -17,6 +17,31 @@ builds:
   main: ./cmd/log-cli
   binary: log-cli
   ldflags: -s -w -X main.ReleaseVersion={{.Version}} -X main.ReleaseCommit={{.ShortCommit}} -X main.ReleaseDate={{.Date}}
+dockers:
+- dockerfile: .goreleaser/Dockerfile
+  binaries:
+    - logd
+  image_templates:
+  - "logd/logd:latest"
+  - "logd/logd:{{ .Tag }}"
+  - "logd/logd:v{{ .Major }}"
+  - "logd/logd:v{{ .Major }}.{{ .Minor }}"
+  build_flag_templates:
+  - "--label=org.label-schema.schema-version=1.0"
+  - "--label=org.label-schema.version={{.Version}}"
+  - "--label=org.label-schema.name={{.ProjectName}}"
+- dockerfile: .goreleaser/Dockerfile.cli
+  binaries:
+    - log-cli
+  image_templates:
+  - "logd/log-cli:latest"
+  - "logd/log-cli:{{ .Tag }}"
+  - "logd/log-cli:v{{ .Major }}"
+  - "logd/log-cli:v{{ .Major }}.{{ .Minor }}"
+  build_flag_templates:
+  - "--label=org.label-schema.schema-version=1.0"
+  - "--label=org.label-schema.version={{.Version}}"
+  - "--label=org.label-schema.name={{.ProjectName}}"
 archives:
 - replacements:
     darwin: Darwin
