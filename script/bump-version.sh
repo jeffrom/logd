@@ -60,7 +60,7 @@ if [[ "$release" != "true" ]]; then
     exit
 fi
 
-git commit VERSION CHANGELOG.md -t <(echo -n "$commit_message")
+git commit VERSION CHANGELOG.md --allow-empty -t <(echo -n "$commit_message")
 git tag -a v"$version" -m "logd v$version"
 
 echo "use git push --follow-tags to deploy the new version."
