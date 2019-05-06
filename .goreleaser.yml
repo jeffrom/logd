@@ -28,9 +28,9 @@ dockers:
     - logd
   image_templates:
   - "logd/logd:latest"
-  - "logd/logd:{{ .Tag }}"
-  - "logd/logd:v{{ .Major }}"
-  - "logd/logd:v{{ .Major }}.{{ .Minor }}"
+  - "logd/logd:{{ .Major }}"
+  - "logd/logd:{{ .Major }}.{{ .Minor }}"
+  - "logd/logd:{{ .Major }}.{{ .Minor }}.{{ .Patch }}"
   build_flag_templates:
   - "--label=org.label-schema.schema-version=1.0"
   - "--label=org.label-schema.version={{.Version}}"
@@ -40,9 +40,9 @@ dockers:
     - log-cli
   image_templates:
   - "logd/log-cli:latest"
-  - "logd/log-cli:{{ .Tag }}"
-  - "logd/log-cli:v{{ .Major }}"
-  - "logd/log-cli:v{{ .Major }}.{{ .Minor }}"
+  - "logd/log-cli:{{ .Major }}"
+  - "logd/log-cli:{{ .Major }}.{{ .Minor }}"
+  - "logd/log-cli:{{ .Major }}.{{ .Minor }}.{{ .Patch }}"
   build_flag_templates:
   - "--label=org.label-schema.schema-version=1.0"
   - "--label=org.label-schema.version={{.Version}}"
