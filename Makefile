@@ -43,6 +43,7 @@ deps:
 	GO111MODULE=off go get golang.org/x/tools/cmd/benchcmp
 	GO111MODULE=off go get github.com/AlekSi/gocoverutil
 	GO111MODULE=off go get github.com/psampaz/go-mod-outdated
+	GO111MODULE=off go get golang.org/x/perf/cmd/benchstat
 	mkdir -p report
 	mkdir -p integration_test/out
 
