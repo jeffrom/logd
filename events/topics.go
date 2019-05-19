@@ -10,6 +10,7 @@ import (
 	"github.com/jeffrom/logd/internal"
 	"github.com/jeffrom/logd/logger"
 	"github.com/jeffrom/logd/protocol"
+	"github.com/jeffrom/logd/stats"
 )
 
 var partitionArgListPool = sync.Pool{
@@ -118,6 +119,7 @@ func (t *topics) add(name string) (*topic, error) {
 		t.mu.Lock()
 		t.m[name] = topic
 		t.mu.Unlock()
+		stats.TotalTopics.Add(1)
 	}
 	return topic, nil
 }

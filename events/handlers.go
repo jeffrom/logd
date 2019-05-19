@@ -9,6 +9,7 @@ import (
 	"github.com/jeffrom/logd/internal"
 	"github.com/jeffrom/logd/protocol"
 	"github.com/jeffrom/logd/server"
+	"github.com/jeffrom/logd/stats"
 	"github.com/jeffrom/logd/transport"
 )
 
@@ -26,6 +27,7 @@ type Handlers struct {
 	mu        sync.Mutex // for h
 	asyncQ    *eventQ
 	topics    *topics
+	whitelist map[string]bool
 	servers   []transport.Server
 	shutdownC chan error
 }
@@ -39,8 +41,13 @@ func NewHandlers(conf *config.Config) *Handlers {
 		h:         make(map[string]*eventQ),
 		asyncQ:    newEventQ(conf),
 		topics:    newTopics(conf),
+		whitelist: make(map[string]bool),
 		servers:   []transport.Server{},
 		shutdownC: make(chan error, 1),
+	}
+
+	for _, tname := range conf.TopicWhitelist {
+		h.whitelist[tname] = true
 	}
 
 	if conf.Host != "" {
@@ -152,6 +159,16 @@ func (h *Handlers) pushBlockingRequest(ctx context.Context, req *protocol.Reques
 			return q.PushRequest(ctx, req)
 		}
 
+		if err := h.addTopicAllowed(name); err != nil {
+			resp, werr := errResponse(h.conf, req, req.Response, err)
+			if werr != nil && werr != err {
+				h.mu.Unlock()
+				return resp, werr
+			}
+			h.mu.Unlock()
+			return resp, nil
+		}
+
 		q := newEventQ(h.conf)
 		topic, err := h.topics.add(name)
 		if err != nil {
@@ -169,6 +186,21 @@ func (h *Handlers) pushBlockingRequest(ctx context.Context, req *protocol.Reques
 		return q.PushRequest(ctx, req)
 	}
 	return h.asyncQ.PushRequest(ctx, req)
+}
+
+func (h *Handlers) addTopicAllowed(name string) error {
+	if h.conf.MaxTopics > 0 && len(h.h) >= h.conf.MaxTopics {
+		stats.DisallowedTopics.Add(1)
+		return protocol.ErrMaxTopics
+	}
+	if len(h.whitelist) == 0 {
+		return nil
+	}
+	if ok, _ := h.whitelist[name]; !ok {
+		stats.DisallowedTopics.Add(1)
+		return protocol.ErrTopicNotAllowed
+	}
+	return nil
 }
 
 func (h *Handlers) Stop() error {

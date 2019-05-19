@@ -56,3 +56,75 @@ func TestTopics(t *testing.T) {
 		}
 	}
 }
+
+func TestTopicConfigMaxTopics(t *testing.T) {
+	// new topics not allowed > the limit
+
+	conf := testhelper.DefaultConfig(testing.Verbose())
+	conf.MaxTopics = 1
+	q := NewHandlers(conf)
+	doStartHandler(t, q)
+	defer doShutdownHandler(t, q)
+
+	b := protocol.NewBatch(conf)
+	b.SetTopic([]byte("default"))
+	b.Append([]byte("woooo"))
+	buf := &bytes.Buffer{}
+	if _, err := b.WriteTo(buf); err != nil {
+		t.Fatal(err)
+	}
+
+	cr := pushBatch(t, q, buf.Bytes())
+	if err := cr.Error(); err != nil {
+		t.Fatal(err)
+	}
+
+	b = protocol.NewBatch(conf)
+	b.SetTopic([]byte("toomanytopics"))
+	b.Append([]byte("woooo"))
+	buf = &bytes.Buffer{}
+	if _, err := b.WriteTo(buf); err != nil {
+		t.Fatal(err)
+	}
+
+	cr = pushBatch(t, q, buf.Bytes())
+	if err := cr.Error(); err != protocol.ErrMaxTopics {
+		t.Fatal("expected max topic error but got:", err)
+	}
+}
+
+func TestTopicConfigTopicWhitelist(t *testing.T) {
+	// new topics not allowed if not in whitelist
+	// infinite new topics if whitelist is empty
+	conf := testhelper.DefaultConfig(testing.Verbose())
+	conf.TopicWhitelist = []string{"allowedtopic"}
+	q := NewHandlers(conf)
+	doStartHandler(t, q)
+	defer doShutdownHandler(t, q)
+
+	b := protocol.NewBatch(conf)
+	b.SetTopic([]byte("allowedtopic"))
+	b.Append([]byte("woooo"))
+	buf := &bytes.Buffer{}
+	if _, err := b.WriteTo(buf); err != nil {
+		t.Fatal(err)
+	}
+
+	cr := pushBatch(t, q, buf.Bytes())
+	if err := cr.Error(); err != nil {
+		t.Fatal(err)
+	}
+
+	b = protocol.NewBatch(conf)
+	b.SetTopic([]byte("notallowed"))
+	b.Append([]byte("woooo"))
+	buf = &bytes.Buffer{}
+	if _, err := b.WriteTo(buf); err != nil {
+		t.Fatal(err)
+	}
+
+	cr = pushBatch(t, q, buf.Bytes())
+	if err := cr.Error(); err != protocol.ErrTopicNotAllowed {
+		t.Fatal("expected topic not allowed but got:", err)
+	}
+}

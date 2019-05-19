@@ -26,6 +26,8 @@ var (
 	StatsErrors       *expvar.Int
 	CloseErrors       *expvar.Int
 	ConfigErrors      *expvar.Int
+	TotalTopics       *expvar.Int
+	DisallowedTopics  *expvar.Int
 )
 
 func init() {
@@ -50,6 +52,9 @@ func init() {
 	StatsErrors = expvar.NewInt("errors.stats")
 	CloseErrors = expvar.NewInt("errors.close")
 	ConfigErrors = expvar.NewInt("errors.config")
+
+	TotalTopics = expvar.NewInt("topics.total")
+	DisallowedTopics = expvar.NewInt("topics.disallowed")
 }
 
 // MultiOK returns an MOK response body

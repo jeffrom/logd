@@ -43,6 +43,14 @@ var (
 	// ErrInvalid refers to an invalid request.
 	ErrInvalid = errors.New("invalid request")
 
+	// ErrMaxTopics means the maximum number of topics has already been
+	// created.
+	ErrMaxTopics = errors.New("maximum topics allowed")
+
+	// ErrTopicNotAllowed means the maximum number of topics has already been
+	// created.
+	ErrTopicNotAllowed = errors.New("topic not allowed")
+
 	// ErrInvalidOffset is returned when a read is attempted from a batch
 	// offset that doesn't point to the beginning of a batch protocol message.
 	ErrInvalidOffset = errors.New("invalid offset")
@@ -75,6 +83,12 @@ var (
 
 	// ErrRespTooLarge indicates a protocol error
 	ErrRespTooLarge = []byte("too large")
+
+	// ErrRespMaxTopics is the serialized form of ErrMaxTopics.
+	ErrRespMaxTopics = []byte("maximum topics allowed")
+
+	// ErrRespTopicNotAllowed is the serialized form of ErrTopicNotAllowed
+	ErrRespTopicNotAllowed = []byte("topic not allowed")
 )
 
 func (resp RespType) String() string {

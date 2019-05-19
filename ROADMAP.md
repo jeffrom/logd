@@ -46,6 +46,7 @@
 
 - [ ] writer backpressure config
 - [ ] test context cancellations
+- [ ] refactor / document client -> server -> events error handling
 
 ### testing
 

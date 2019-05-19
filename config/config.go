@@ -20,13 +20,15 @@ type Config struct {
 	IdleTimeout     time.Duration `json:"idle-timeout"`
 	ShutdownTimeout time.Duration `json:"shutdown-timeout"`
 
-	WorkDir       string        `json:"work-dir"`
-	LogFileMode   int           `json:"log-file-mode"`
-	MaxBatchSize  int           `json:"max-batch-size"`
-	PartitionSize int           `json:"partition-size"`
-	MaxPartitions int           `json:"max-partitions"`
-	FlushBatches  int           `json:"flush-batches"`
-	FlushInterval time.Duration `json:"flush-interval"`
+	WorkDir        string        `json:"work-dir"`
+	LogFileMode    int           `json:"log-file-mode"`
+	MaxBatchSize   int           `json:"max-batch-size"`
+	PartitionSize  int           `json:"partition-size"`
+	MaxPartitions  int           `json:"max-partitions"`
+	FlushBatches   int           `json:"flush-batches"`
+	FlushInterval  time.Duration `json:"flush-interval"`
+	MaxTopics      int           `json:"topics"`
+	TopicWhitelist []string      `json:"topic-whitelist"`
 }
 
 // New returns a new configuration object
@@ -42,7 +44,7 @@ func (c *Config) String() string {
 var Default = &Config{
 	Host:            ":1774",
 	HttpHost:        ":1775",
-	Timeout:         10 * time.Second,
+	Timeout:         15 * time.Second,
 	IdleTimeout:     30 * time.Second,
 	ShutdownTimeout: 15 * time.Second,
 	WorkDir:         "logs/",
@@ -52,4 +54,5 @@ var Default = &Config{
 	MaxPartitions:   8,
 	FlushBatches:    0,
 	FlushInterval:   -1,
+	MaxTopics:       8,
 }
