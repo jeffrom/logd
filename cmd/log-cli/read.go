@@ -19,7 +19,7 @@ func init() {
 	pflags.IntVar(&tmpConfig.Limit, "limit", dconf.Limit, "limit minimum number of messages per read to `MESSAGES`")
 	pflags.Uint64Var(&tmpConfig.Offset, "offset", dconf.Offset, "start reading messages from `OFFSET`")
 
-	pflags.BoolVarP(&tmpConfig.ReadForever, "read-forever", "F", dconf.WriteForever, "Keep reading input until the program is killed")
+	pflags.BoolVarP(&tmpConfig.ReadForever, "read-forever", "F", dconf.ReadForever, "Keep reading input until the program is killed")
 	pflags.StringVar(&topicFlag, "topic", "default", "a `TOPIC` for the read")
 
 	pflags.IntVar(&tmpConfig.ConnRetries, "retries", dconf.ConnRetries, "total number of connection retries")
