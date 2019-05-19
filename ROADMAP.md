@@ -4,7 +4,7 @@
 
 - [X] configuration to limit the number of topics
 - [X] topic whitelist
-- [ ] document config
+- [X] document config
 
 ### testing
 
