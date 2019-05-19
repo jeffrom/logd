@@ -114,6 +114,7 @@ func benchmarkBatchFull(b *testing.B, conf *config.Config, fixturename string, t
 	defer shutdownHandlers(b, h)
 	addr := h.servers[0].ListenAddr().String()
 	fixture := testhelper.LoadFixture(fixturename)
+	b.SetBytes(int64(len(fixture)))
 
 	fixtures := make([][]byte, len(topics))
 	for i, topic := range topics {
@@ -170,7 +171,7 @@ func benchmarkReadFull(b *testing.B, conf *config.Config, messages int) {
 		topic := []byte("default")
 
 		for pb.Next() {
-			_, bs, err := c.ReadOffset(topic, 0, 3)
+			_, bs, err := c.ReadOffset(topic, 0, messages)
 			if err != nil {
 				b.Fatal(err)
 			}

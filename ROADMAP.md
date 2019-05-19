@@ -5,7 +5,6 @@
 - [X] configuration to limit the number of topics
 - [X] topic whitelist
 - [ ] document config
-- [ ] stabilize logd.Backlog
 
 ### testing
 
@@ -55,6 +54,7 @@
 ## 0.7.0
 
 - [ ] blocking READ
+- [ ] stabilize logd.Backlog
 
 ## 0.8.0
 

@@ -134,6 +134,7 @@ func (w *Writer) WithStateHandler(m StatePusher) *Writer {
 
 func (w *Writer) WithBacklog(bl Backlogger) *Writer {
 	w.backlog = bl
+	w.backlogC = bl.Backlog()
 	return w
 }
 
