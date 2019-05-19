@@ -10,7 +10,6 @@
 ### testing
 
 - [ ] eventQ should return the correct number of batches when there is more than one
-- [ ] configuration validation
 - [ ] scanner offset/delta state with restarts
 
 ## 0.3.0
@@ -47,6 +46,7 @@
 - [ ] writer backpressure config
 - [ ] test context cancellations
 - [ ] refactor / document client -> server -> events error handling
+- [ ] configuration validation
 
 ### testing
 

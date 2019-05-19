@@ -42,6 +42,7 @@ deps:
 	GO111MODULE=off go get github.com/wadey/gocovmerge
 	GO111MODULE=off go get golang.org/x/tools/cmd/benchcmp
 	GO111MODULE=off go get github.com/AlekSi/gocoverutil
+	GO111MODULE=off go get github.com/psampaz/go-mod-outdated
 	mkdir -p report
 	mkdir -p integration_test/out
 
@@ -108,6 +109,10 @@ lint:
 lint.install:
 	GO111MODULE=on go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.16.0
 
+.PHONY: check.deps
+check.deps:
+	GO111MODULE=on go list -u -m -json all | go-mod-outdated
+
 .PHONY: bench
 BENCH ?= .
 bench:
@@ -129,7 +134,7 @@ bench.race:
 bench.ci: bench.race bench.compare
 
 .PHONY: ci
-ci: clean deps build test.coverprofile test.race bench.ci test.report.summary
+ci: clean deps build test.coverprofile test.race bench.ci check.deps test.report.summary
 
 .PHONY: ci.local
 ci.local:
