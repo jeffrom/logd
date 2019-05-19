@@ -60,7 +60,7 @@ func doRead(conf *logd.Config, c *cobra.Command) error {
 		defer out.Close()
 	}
 
-	scanner, err := logd.DialScannerConfig(conf.Hostport, conf)
+	scanner, err := logd.DialScannerConfig(conf.Host, conf)
 	if err != nil {
 		return err
 	}

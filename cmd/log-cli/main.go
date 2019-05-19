@@ -25,7 +25,7 @@ func init() {
 	pflags := RootCmd.PersistentFlags()
 
 	pflags.BoolVarP(&tmpConfig.Verbose, "verbose", "v", logd.DefaultConfig.Verbose, "print debug output")
-	pflags.StringVar(&tmpConfig.Hostport, "host", logd.DefaultConfig.Hostport, "a `HOST:PORT` combination to listen on")
+	pflags.StringVar(&tmpConfig.Host, "host", logd.DefaultConfig.Host, "a `HOST:PORT` combination to listen on")
 	pflags.DurationVar(&tmpConfig.Timeout, "timeout", logd.DefaultConfig.Timeout, "duration to wait for requests to complete")
 	pflags.DurationVar(&tmpConfig.ConnectTimeout, "connect-timeout", logd.DefaultConfig.ConnectTimeout, "duration to wait for connection to establish. Overrides 'timeout' if set")
 	pflags.DurationVar(&tmpConfig.WriteTimeout, "write-timeout", logd.DefaultConfig.WriteTimeout, "duration to wait for writes to the server to complete. Overrides 'timeout' if set")

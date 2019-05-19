@@ -73,7 +73,7 @@ func ScannerForClient(c *Client) *Scanner {
 // DialScannerConfig returns a new writer with a connection to addr
 func DialScannerConfig(addr string, conf *Config) (*Scanner, error) {
 	if addr == "" {
-		addr = conf.Hostport
+		addr = conf.Host
 	}
 	c, err := DialConfig(addr, conf)
 	if err != nil {

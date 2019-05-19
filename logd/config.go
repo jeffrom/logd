@@ -11,8 +11,10 @@ import (
 // Config is used for client configuration
 type Config struct {
 	// shared options
+
+	// Verbose prints debugging information.
 	Verbose              bool          `json:"verbose"`
-	Hostport             string        `json:"host"`
+	Host                 string        `json:"host"`
 	Timeout              time.Duration `json:"timeout"`
 	ConnectTimeout       time.Duration `json:"connect-timeout"`
 	WriteTimeout         time.Duration `json:"write-timeout"`
@@ -40,7 +42,7 @@ type Config struct {
 // DefaultConfig is the default client configuration
 var DefaultConfig = &Config{
 	Verbose:              false,
-	Hostport:             "127.0.0.1:1774",
+	Host:                 "127.0.0.1:1774",
 	Timeout:              10 * time.Second,
 	ConnectTimeout:       -1,
 	WriteTimeout:         -1,
@@ -106,7 +108,7 @@ func (c *Config) ToGeneralConfig() *config.Config {
 	gconf := &config.Config{}
 	*gconf = *config.Default
 	gconf.Verbose = c.Verbose
-	gconf.Host = c.Hostport
+	gconf.Host = c.Host
 	gconf.MaxBatchSize = c.BatchSize
 	return gconf
 }
@@ -117,7 +119,7 @@ func (c *Config) FromGeneralConfig(conf *config.Config) *Config {
 	*newc = *c
 
 	c.Verbose = conf.Verbose
-	c.Hostport = conf.Host
+	c.Host = conf.Host
 	c.BatchSize = conf.MaxBatchSize
 
 	return newc

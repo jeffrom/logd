@@ -307,7 +307,7 @@ func generateConns(bconf *benchConfig, counts *benchCounts, inputs [][]byte) ([]
 	}
 	var conns []*benchConn
 	for i := 0; i < bconf.conns; i++ {
-		c, err := logd.DialConfig(bconf.conf.Hostport, bconf.conf)
+		c, err := logd.DialConfig(bconf.conf.Host, bconf.conf)
 		if err != nil {
 			return conns, err
 		}
