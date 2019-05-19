@@ -17,8 +17,6 @@ func init() {
 
 	pflags.Uint64Var(&tmpConfig.Offset, "offset", dconf.Offset,
 		"start reading messages from `OFFSET`")
-	pflags.BoolVarP(&tmpConfig.WriteForever, "write-forever", "F", dconf.WriteForever,
-		"Keep reading input until the program is killed")
 	pflags.StringVar(&topicFlag, "topic", "default",
 		"a `TOPIC` for the write")
 

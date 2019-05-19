@@ -70,7 +70,7 @@ func (ts *integrationTest) setup(t *testing.T) {
 	ts.h = NewHandlers(ts.conf)
 	doStartHandler(t, ts.h)
 
-	ts.cconf.Hostport = ts.h.servers[0].ListenAddr().String()
+	ts.cconf.Host = ts.h.servers[0].ListenAddr().String()
 	for i := 0; i < ts.n; i++ {
 		w := logd.NewWriter(ts.cconf, "default")
 		w.WithStateHandler(ts)
@@ -304,7 +304,7 @@ func testIntegrationReconnect(t *testing.T, ts *integrationTest) {
 		wg.Wait()
 		failOnErrors(t, errC)
 
-		c, err := logd.DialConfig(ts.cconf.Hostport, ts.cconf)
+		c, err := logd.DialConfig(ts.cconf.Host, ts.cconf)
 		if err != nil {
 			t.Fatalf("failed to connect for recovering batches: %+v", err)
 		}

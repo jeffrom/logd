@@ -357,7 +357,7 @@ func (w *Writer) resetTimer(interval time.Duration) {
 
 func (w *Writer) handleReconnect() error {
 	internal.Debugf(w.gconf, "attempting reconnect, attempt: %d", w.retries+1)
-	if err := w.Client.connect(w.conf.Hostport); err != nil {
+	if err := w.Client.connect(w.conf.Host); err != nil {
 		w.retries++
 		if w.conf.ConnRetries > 0 && w.retries >= w.conf.ConnRetries {
 			internal.Debugf(w.gconf, "giving up after %d attempts", w.retries+1)

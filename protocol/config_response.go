@@ -10,7 +10,7 @@ import (
 	"github.com/jeffrom/logd/config"
 )
 
-var bhostport = []byte("Hostport: ")
+var bhostport = []byte("Host: ")
 var btimeout = []byte("Timeout: ")
 var bidletimeout = []byte("IdleTimeout: ")
 var bmaxbatchsize = []byte("MaxBatchSize: ")
@@ -175,7 +175,7 @@ func (cr *ConfigResponse) readFromBuf(r *bufio.Reader) (int64, error) {
 		}
 
 		switch string(kb) {
-		case "Hostport: ":
+		case "Host: ":
 			cr.readConf.Host = string(vb)
 		case "Timeout: ":
 			dur, err := time.ParseDuration(string(vb))

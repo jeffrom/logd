@@ -11,36 +11,87 @@ import (
 // Config is used for client configuration
 type Config struct {
 	// shared options
-	Verbose              bool          `json:"verbose"`
-	Hostport             string        `json:"host"`
-	Timeout              time.Duration `json:"timeout"`
-	ConnectTimeout       time.Duration `json:"connect-timeout"`
-	WriteTimeout         time.Duration `json:"write-timeout"`
-	ReadTimeout          time.Duration `json:"read-timeout"`
-	Count                bool          `json:"count"`
-	OutputPath           string        `json:"output"`
-	WaitInterval         time.Duration `json:"wait-interval"`
-	ConnRetries          int           `json:"connection-retries"`
-	ConnRetryInterval    time.Duration `json:"connection-retry-interval"`
+
+	// Verbose prints debugging information.
+	Verbose bool `json:"verbose"`
+
+	// Host defines the host:port to connect to.
+	Host string `json:"host"`
+
+	// Timeout defines the overall socket timeout. For more granular control,
+	// set ConnectTimeout, WriteTimeout, and ReadTimeout.
+	Timeout time.Duration `json:"timeout"`
+
+	// ConnectTimeout defines the time limit for connecting to the server.
+	ConnectTimeout time.Duration `json:"connect-timeout"`
+
+	// WriteTimeout defines the time limit for writing to the server socket.
+	WriteTimeout time.Duration `json:"write-timeout"`
+
+	// ReadTimeout defines the time limit for reading from the server socket.
+	ReadTimeout time.Duration `json:"read-timeout"`
+
+	// Count prints some counts of messages written before exiting log-cli.
+	Count bool `json:"count"`
+
+	// OutputPath is the file log-cli will write output data to. Defaults to
+	// standard out.
+	OutputPath string `json:"output"`
+
+	// WaitInterval, for Writer, determines the length of time, without any
+	// messages written, before the batch is flushed to the server. For
+	// Scanner, determines how long to wait before requesting new batches.
+	// TODO these should be split out when writer and scanner have seperate
+	// configs.
+	WaitInterval time.Duration `json:"wait-interval"`
+
+	// ConnRetries defines how many attempts to connect should happen. A
+	// negative number will retry forever.
+	ConnRetries int `json:"connection-retries"`
+
+	// ConnRetryMaxInterval defines the initial amount of time to wait before
+	// attempting to reconnect.
+	ConnRetryInterval time.Duration `json:"connection-retry-interval"`
+
+	// ConnRetryMaxInterval defines the maximum amount of time to wait before
+	// attempting to reconnect.
 	ConnRetryMaxInterval time.Duration `json:"connection-retry-max-interval"`
-	ConnRetryMultiplier  float64       `json:"connection-retry-multiplier"`
+
+	// ConnRetryMultiplier defines the multiplier for reconnection attempts.
+	// For example, if the multiplier is 2.0, the amount of time to wait will
+	// double each time a reconnect is attempted, up to ConnRetryMaxInterval.
+	ConnRetryMultiplier float64 `json:"connection-retry-multiplier"`
 
 	// write options
-	BatchSize    int    `json:"batch-size"`
-	WriteForever bool   `json:"write-forever"`
-	InputPath    string `json:"input"`
+
+	// BatchSize is the maximum batch size to reach before flushing a batch to
+	// the server.
+	BatchSize int `json:"batch-size"`
+
+	// InputPath defines the file from which log-cli reads messages. Defaults
+	// to standard input.
+	InputPath string `json:"input"`
 
 	// read options
-	Limit       int    `json:"limit"`
-	Offset      uint64 `json:"offset"`
-	ReadForever bool   `json:"read-forever"`
-	UseTail     bool   `json:"use-tail"`
+
+	// Limit defines the minimum number of messages to read per read operation.
+	Limit int `json:"limit"`
+
+	// Offset defines the initial offset from which to read messages.
+	Offset uint64 `json:"offset"`
+
+	// ReadForever will read messages until the scanner is stopped.
+	ReadForever bool `json:"read-forever"`
+
+	// UseTail tells the scanner to begin reading from the beginning of the
+	// log.
+	UseTail bool `json:"use-tail"`
 }
 
 // DefaultConfig is the default client configuration
 var DefaultConfig = &Config{
 	Verbose:              false,
-	Hostport:             "127.0.0.1:1774",
+	Host:                 "127.0.0.1:1774",
 	Timeout:              10 * time.Second,
 	ConnectTimeout:       -1,
 	WriteTimeout:         -1,
@@ -106,7 +157,7 @@ func (c *Config) ToGeneralConfig() *config.Config {
 	gconf := &config.Config{}
 	*gconf = *config.Default
 	gconf.Verbose = c.Verbose
-	gconf.Host = c.Hostport
+	gconf.Host = c.Host
 	gconf.MaxBatchSize = c.BatchSize
 	return gconf
 }
@@ -117,7 +168,7 @@ func (c *Config) FromGeneralConfig(conf *config.Config) *Config {
 	*newc = *c
 
 	c.Verbose = conf.Verbose
-	c.Hostport = conf.Host
+	c.Host = conf.Host
 	c.BatchSize = conf.MaxBatchSize
 
 	return newc

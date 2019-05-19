@@ -194,7 +194,7 @@ func fillTopic(b *testing.B, conf *config.Config, h *Handlers, data []byte) {
 	s := bufio.NewScanner(bytes.NewBuffer(data))
 	s.Split(bufio.ScanLines)
 	cconf := logd.DefaultConfig.FromGeneralConfig(conf)
-	cconf.Hostport = h.servers[0].ListenAddr().String()
+	cconf.Host = h.servers[0].ListenAddr().String()
 	w := logd.NewWriter(cconf, "default")
 	defer w.Close()
 	// read := 0

@@ -75,7 +75,7 @@ func New(conf *Config) *Client {
 	c := &Client{
 		conf:         conf,
 		gconf:        gconf,
-		hostport:     conf.Hostport,
+		hostport:     conf.Host,
 		dialer:       &netDialer{},
 		readTimeout:  conf.getReadTimeout(),
 		writeTimeout: conf.getWriteTimeout(),
@@ -402,7 +402,7 @@ func (c *Client) ensureConn() error {
 		return nil
 	}
 
-	err := c.connect(c.conf.Hostport)
+	err := c.connect(c.conf.Host)
 	return err
 }
 
@@ -434,7 +434,7 @@ func (c *Client) retryRequest(wt io.WriterTo, origSent, origRecv int64, err erro
 		if c.closer != nil {
 			internal.IgnoreError(c.conf.Verbose, c.closer.Close())
 		}
-		retryErr = c.connect(c.conf.Hostport)
+		retryErr = c.connect(c.conf.Host)
 		if retryErr != nil {
 			continue
 		}
