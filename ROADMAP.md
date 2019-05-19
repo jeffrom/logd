@@ -3,7 +3,7 @@
 ## 0.2.0
 
 - [X] configuration to limit the number of topics
-- [X] topic whitelist
+- [ ] topic whitelist
 - [ ] document config
 - [ ] stabilize logd.Backlog
 
