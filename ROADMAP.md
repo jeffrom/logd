@@ -8,7 +8,7 @@
 
 ### testing
 
-- [ ] eventQ should return the correct number of batches when there is more than one
+- [X] eventQ should return the correct number of batches when there is more than one
 - [ ] scanner offset/delta state with restarts
 
 ## 0.3.0

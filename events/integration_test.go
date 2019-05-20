@@ -167,6 +167,39 @@ func TestIntegrationReconnect4(t *testing.T) {
 	testIntegrationReconnect(t, ts)
 }
 
+func TestIntegrationMultipleBatchResponse(t *testing.T) {
+	conf := testhelper.IntegrationTestConfig(testing.Verbose())
+	cconf := newIntegrationTestClientConfig(testing.Verbose())
+	cconf.ConnectTimeout = 100 * time.Millisecond
+
+	ts := newIntegrationTestState(conf, cconf, 1)
+	ts.setup(t)
+	defer ts.shutdown(t)
+
+	wrote := 0
+	for _, w := range ts.writers {
+		for i := 0; i < 10000; i++ {
+			_, err := w.Write([]byte("this is not exact but definitely should result in more than one batch"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			wrote++
+		}
+		if err := w.Flush(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	s := ts.scanners[0]
+	_, nbatches, _, err := s.Client.Tail([]byte(s.Topic()), wrote)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if nbatches <= 1 {
+		t.Fatal("expected > 1 batch response but got: ", nbatches)
+	}
+}
+
 func testIntegrationWriter(t *testing.T, ts *integrationTest) {
 	n := 10000
 	errC := make(chan error, ts.n)
