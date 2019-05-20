@@ -9,7 +9,7 @@
 ### testing
 
 - [X] eventQ should return the correct number of batches when there is more than one
-- [ ] scanner offset/delta state with restarts
+- [X] scanner offset/delta state with restarts
 
 ## 0.3.0
 
@@ -28,7 +28,7 @@
 
 - [ ] stabilize socket client reconnection
 - [ ] stabilize graceful shutdown
-- [ ] Writer, Scanner get own configs
+- [ ] Writer, Scanner, FileStatePuller, others get own configs
 - [ ] fix(cli): log-cli incorrectly prints "topic is empty" when bad offset
       requested
 
