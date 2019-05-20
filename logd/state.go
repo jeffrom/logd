@@ -185,6 +185,7 @@ func (m *FileStatePuller) isReady() bool {
 
 // Setup implements internal.LifecycleManager.
 func (m *FileStatePuller) Setup() error {
+	panic("not implemented")
 	return nil
 }
 
@@ -198,15 +199,18 @@ func (m *FileStatePuller) Shutdown() error {
 
 // Get implements StatePuller interface.
 func (m *FileStatePuller) Get() (uint64, uint64, error) {
+	panic("not implemented")
 	return 0, 0, nil
 }
 
 func (m *FileStatePuller) Start(off, delta uint64) error {
+	panic("not implemented")
 	return nil
 }
 
 // Complete implements StatePuller interface.
 func (m *FileStatePuller) Complete(off, delta uint64) error {
+	panic("not implemented")
 	return nil
 }
 
