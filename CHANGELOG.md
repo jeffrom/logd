@@ -1,4 +1,35 @@
 
+<a name="v0.2.0"></a>
+## [v0.2.0](https://github.com/jeffrom/logd/compare/v0.1.11...v0.2.0) (2019-05-20)
+
+### Chore
+
+* replace WORK.md with ROADMAP.md
+* allow setting -count flag in bench tasks
+* document configuration
+* tool to check outdated dependencies
+* fix docker image tags
+* remove TODO.wiki
+* tweak release commit message template
+* **client:** set FileStatePuller as not implemented
+
+### Feat
+
+* topic limits
+
+### Fix
+
+* **client:** set backlogC when calling WithBacklog
+
+### Style
+
+* **cli:** change version format
+
+### Test
+
+* **events:** multiple batch read request response
+
+
 <a name="v0.1.11"></a>
 ## [v0.1.11](https://github.com/jeffrom/logd/compare/v0.1.10...v0.1.11) (2019-05-05)
 
@@ -49,7 +80,11 @@
 
 
 <a name="v0.1.2"></a>
-## [v0.1.2](https://github.com/jeffrom/logd/compare/v0.1.1...v0.1.2) (2019-05-05)
+## [v0.1.2](https://github.com/jeffrom/logd/compare/v0.1.0-494184431...v0.1.2) (2019-05-05)
+
+
+<a name="v0.1.0-494184431"></a>
+## [v0.1.0-494184431](https://github.com/jeffrom/logd/compare/v0.1.1...v0.1.0-494184431) (2019-05-05)
 
 ### Chore
 
