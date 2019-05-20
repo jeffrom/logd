@@ -112,7 +112,7 @@ lint.install:
 
 .PHONY: check.deps
 check.deps:
-	GO111MODULE=on go list -u -m -json all | go-mod-outdated
+	./script/check-deps.sh
 
 .PHONY: bench
 BENCH ?= .
