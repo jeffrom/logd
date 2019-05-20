@@ -6,6 +6,7 @@ benchtime="${BENCHTIME:-1s}"
 benchmarks="${BENCH:-.}"
 race="${RACE:-}"
 go111module="${GO111MODULE:-on}"
+count="${COUNT:-1}"
 
 if [[ "$race" = "true" ]]; then
     race="-race"
@@ -66,6 +67,7 @@ GO111MODULE="$go111module" go test ./"$package" -run="^$" -bench="$benchmarks" \
     -benchmem \
     -benchtime="$benchtime" \
     "$race" \
+    -count="$count" \
     | tee -a report/bench.out
 
     # -blockprofile=block.pprof \

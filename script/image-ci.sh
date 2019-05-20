@@ -5,5 +5,11 @@ cd "$( cd "$(dirname "$0")" ; pwd )/../"
 
 set -x
 
-docker build -t logd/ci --rm -f Dockerfile.ci . && \
-    docker run --rm logd/ci "$@"
+set +u
+count="${COUNT:-1}"
+set -u
+
+docker build -t logd/ci --rm -f Dockerfile.ci . \
+    && docker run --rm \
+    -e COUNT="$count" \
+    logd/ci "$@"
