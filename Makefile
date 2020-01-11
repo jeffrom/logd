@@ -1,5 +1,8 @@
+SHELL := /bin/bash
 
-TMPDIR ?= /tmp
+TMPDIR := $(if $(TMPDIR),$(TMPDIR),"/tmp/")
+GOPATH := $(shell go env GOPATH)
+
 PKGS ?= $(shell go list ./...)
 SHORT_PKGS ?= $(shell go list -f '{{.Name}}' ./... | grep -v main)
 PKG_DIRS ?= $(shell go list -f '{{.Dir}}' ./...)
@@ -97,7 +100,10 @@ test.cover:
 .PHONY: test.coverprofile
 test.coverprofile:
 	mkdir -p report
-	GO111MODULE=on gocoverutil -coverprofile=report/cov.out test -covermode=count ./...
+	@echo "GO111MODULE=on gocoverutil -coverprofile=report/cov.out test -race -covermode=atomic ./..."
+	@set -euo pipefail; GO111MODULE=on gocoverutil -coverprofile=report/cov.out test -race -covermode=atomic ./... \
+		2> >(grep -v "no packages being tested depend on matches for pattern" 1>&2) \
+		| sed -e 's/of statements in .*/of statements/'
 
 .PHONY: test.golden
 test.golden:
