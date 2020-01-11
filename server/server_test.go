@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"flag"
+	"os"
 	"testing"
 
 	"github.com/jeffrom/logd/config"
@@ -13,11 +14,12 @@ import (
 	"github.com/jeffrom/logd/transport"
 )
 
-func init() {
+func TestMain(m *testing.M) {
 	// each test module must define this flag and pass its value to the
 	// testhelper module.
 	flag.BoolVar(&testhelper.Golden, "golden", false, "write the golden file for this module")
 	flag.Parse()
+	os.Exit(m.Run())
 }
 
 func NewTestServer(conf *config.Config) *Socket {

@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 	"runtime/debug"
 	"testing"
@@ -17,11 +18,12 @@ import (
 	"github.com/jeffrom/logd/testhelper"
 )
 
-func init() {
+func TestMain(m *testing.M) {
 	// each test module must define this flag and pass its value to the
 	// testhelper module.
 	flag.BoolVar(&testhelper.Golden, "golden", false, "write the golden file for this module")
 	flag.Parse()
+	os.Exit(m.Run())
 }
 
 func startHandlerConfig(t testing.TB, conf *config.Config) *Handlers {
