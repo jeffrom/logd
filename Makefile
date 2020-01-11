@@ -7,6 +7,11 @@ WITHOUT_APPTEST ?= $(shell go list -f '{{.Name}}' ./... | grep -v main | grep -v
 
 GENERATED_FILES ?= __* testdata/*.actual.golden logd.test log-cli.test
 
+# tools
+
+gomodoutdated := $(GOPATH)/bin/go-mod-outdated
+
+
 .PHONY: all
 all: build
 
@@ -101,6 +106,13 @@ test.golden:
 	cp testdata/events.file_partition_write.1.golden testdata/q.read_file_test_log.1
 	cp testdata/events.file_partition_write.2.golden testdata/q.read_file_test_log.2
 	cp testdata/events.file_partition_write.index.golden testdata/q.read_file_test_log.index
+
+.PHONY: test.outdated
+test.outdated: $(gomodoutdated)
+	GO111MODULE=on go list -u -m -json all | go-mod-outdated -direct
+
+$(gomodoutdated):
+	GO111MODULE=off go get github.com/psampaz/go-mod-outdated
 
 .PHONY: lint
 lint:
