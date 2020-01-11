@@ -1,7 +1,7 @@
 language: go
 go:
     # - "1.11"
-    - "1.12"
+    - "1.13"
 
 addons:
   apt:
@@ -36,7 +36,7 @@ deploy:
     skip_cleanup: true
     script: curl -sL https://git.io/goreleaser | bash
     on:
-      go: 1.12
+      go: 1.13
       branch: master
       tags: true
       condition: $TRAVIS_OS_NAME = linux
