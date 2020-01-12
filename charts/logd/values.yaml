@@ -72,4 +72,4 @@ persistence:
   annotations: {}
   accessMode: ReadWriteOnce
   storageClass: ''
-  size: 2Gi
+  size: 60Gi
