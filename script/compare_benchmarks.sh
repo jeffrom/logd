@@ -34,19 +34,23 @@ if ! git diff-index --quiet HEAD --; then
     exit 1
 fi
 
-branch=$(git rev-parse --abbrev-ref HEAD)
+branch=$(git rev-parse --symbolic-full-name HEAD)
 echo "current branch is ${branch}"
 
 set -x
 
 PACKAGE=events BENCH=Full ./script/benchmark.sh
 
-if [[ "$branch" == "master" ]]; then
+set +x 2> /dev/null
+if [[ "${branch##/master}" == "/master" ]]; then
     # checkout previous commit on master
+    echo "checking out previous commit because we're on master branch"
     git checkout HEAD^
 else
+    echo "checking out master because we're on another branch"
     git checkout master
 fi
+set -x
 
 finish() {
     git checkout -- go.mod # temporary workaround for go 1.13
