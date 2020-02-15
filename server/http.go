@@ -52,6 +52,8 @@ func (s *Http) GoServe() {
 }
 
 func (s *Http) setupHandlers() {
+	s.mux.HandleFunc("/healthz", healthCheck)
+
 	s.mux.HandleFunc("/debug/pprof/", pprof.Index)
 	s.mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
 	s.mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
@@ -79,4 +81,8 @@ func (s *Http) ListenAddr() net.Addr {
 
 func (s *Http) SetHandler(h transport.RequestHandler) {
 	s.h = h
+}
+
+func healthCheck(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(200)
 }

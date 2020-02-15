@@ -44,6 +44,7 @@ else
 fi
 
 finish() {
+    git checkout -- go.mod # temporary workaround for go 1.13
     git checkout -
 }
 trap finish EXIT
