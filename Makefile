@@ -3,6 +3,10 @@ SHELL := /bin/bash
 TMPDIR := $(if $(TMPDIR),$(TMPDIR),"/tmp/")
 GOPATH := $(shell go env GOPATH)
 
+gofiles := $(wildcard **/*.go **/**/*.go **/**/**/*.go **/**/**/**/*.go)
+logd_bin := $(GOPATH)/bin/logd
+logcli_bin := $(GOPATH)/bin/log-cli
+
 PKGS ?= $(shell go list ./...)
 SHORT_PKGS ?= $(shell go list -f '{{.Name}}' ./... | grep -v main)
 PKG_DIRS ?= $(shell go list -f '{{.Dir}}' ./...)
@@ -13,6 +17,11 @@ GENERATED_FILES ?= __* testdata/*.actual.golden logd.test log-cli.test
 # tools
 
 gomodoutdated := $(GOPATH)/bin/go-mod-outdated
+golangcilint := $(GOPATH)/bin/golangci-lint
+staticcheck := $(GOPATH)/bin/staticcheck
+richgo := $(GOPATH)/bin/richgo
+gocoverutil := $(GOPATH)/bin/gocoverutil
+gotestsum := $(GOPATH)/bin/gotestsum
 
 
 .PHONY: all
@@ -90,15 +99,15 @@ build.container:
 test: test.cover test.race
 
 .PHONY: test.race
-test.race:
-	GO111MODULE=on go test -race $(PKGS)
+test.race: $(richgo)
+	GO111MODULE=on richgo test -race $(PKGS)
 
 .PHONY: test.cover
-test.cover:
-	go test -cover -coverpkg ./... ./...
+test.cover: $(richgo)
+	GO111MODULE=on richgo test -cover -coverpkg ./... ./...
 
 .PHONY: test.coverprofile
-test.coverprofile:
+test.coverprofile: $(gocoverutil)
 	mkdir -p report
 	@echo "GO111MODULE=on gocoverutil -coverprofile=report/cov.out test -race -covermode=atomic ./..."
 	@set -euo pipefail; GO111MODULE=on gocoverutil -coverprofile=report/cov.out test -race -covermode=atomic ./... \
@@ -117,16 +126,28 @@ test.golden:
 test.outdated: $(gomodoutdated)
 	GO111MODULE=on go list -u -m -json all | go-mod-outdated -direct
 
+.PHONY: lint
+lint: $(staticcheck) $(golangcilint)
+	# GO111MODULE=on $(staticcheck) -f stylish -checks all ./...
+	GO111MODULE=on $(golangcilint) run --deadline 2m
+
+$(golangcilint):
+	cd $(TMPDIR) && GO111MODULE=on go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.18.0
+
+$(staticcheck):
+	cd $(TMPDIR) && GO111MODULE=on go get honnef.co/go/tools/cmd/staticcheck@2019.2.3
+
 $(gomodoutdated):
 	GO111MODULE=off go get github.com/psampaz/go-mod-outdated
 
-.PHONY: lint
-lint:
-	./script/lint.sh
+$(richgo):
+	GO111MODULE=off go get github.com/kyoh86/richgo
 
-.PHONY: lint.install
-lint.install:
-	GO111MODULE=on go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.16.0
+$(gocoverutil):
+	GO111MODULE=off go get github.com/AlekSi/gocoverutil
+
+$(gotestsum):
+	GO111MODULE=off go get gotest.tools/gotestsum
 
 .PHONY: check.deps
 check.deps:
