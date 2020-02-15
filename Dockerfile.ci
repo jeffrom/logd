@@ -4,9 +4,11 @@ FROM golang:1.13
 RUN mkdir /logd
 WORKDIR /logd
 
-COPY go.mod /logd/
-COPY go.sum /logd/
-RUN go mod download
+COPY go.mod go.sum Makefile /logd/
+RUN set -ex; \
+    go mod download \
+    && make deps \
+    && make clean
 
 COPY . /logd
 
