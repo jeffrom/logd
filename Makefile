@@ -98,7 +98,7 @@ test: $(gotestsum)
 
 .PHONY: test.race
 test.race: $(gotestsum)
-	GO111MODULE=on gotestsum -f dots -- -race -coverprofile cov.out -covermode atomic ./...
+	GO111MODULE=on gotestsum -f short-with-failures -- -race -coverprofile cov.out -covermode atomic ./...
 
 .PHONY: test.cover
 test.cover: $(richgo)
