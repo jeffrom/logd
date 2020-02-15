@@ -1,4 +1,4 @@
-FROM golang:1.13 as builder
+FROM golang:1.13.8 as builder
 
 RUN mkdir /build
 WORKDIR /build
@@ -14,13 +14,8 @@ FROM alpine
 
 RUN mkdir -p /opt/logd && \
     mkdir -p /opt/tmp && \
-    addgroup loguser && \
-    adduser -S -D -H -h /logd -G loguser loguser && \
-    chown loguser:loguser /opt/logd && \
     chmod -R 777 /opt/tmp
 
 COPY --from=builder /build/logd.bin /usr/local/bin/logd
-
-USER loguser
 
 ENTRYPOINT ["logd"]

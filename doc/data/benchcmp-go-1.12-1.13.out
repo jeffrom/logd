@@ -1,0 +1,73 @@
+benchmark                          old ns/op     new ns/op     delta
+BenchmarkBatchFile-12              5319          5180          -2.61%
+BenchmarkLifecycle-12              210718        181983        -13.64%
+BenchmarkBatchFull-12              5441          4988          -8.33%
+BenchmarkBatchFullLarge-12         54859         45081         -17.82%
+BenchmarkBatchFullTopics8-12       4180          3793          -9.26%
+BenchmarkReadFull-12               11990         11982         -0.07%
+BenchmarkReadFull10000-12          25305         24060         -4.92%
+BenchmarkReadFull4-12              30554         27029         -11.54%
+BenchmarkReadHead-12               8776          8608          -1.91%
+BenchmarkReadTail-12               8064          8024          -0.50%
+BenchmarkReadAll-12                11985         9739          -18.74%
+BenchmarkBatch-12                  10529         10350         -1.70%
+BenchmarkRead-12                   6513          5819          -10.66%
+BenchmarkBatchWrite-12             47.9          51.4          +7.31%
+BenchmarkBatchWriteNew-12          577           595           +3.12%
+BenchmarkBatchRead-12              201           216           +7.46%
+BenchmarkMessageWrite-12           19.9          21.1          +6.03%
+BenchmarkMessageRead-12            78.7          77.7          -1.27%
+BenchmarkRequestRead-12            294           307           +4.42%
+BenchmarkBatchResponseWrite-12     28.6          30.5          +6.64%
+BenchmarkClientBatch-12            2469          2665          +7.94%
+
+benchmark                        old MB/s     new MB/s     speedup
+BenchmarkBatchFull-12            12.31        13.43        1.09x
+BenchmarkBatchFullLarge-12       1019.91      1241.14      1.22x
+BenchmarkBatchFullTopics8-12     16.03        17.67        1.10x
+
+benchmark                          old allocs     new allocs     delta
+BenchmarkBatchFile-12              1              1              +0.00%
+BenchmarkLifecycle-12              1212           1211           -0.08%
+BenchmarkBatchFull-12              6              6              +0.00%
+BenchmarkBatchFullLarge-12         9              9              +0.00%
+BenchmarkBatchFullTopics8-12       6              6              +0.00%
+BenchmarkReadFull-12               24             24             +0.00%
+BenchmarkReadFull10000-12          24             24             +0.00%
+BenchmarkReadFull4-12              24             24             +0.00%
+BenchmarkReadHead-12               12             12             +0.00%
+BenchmarkReadTail-12               12             12             +0.00%
+BenchmarkReadAll-12                14             14             +0.00%
+BenchmarkBatch-12                  9              9              +0.00%
+BenchmarkRead-12                   13             13             +0.00%
+BenchmarkBatchWrite-12             0              0              +0.00%
+BenchmarkBatchWriteNew-12          0              0              +0.00%
+BenchmarkBatchRead-12              0              0              +0.00%
+BenchmarkMessageWrite-12           0              0              +0.00%
+BenchmarkMessageRead-12            0              0              +0.00%
+BenchmarkRequestRead-12            0              0              +0.00%
+BenchmarkBatchResponseWrite-12     0              0              +0.00%
+BenchmarkClientBatch-12            9              9              +0.00%
+
+benchmark                          old bytes     new bytes     delta
+BenchmarkBatchFile-12              155           140           -9.68%
+BenchmarkLifecycle-12              144066        144122        +0.04%
+BenchmarkBatchFull-12              213           207           -2.82%
+BenchmarkBatchFullLarge-12         1133          1247          +10.06%
+BenchmarkBatchFullTopics8-12       164           162           -1.22%
+BenchmarkReadFull-12               849           853           +0.47%
+BenchmarkReadFull10000-12          962           955           -0.73%
+BenchmarkReadFull4-12              1321          1390          +5.22%
+BenchmarkReadHead-12               684           673           -1.61%
+BenchmarkReadTail-12               629           624           -0.79%
+BenchmarkReadAll-12                800           824           +3.00%
+BenchmarkBatch-12                  312           312           +0.00%
+BenchmarkRead-12                   448           448           +0.00%
+BenchmarkBatchWrite-12             0             0             +0.00%
+BenchmarkBatchWriteNew-12          0             0             +0.00%
+BenchmarkBatchRead-12              0             0             +0.00%
+BenchmarkMessageWrite-12           0             0             +0.00%
+BenchmarkMessageRead-12            0             0             +0.00%
+BenchmarkRequestRead-12            0             0             +0.00%
+BenchmarkBatchResponseWrite-12     0             0             +0.00%
+BenchmarkClientBatch-12            502           504           +0.40%

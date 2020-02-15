@@ -9,8 +9,8 @@ __*.index
 *.actual.golden
 
 # files output by tools
-*.out
-*.pprof
+/*.out
+/*.pprof
 
 # coverage artifacts
 cov.html

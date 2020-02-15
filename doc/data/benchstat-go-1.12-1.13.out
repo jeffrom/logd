@@ -1,0 +1,86 @@
+name                   old time/op    new time/op    delta
+pkg:github.com/jeffrom/logd/events goos:linux goarch:amd64
+BatchFile-12             5.32µs ± 0%    5.18µs ± 0%   ~     (p=1.000 n=1+1)
+Lifecycle-12              211µs ± 0%     182µs ± 0%   ~     (p=1.000 n=1+1)
+BatchFull-12             5.44µs ± 0%    4.99µs ± 0%   ~     (p=1.000 n=1+1)
+BatchFullLarge-12        54.9µs ± 0%    45.1µs ± 0%   ~     (p=1.000 n=1+1)
+BatchFullTopics8-12      4.18µs ± 0%    3.79µs ± 0%   ~     (p=1.000 n=1+1)
+ReadFull-12              12.0µs ± 0%    12.0µs ± 0%   ~     (p=1.000 n=1+1)
+ReadFull10000-12         25.3µs ± 0%    24.1µs ± 0%   ~     (p=1.000 n=1+1)
+ReadFull4-12             30.6µs ± 0%    27.0µs ± 0%   ~     (p=1.000 n=1+1)
+ReadHead-12              8.78µs ± 0%    8.61µs ± 0%   ~     (p=1.000 n=1+1)
+ReadTail-12              8.06µs ± 0%    8.02µs ± 0%   ~     (p=1.000 n=1+1)
+ReadAll-12               12.0µs ± 0%     9.7µs ± 0%   ~     (p=1.000 n=1+1)
+pkg:github.com/jeffrom/logd/logd goos:linux goarch:amd64
+Batch-12                 10.5µs ± 0%    10.3µs ± 0%   ~     (p=1.000 n=1+1)
+Read-12                  6.51µs ± 0%    5.82µs ± 0%   ~     (p=1.000 n=1+1)
+pkg:github.com/jeffrom/logd/protocol goos:linux goarch:amd64
+BatchWrite-12            47.9ns ± 0%    51.4ns ± 0%   ~     (p=1.000 n=1+1)
+BatchWriteNew-12          577ns ± 0%     595ns ± 0%   ~     (p=1.000 n=1+1)
+BatchRead-12              201ns ± 0%     216ns ± 0%   ~     (p=1.000 n=1+1)
+MessageWrite-12          19.9ns ± 0%    21.1ns ± 0%   ~     (p=1.000 n=1+1)
+MessageRead-12           78.7ns ± 0%    77.7ns ± 0%   ~     (p=1.000 n=1+1)
+RequestRead-12            294ns ± 0%     307ns ± 0%   ~     (p=1.000 n=1+1)
+BatchResponseWrite-12    28.6ns ± 0%    30.5ns ± 0%   ~     (p=1.000 n=1+1)
+pkg:github.com/jeffrom/logd/server goos:linux goarch:amd64
+ClientBatch-12           2.47µs ± 0%    2.67µs ± 0%   ~     (p=1.000 n=1+1)
+
+name                   old alloc/op   new alloc/op   delta
+pkg:github.com/jeffrom/logd/events goos:linux goarch:amd64
+BatchFile-12               155B ± 0%      140B ± 0%   ~     (p=1.000 n=1+1)
+Lifecycle-12              144kB ± 0%     144kB ± 0%   ~     (p=1.000 n=1+1)
+BatchFull-12               213B ± 0%      207B ± 0%   ~     (p=1.000 n=1+1)
+BatchFullLarge-12        1.13kB ± 0%    1.25kB ± 0%   ~     (p=1.000 n=1+1)
+BatchFullTopics8-12        164B ± 0%      162B ± 0%   ~     (p=1.000 n=1+1)
+ReadFull-12                849B ± 0%      853B ± 0%   ~     (p=1.000 n=1+1)
+ReadFull10000-12           962B ± 0%      955B ± 0%   ~     (p=1.000 n=1+1)
+ReadFull4-12             1.32kB ± 0%    1.39kB ± 0%   ~     (p=1.000 n=1+1)
+ReadHead-12                684B ± 0%      673B ± 0%   ~     (p=1.000 n=1+1)
+ReadTail-12                629B ± 0%      624B ± 0%   ~     (p=1.000 n=1+1)
+ReadAll-12                 800B ± 0%      824B ± 0%   ~     (p=1.000 n=1+1)
+pkg:github.com/jeffrom/logd/logd goos:linux goarch:amd64
+Batch-12                   312B ± 0%      312B ± 0%   ~     (all equal)
+Read-12                    448B ± 0%      448B ± 0%   ~     (all equal)
+pkg:github.com/jeffrom/logd/protocol goos:linux goarch:amd64
+BatchWrite-12             0.00B          0.00B        ~     (all equal)
+BatchWriteNew-12          0.00B          0.00B        ~     (all equal)
+BatchRead-12              0.00B          0.00B        ~     (all equal)
+MessageWrite-12           0.00B          0.00B        ~     (all equal)
+MessageRead-12            0.00B          0.00B        ~     (all equal)
+RequestRead-12            0.00B          0.00B        ~     (all equal)
+BatchResponseWrite-12     0.00B          0.00B        ~     (all equal)
+pkg:github.com/jeffrom/logd/server goos:linux goarch:amd64
+ClientBatch-12             502B ± 0%      504B ± 0%   ~     (p=1.000 n=1+1)
+
+name                   old allocs/op  new allocs/op  delta
+pkg:github.com/jeffrom/logd/events goos:linux goarch:amd64
+BatchFile-12               1.00 ± 0%      1.00 ± 0%   ~     (all equal)
+Lifecycle-12              1.21k ± 0%     1.21k ± 0%   ~     (p=1.000 n=1+1)
+BatchFull-12               6.00 ± 0%      6.00 ± 0%   ~     (all equal)
+BatchFullLarge-12          9.00 ± 0%      9.00 ± 0%   ~     (all equal)
+BatchFullTopics8-12        6.00 ± 0%      6.00 ± 0%   ~     (all equal)
+ReadFull-12                24.0 ± 0%      24.0 ± 0%   ~     (all equal)
+ReadFull10000-12           24.0 ± 0%      24.0 ± 0%   ~     (all equal)
+ReadFull4-12               24.0 ± 0%      24.0 ± 0%   ~     (all equal)
+ReadHead-12                12.0 ± 0%      12.0 ± 0%   ~     (all equal)
+ReadTail-12                12.0 ± 0%      12.0 ± 0%   ~     (all equal)
+ReadAll-12                 14.0 ± 0%      14.0 ± 0%   ~     (all equal)
+pkg:github.com/jeffrom/logd/logd goos:linux goarch:amd64
+Batch-12                   9.00 ± 0%      9.00 ± 0%   ~     (all equal)
+Read-12                    13.0 ± 0%      13.0 ± 0%   ~     (all equal)
+pkg:github.com/jeffrom/logd/protocol goos:linux goarch:amd64
+BatchWrite-12              0.00           0.00        ~     (all equal)
+BatchWriteNew-12           0.00           0.00        ~     (all equal)
+BatchRead-12               0.00           0.00        ~     (all equal)
+MessageWrite-12            0.00           0.00        ~     (all equal)
+MessageRead-12             0.00           0.00        ~     (all equal)
+RequestRead-12             0.00           0.00        ~     (all equal)
+BatchResponseWrite-12      0.00           0.00        ~     (all equal)
+pkg:github.com/jeffrom/logd/server goos:linux goarch:amd64
+ClientBatch-12             9.00 ± 0%      9.00 ± 0%   ~     (all equal)
+
+name                   old speed      new speed      delta
+pkg:github.com/jeffrom/logd/events goos:linux goarch:amd64
+BatchFull-12           12.3MB/s ± 0%  13.4MB/s ± 0%   ~     (p=1.000 n=1+1)
+BatchFullLarge-12      1.02GB/s ± 0%  1.24GB/s ± 0%   ~     (p=1.000 n=1+1)
+BatchFullTopics8-12    16.0MB/s ± 0%  17.7MB/s ± 0%   ~     (p=1.000 n=1+1)

@@ -1,0 +1,28 @@
+batch size: 65500b, topics: 4, duration: 1m0s, connections: 8
+config: {Verbose:false Host:127.0.0.1:1774 Timeout:10s ConnectTimeout:-1ns WriteTimeout:-1ns ReadTimeout:-1ns Count:false OutputPath:- WaitInterval:400ms ConnRetries:50 ConnRetryInterval:1s ConnRetryMaxInterval:30s ConnRetryMultiplier:2 BatchSize:65536 InputPath:- Limit:15 Offset:0 ReadForever:false UseTail:false}
+
+write batch:
+
+bytes out :		55.22Gb   		942.87Mb/s
+batches   :		905.02K   		15.09K/s
+timing    :
+	min 117.83μ
+	p50 331.14μ
+	p90 464.99μ
+	p95 563.84μ
+	p99 928.07μ
+	max 170.72ms
+
+
+read batch:
+
+bytes in  :		35.73Gb   		610.68Mb/s
+batches   :		585.60K   		9.77K/s
+timing    :
+	min 122.17μ
+	p50 700.61μ
+	p90 1.13ms
+	p95 1.33ms
+	p99 3.38ms
+	max 212.25ms
+

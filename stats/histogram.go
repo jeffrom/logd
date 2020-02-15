@@ -7,7 +7,7 @@ import (
 
 // thanks zserge/metric!
 
-const maxBins = 100
+const maxBins = 1000
 
 type bin struct {
 	value float64

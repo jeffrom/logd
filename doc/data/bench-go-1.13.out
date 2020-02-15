@@ -1,0 +1,52 @@
+./script/benchmark.sh
+?   	github.com/jeffrom/logd/cmd/log-cli	[no test files]
+?   	github.com/jeffrom/logd/cmd/logd	[no test files]
+?   	github.com/jeffrom/logd/config	[no test files]
+goos: linux
+goarch: amd64
+pkg: github.com/jeffrom/logd/events
+BenchmarkBatchFile-12           	  201184	      5180 ns/op	     140 B/op	       1 allocs/op
+BenchmarkLifecycle-12           	    7152	    181983 ns/op	  144122 B/op	    1211 allocs/op
+BenchmarkBatchFull-12           	  217024	      4988 ns/op	  13.43 MB/s	     207 B/op	       6 allocs/op
+BenchmarkBatchFullLarge-12      	   25809	     45081 ns/op	1241.14 MB/s	    1247 B/op	       9 allocs/op
+BenchmarkBatchFullTopics8-12    	  326655	      3793 ns/op	  17.67 MB/s	     162 B/op	       6 allocs/op
+BenchmarkReadFull-12            	   92643	     11982 ns/op	     853 B/op	      24 allocs/op
+BenchmarkReadFull10000-12       	   52120	     24060 ns/op	     955 B/op	      24 allocs/op
+BenchmarkReadFull4-12           	   44226	     27029 ns/op	    1390 B/op	      24 allocs/op
+BenchmarkReadHead-12            	  132642	      8608 ns/op	     673 B/op	      12 allocs/op
+BenchmarkReadTail-12            	  132626	      8024 ns/op	     624 B/op	      12 allocs/op
+BenchmarkReadAll-12             	  116164	      9739 ns/op	     824 B/op	      14 allocs/op
+PASS
+ok  	github.com/jeffrom/logd/events	23.395s
+?   	github.com/jeffrom/logd/internal	[no test files]
+goos: linux
+goarch: amd64
+pkg: github.com/jeffrom/logd/logd
+BenchmarkBatch-12    	  109246	     10350 ns/op	     312 B/op	       9 allocs/op
+BenchmarkRead-12     	  211948	      5819 ns/op	     448 B/op	      13 allocs/op
+PASS
+ok  	github.com/jeffrom/logd/logd	2.539s
+PASS
+ok  	github.com/jeffrom/logd/logger	0.002s
+goos: linux
+goarch: amd64
+pkg: github.com/jeffrom/logd/protocol
+BenchmarkBatchWrite-12            	23681578	        51.4 ns/op	       0 B/op	       0 allocs/op
+BenchmarkBatchWriteNew-12         	 1969728	       595 ns/op	       0 B/op	       0 allocs/op
+BenchmarkBatchRead-12             	 5644422	       216 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMessageWrite-12          	59057971	        21.1 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMessageRead-12           	15087292	        77.7 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRequestRead-12           	 3907780	       307 ns/op	       0 B/op	       0 allocs/op
+BenchmarkBatchResponseWrite-12    	40694126	        30.5 ns/op	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/jeffrom/logd/protocol	9.801s
+goos: linux
+goarch: amd64
+pkg: github.com/jeffrom/logd/server
+BenchmarkClientBatch-12    	  472832	      2665 ns/op	     504 B/op	       9 allocs/op
+PASS
+ok  	github.com/jeffrom/logd/server	2.079s
+?   	github.com/jeffrom/logd/stats	[no test files]
+?   	github.com/jeffrom/logd/testhelper	[no test files]
+PASS
+ok  	github.com/jeffrom/logd/transport	0.002s
