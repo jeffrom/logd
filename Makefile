@@ -22,6 +22,8 @@ staticcheck := $(GOPATH)/bin/staticcheck
 richgo := $(GOPATH)/bin/richgo
 gocoverutil := $(GOPATH)/bin/gocoverutil
 gotestsum := $(GOPATH)/bin/gotestsum
+benchcmp := $(GOPATH)/bin/benchcmp
+benchstat := $(GOPATH)/bin/benchstat
 
 
 .PHONY: all
@@ -55,12 +57,7 @@ ls.tmp:
 	ls integration_tests/out
 
 .PHONY: deps
-deps:
-	GO111MODULE=off go get github.com/wadey/gocovmerge
-	GO111MODULE=off go get golang.org/x/tools/cmd/benchcmp
-	GO111MODULE=off go get github.com/AlekSi/gocoverutil
-	GO111MODULE=off go get github.com/psampaz/go-mod-outdated
-	GO111MODULE=off go get golang.org/x/perf/cmd/benchstat
+deps: $(benchcmp) $(gocoverutil) $(gomodoutdated) $(benchstat) $(golangcilint) $(staticcheck) $(gotestsum)
 	mkdir -p report
 	mkdir -p integration_test/out
 
@@ -96,11 +93,12 @@ build.container:
 	docker build -f Dockerfile -t logd:latest .
 
 .PHONY: test
-test: test.cover test.race
+test: $(gotestsum)
+	GO111MODULE=on gotestsum -f dots
 
 .PHONY: test.race
-test.race: $(richgo)
-	GO111MODULE=on richgo test -race $(PKGS)
+test.race: $(gotestsum)
+	GO111MODULE=on gotestsum -f short-with-failures -- -race -coverprofile cov.out -covermode atomic ./...
 
 .PHONY: test.cover
 test.cover: $(richgo)
@@ -148,6 +146,12 @@ $(gocoverutil):
 
 $(gotestsum):
 	GO111MODULE=off go get gotest.tools/gotestsum
+
+$(benchcmp):
+	GO111MODULE=off go get golang.org/x/tools/cmd/benchcmp
+
+$(benchstat):
+	GO111MODULE=off go get golang.org/x/perf/cmd/benchstat
 
 .PHONY: check.deps
 check.deps:
