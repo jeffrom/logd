@@ -107,8 +107,8 @@ test.cover: $(richgo)
 .PHONY: test.coverprofile
 test.coverprofile: $(gocoverutil)
 	mkdir -p report
-	@echo "GO111MODULE=on gocoverutil -coverprofile=report/cov.out test -race -covermode=atomic ./..."
-	@set -euo pipefail; GO111MODULE=on gocoverutil -coverprofile=report/cov.out test -race -covermode=atomic ./... \
+	@echo "GO111MODULE=on gocoverutil -coverprofile=report/cov.out test -covermode=count ./..."
+	@set -euo pipefail; GO111MODULE=on gocoverutil -coverprofile=report/cov.out test -covermode=count ./... \
 		2> >(grep -v "no packages being tested depend on matches for pattern" 1>&2) \
 		| sed -e 's/of statements in .*/of statements/'
 
