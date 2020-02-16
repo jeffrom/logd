@@ -1,7 +1,9 @@
 #!/bin/bash
-set -euxo pipefail
+set -euo pipefail
 
 cd "$( cd "$(dirname "$0")" ; pwd )/../"
+
+set -x
 
 if ! command -v benchcmp > /dev/null; then
     GO111MODULE=off go get golang.org/x/tools/cmd/benchcmp
@@ -18,8 +20,8 @@ if grep "docker" /proc/1/cgroup > /dev/null; then
     git reset --hard HEAD
 fi
 
-set +u
-if [[ ! -z "$CI" && "$CI" != "false" && "$CI" != "no" ]]; then
+set +ux
+if [[ -n "$CI" && "$CI" != "false" && "$CI" != "no" ]]; then
     echo "in CI, so cleaning git state. These changes will be undone:"
     git diff
     git reset --hard HEAD
@@ -32,16 +34,26 @@ if ! git diff-index --quiet HEAD --; then
     exit 1
 fi
 
-branch=$(git rev-parse --abbrev-ref HEAD)
+branch=$(git rev-parse --symbolic-full-name HEAD)
+if [[ -n "$TRAVIS_BRANCH" ]]; then
+    branch="$TRAVIS_BRANCH"
+fi
+echo "current branch is ${branch}"
+
+set -x
 
 PACKAGE=events BENCH=Full ./script/benchmark.sh
 
-if [[ "$branch" == "master" ]]; then
+set +x 2> /dev/null
+if [[ "${branch##master}" == "master" ]]; then
     # checkout previous commit on master
+    echo "checking out previous commit because we're on master branch"
     git checkout HEAD^
 else
+    echo "checking out master because we're on another branch"
     git checkout master
 fi
+set -x
 
 finish() {
     git checkout -- go.mod # temporary workaround for go 1.13
