@@ -35,6 +35,9 @@ if ! git diff-index --quiet HEAD --; then
 fi
 
 branch=$(git rev-parse --symbolic-full-name HEAD)
+if [[ -n "$TRAVIS_BRANCH" ]]; then
+    branch="$TRAVIS_BRANCH"
+fi
 echo "current branch is ${branch}"
 
 set -x
