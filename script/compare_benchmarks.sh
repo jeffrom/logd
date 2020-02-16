@@ -45,7 +45,7 @@ set -x
 PACKAGE=events BENCH=Full ./script/benchmark.sh
 
 set +x 2> /dev/null
-if [[ "${branch##/master}" == "/master" ]]; then
+if [[ "${branch##master}" == "master" ]]; then
     # checkout previous commit on master
     echo "checking out previous commit because we're on master branch"
     git checkout HEAD^
