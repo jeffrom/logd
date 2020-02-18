@@ -385,20 +385,6 @@ func (q *eventQ) handleConfig(req *protocol.Request) (*protocol.Response, error)
 func (q *eventQ) gatherReadArgs(topic *topic, offset uint64, messages int, newArgs *partitionArgList) (*partitionArgList, error) {
 	err := topic.idx.Query(offset, messages, newArgs)
 	return newArgs, err
-	// if err != nil {
-	// 	log.Printf("<%d, %d>: error w/ new query index: %+v", offset, messages, err)
-	// }
-
-	// // old way
-	// args, err := topic.Query(offset, messages)
-	// if err != nil {
-	// 	return args, err
-	// }
-
-	// if !newArgs.equals(args) {
-	// 	log.Printf("<%d, %d>: new args not equal to old:\n\nold: %+v\n\nnew: %v\n", offset, messages, args, newArgs)
-	// }
-	// return args, err
 }
 
 // handleShutdown handles a shutdown request
