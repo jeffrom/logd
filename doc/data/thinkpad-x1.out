@@ -1,0 +1,28 @@
+jeff@x1cats:~/.../github.com/jeffrom/logd (master) $ log-cli bench --conns 16 --topics 4 --duration 1m
+batch size: 65500b, topics: 4, duration: 1m0s, connections: 16
+config: {Verbose:false Host:127.0.0.1:1774 Timeout:10s ConnectTimeout:-1ns WriteTimeout:-1ns ReadTimeout:-1ns Count:false OutputPath:- WaitInterval:400ms ConnRetries:50 ConnRetryInterval:1s ConnRetryMaxInterval:30s ConnRetryMultiplier:2 BatchSize:65536 InputPath:- Limit:15 Offset:0 ReadForever:false UseTail:false}
+
+write batch:
+
+bytes out :             52.67Gb                 899.87Mb/s
+batches   :             863.21K                 14.40K/s
+timing    :
+        min 125.96μ
+        p50 182.37μ
+        p90 249.22μ
+        p95 633.44μ
+        p99 34.38ms
+        max 1.09s
+
+
+read batch:
+
+bytes in  :             68.83Gb                 1.15Gb/s
+batches   :             1.13M                   18.81K/s
+timing    :
+        min 78.10μ
+        p50 610.35μ
+        p90 1.44ms
+        p95 1.76ms
+        p99 3.64ms
+        max 164.95ms

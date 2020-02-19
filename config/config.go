@@ -59,6 +59,10 @@ type Config struct {
 
 	// TopicWhitelist can be defined to limit topics to a predefined list.
 	TopicWhitelist []string `json:"topic-whitelist"`
+
+	// MaxMessages is the maximum number of messages allowed to be returned by
+	// read and tail requests.
+	MaxMessages int `json:"max-messages"`
 }
 
 // New returns a new configuration object
@@ -85,4 +89,5 @@ var Default = &Config{
 	FlushBatches:    0,
 	FlushInterval:   -1,
 	MaxTopics:       8,
+	MaxMessages:     50000,
 }

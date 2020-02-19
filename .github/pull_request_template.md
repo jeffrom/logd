@@ -20,5 +20,3 @@ In addition to the `BREAKING CHANGE` footer, the following can also be used:
 
 - `NOTE` for general notes
 - `UPCOMING CHANGE` for upcoming breaking changes prepared by this change
-
-See [doc/CONTRIBUTING.md](../doc/CONTRIBUTING.md) for more information.

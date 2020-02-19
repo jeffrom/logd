@@ -79,6 +79,9 @@ func init() {
 	pflags.DurationVar(&tmpConfig.FlushInterval, "flush-interval", config.Default.FlushInterval, "amount of time to wait before flushing")
 	viper.BindPFlag("flush-interval", pflags.Lookup("flush-interval"))
 
+	pflags.IntVar(&tmpConfig.MaxMessages, "max-messages", config.Default.MaxMessages, "maximum number of messages allowed in read and tail requests")
+	viper.BindPFlag("max-messages", pflags.Lookup("max-messages"))
+
 	pflags.IntVar(&tmpConfig.MaxTopics, "topics", config.Default.MaxTopics, "maximum number of allowed topics")
 	viper.BindPFlag("topics", pflags.Lookup("topics"))
 

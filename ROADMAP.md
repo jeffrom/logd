@@ -14,8 +14,7 @@
 ## 0.3.0
 
 - [ ] writer error handler / reconnect sequencing
-- [ ] server-side limit on number of messages returned for reads
-- [ ] yaml configuration files
+- [X] server-side limit on number of messages returned for reads
 - [ ] fix: events test attempts to reconnect to default host:port. it should
       instead try to reconnect to the test server's ephemeral host:port.
 
