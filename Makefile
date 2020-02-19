@@ -94,7 +94,7 @@ build.container:
 
 .PHONY: test
 test: $(gotestsum)
-	GO111MODULE=on gotestsum -f dots
+	GO111MODULE=on gotestsum -f dots -- -short ./...
 
 .PHONY: test.race
 test.race: $(gotestsum)

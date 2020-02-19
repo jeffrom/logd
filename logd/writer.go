@@ -90,7 +90,9 @@ type Writer struct {
 	backlogC     chan *Backlog
 	errh         ErrorHandler
 
-	retries      int
+	retries int
+	// timer is used to trigger flushing of batches, or reconnection interval
+	// if the writer is reconnecting.
 	timer        *time.Timer
 	timerStarted bool
 	batch        *protocol.Batch // owned by client goroutine
@@ -249,6 +251,7 @@ func (w *Writer) loop() {
 			// case stateClosed:
 			// 	w.stopTimer()
 			case stateConnected:
+				// flush any batches from a previous connection and reset
 				err := w.handleFlush()
 				w.err = err
 				if err == nil {

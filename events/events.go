@@ -254,6 +254,10 @@ func (q *eventQ) handleRead(req *protocol.Request) (*protocol.Response, error) {
 		return errResponse(q.conf, req, resp, err)
 	}
 
+	if readreq.Messages > q.conf.MaxMessages {
+		return errResponse(q.conf, req, resp, protocol.ErrInvalid)
+	}
+
 	topic := q.topic
 	if topic == nil {
 		return errResponse(q.conf, req, resp, protocol.ErrNotFound)
@@ -305,6 +309,10 @@ func (q *eventQ) handleTail(req *protocol.Request) (*protocol.Response, error) {
 	tailreq, err := protocol.NewTail(q.conf).FromRequest(req)
 	if err != nil {
 		return errResponse(q.conf, req, resp, err)
+	}
+
+	if tailreq.Messages > q.conf.MaxMessages {
+		return errResponse(q.conf, req, resp, protocol.ErrInvalid)
 	}
 
 	topic := q.topic
@@ -385,23 +393,10 @@ func (q *eventQ) handleConfig(req *protocol.Request) (*protocol.Response, error)
 func (q *eventQ) gatherReadArgs(topic *topic, offset uint64, messages int, newArgs *partitionArgList) (*partitionArgList, error) {
 	err := topic.idx.Query(offset, messages, newArgs)
 	return newArgs, err
-	// if err != nil {
-	// 	log.Printf("<%d, %d>: error w/ new query index: %+v", offset, messages, err)
-	// }
-
-	// // old way
-	// args, err := topic.Query(offset, messages)
-	// if err != nil {
-	// 	return args, err
-	// }
-
-	// if !newArgs.equals(args) {
-	// 	log.Printf("<%d, %d>: new args not equal to old:\n\nold: %+v\n\nnew: %v\n", offset, messages, args, newArgs)
-	// }
-	// return args, err
 }
 
 // handleShutdown handles a shutdown request
+// TODO remove this
 func (q *eventQ) handleShutdown() error {
 	// check if shutdown command is allowed and wait to finish any outstanding
 	// work here
