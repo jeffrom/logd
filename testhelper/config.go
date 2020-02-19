@@ -31,6 +31,7 @@ func DefaultConfig(verbose bool) *config.Config {
 		MaxBatchSize:    1024 * 2,
 		PartitionSize:   1024 * 5,
 		MaxPartitions:   5,
+		MaxMessages:     50000,
 	}
 
 	if !testing.Short() && IsCI() {
@@ -57,6 +58,7 @@ func IntegrationTestConfig(verbose bool) *config.Config {
 		MaxBatchSize:    1024 * 20,
 		PartitionSize:   1024 * 100,
 		MaxPartitions:   5,
+		MaxMessages:     50000,
 	}
 
 	return c

@@ -269,6 +269,18 @@ func TestUnknownCommand(t *testing.T) {
 	}
 }
 
+func TestReadOverMaxMessages(t *testing.T) {
+	conf := testhelper.DefaultConfig(testing.Verbose())
+	h := NewHandlers(conf)
+	doStartHandler(t, h)
+	defer doShutdownHandler(t, h)
+
+	res := string(pushRead(t, h, 0, 50001))
+	if res != "ERR invalid request\r\n" {
+		t.Fatal("expected invalid request, got:", res)
+	}
+}
+
 func checkNotFound(t testing.TB, conf *config.Config, b []byte) {
 	t.Helper()
 	if !bytes.HasPrefix(b, []byte("ERR")) {

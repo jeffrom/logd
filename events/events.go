@@ -254,6 +254,10 @@ func (q *eventQ) handleRead(req *protocol.Request) (*protocol.Response, error) {
 		return errResponse(q.conf, req, resp, err)
 	}
 
+	if readreq.Messages > q.conf.MaxMessages {
+		return errResponse(q.conf, req, resp, protocol.ErrInvalid)
+	}
+
 	topic := q.topic
 	if topic == nil {
 		return errResponse(q.conf, req, resp, protocol.ErrNotFound)
@@ -305,6 +309,10 @@ func (q *eventQ) handleTail(req *protocol.Request) (*protocol.Response, error) {
 	tailreq, err := protocol.NewTail(q.conf).FromRequest(req)
 	if err != nil {
 		return errResponse(q.conf, req, resp, err)
+	}
+
+	if tailreq.Messages > q.conf.MaxMessages {
+		return errResponse(q.conf, req, resp, protocol.ErrInvalid)
 	}
 
 	topic := q.topic
@@ -388,6 +396,7 @@ func (q *eventQ) gatherReadArgs(topic *topic, offset uint64, messages int, newAr
 }
 
 // handleShutdown handles a shutdown request
+// TODO remove this
 func (q *eventQ) handleShutdown() error {
 	// check if shutdown command is allowed and wait to finish any outstanding
 	// work here
