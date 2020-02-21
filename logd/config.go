@@ -184,10 +184,13 @@ var DefaultBenchConfig = &BenchConfig{
 	Verbose: false,
 }
 
+var cachedPort = 4771
+
 // DefaultTestConfig returns a testing configuration
 func DefaultTestConfig(verbose bool) *Config {
 	c := &Config{}
 	*c = *DefaultConfig
+	c.Host = fmt.Sprintf("127.0.0.1:%d", cachedPort)
 	c.Verbose = verbose
 	c.BatchSize = 1024 * 20
 	c.ReadTimeout = 100 * time.Millisecond
