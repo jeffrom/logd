@@ -32,10 +32,10 @@ spec:
             - --workdir=/opt/logd
           ports:
             - name: logd
-              containerPort: 1774
+              containerPort: {{ .Values.service.port }}
               protocol: TCP
             - name: http
-              containerPort: 1775
+              containerPort: {{ .Values.service.httpPort }}
               protocol: TCP
           livenessProbe:
             httpGet:

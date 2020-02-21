@@ -8,6 +8,10 @@ spec:
   type: {{ .Values.service.type }}
   ports:
     - port: {{ .Values.service.port }}
+      targetPort: logd
+      protocol: TCP
+      name: logd
+    - port: {{ .Values.service.httpPort }}
       targetPort: http
       protocol: TCP
       name: http
