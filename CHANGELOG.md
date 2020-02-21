@@ -1,4 +1,29 @@
 
+<a name="v0.3.0"></a>
+## [v0.3.0](https://github.com/jeffrom/logd/compare/v0.2.1...v0.3.0) (2020-02-21)
+
+### Chore
+
+* misc build cleanups
+* update depdendencies
+* update dep management in ci a bit ([#4](https://github.com/jeffrom/logd/issues/4))
+* update to go 1.13 ([#3](https://github.com/jeffrom/logd/issues/3))
+* **ci:** last fix for branch detection (i hope)
+* **ci:** fix branch-based benchark comparison
+
+### Doc
+
+* add some comparison data between go 1.12 and 1.13
+
+### Feat
+
+* limit max messages returned by read, tail
+
+### Fix
+
+* reconnect in tests would hit localhost 1774 ([#7](https://github.com/jeffrom/logd/issues/7))
+
+
 <a name="v0.2.1"></a>
 ## [v0.2.1](https://github.com/jeffrom/logd/compare/v0.2.0...v0.2.1) (2019-05-20)
 
