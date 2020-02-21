@@ -1,4 +1,12 @@
 
+<a name="v0.3.2"></a>
+## [v0.3.2](https://github.com/jeffrom/logd/compare/v0.3.1...v0.3.2) (2020-02-21)
+
+### Chore
+
+* trigger another build
+
+
 <a name="v0.3.1"></a>
 ## [v0.3.1](https://github.com/jeffrom/logd/compare/v0.3.0...v0.3.1) (2020-02-21)
 
