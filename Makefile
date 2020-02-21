@@ -24,6 +24,7 @@ gocoverutil := $(GOPATH)/bin/gocoverutil
 gotestsum := $(GOPATH)/bin/gotestsum
 benchcmp := $(GOPATH)/bin/benchcmp
 benchstat := $(GOPATH)/bin/benchstat
+godepgraph := $(GOPATH)/bin/godepgraph
 
 
 .PHONY: all
@@ -153,6 +154,9 @@ $(benchcmp):
 $(benchstat):
 	GO111MODULE=off go get golang.org/x/perf/cmd/benchstat
 
+$(godepgraph):
+	GO111MODULE=off go get github.com/kisielk/godepgraph
+
 .PHONY: check.deps
 check.deps:
 	./script/check-deps.sh
@@ -208,5 +212,5 @@ test.report.html:
 	go tool cover -html=report/cov.out -o report/cov.html
 
 .PHONY: report.depgraph
-report.depgraph:
+report.depgraph: $(godepgraph)
 	go list ./... | grep -v cmd | xargs godepgraph -s -p "github.com/pkg/errors" | dot -Tpng -o godepgraph.png

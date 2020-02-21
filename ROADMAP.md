@@ -15,7 +15,7 @@
 
 - [ ] writer error handler / reconnect sequencing
 - [X] server-side limit on number of messages returned for reads
-- [ ] fix: events test attempts to reconnect to default host:port. it should
+- [X] fix: events test attempts to reconnect to default host:port. it should
       instead try to reconnect to the test server's ephemeral host:port.
 
 ### testing
