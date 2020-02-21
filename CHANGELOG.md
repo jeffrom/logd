@@ -1,4 +1,12 @@
 
+<a name="v0.3.1"></a>
+## [v0.3.1](https://github.com/jeffrom/logd/compare/v0.3.0...v0.3.1) (2020-02-21)
+
+### Chore
+
+* fix goreleaser config
+
+
 <a name="v0.3.0"></a>
 ## [v0.3.0](https://github.com/jeffrom/logd/compare/v0.2.1...v0.3.0) (2020-02-21)
 
