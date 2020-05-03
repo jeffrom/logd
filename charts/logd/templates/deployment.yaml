@@ -50,7 +50,7 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /opt/logd
-							{{- if .Values.persistence.subPath }}
+              {{- if .Values.persistence.subPath }}
               subPath: {{ .Values.persistence.subPath }}
               {{- end }}
 
